@@ -1,0 +1,16 @@
+# Client
+client/node_modules
+client/dist
+client/.env
+
+# Server
+server/target
+server/.env
+
+# IntelliJ
+.idea
+*.iml
+
+# Misc
+tree.txt
+.DS_Store
