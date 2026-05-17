@@ -1,13 +1,11 @@
-import { useState } from 'react'
-import './App.css'
-
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <p>HI XD</p>
-    </>
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-white mb-4">Tailwind Works ✅</h1>
+          <p className="text-gray-400">Your setup is good. Start building.</p>
+        </div>
+      </div>
   )
 }
 
