@@ -3,9 +3,12 @@ spring:
     name: server
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://aws-1-ap-southeast-2.pooler.supabase.com:5432/postgres
-    username: postgres.yicgcmjayuctcjibjurb
-    password: Prepedge@123
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  hikari:
+    connection-timeout: 20000
+    maximum-pool-size: 5
   jpa:
     hibernate:
       ddl-auto: update
