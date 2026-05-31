@@ -44,7 +44,7 @@ export default function Navbar() {
               href="/signup"
               className="bg-gradient-to-r from-blue-600 to-blue-500 text-white mx-2 border-blue-500 rounded-4xl py-1 px-4 hover:from-blue-700 hover:to-blue-600 [box-shadow:0_2px_6px_rgba(0,0,255,0.35)] text-center transition-all duration-200"
             >
-              Sign Up Free
+              Sign Up
             </a>
           </div>
 

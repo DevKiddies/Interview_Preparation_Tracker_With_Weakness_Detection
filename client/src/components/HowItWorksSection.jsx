@@ -1,19 +1,19 @@
 const steps = [
   {
     number: '01',
-    title: 'Create your profile',
+    title: 'Create Your Profile',
     description:
       'Tell us your target company, experience level, and interview date. Takes 2 minutes.',
   },
   {
     number: '02',
-    title: 'Take mock tests',
+    title: 'Give Mock Test',
     description:
       'Attempt curated tests tailored to your goal. Get instant, detailed feedback.',
   },
   {
     number: '03',
-    title: 'Track & improve',
+    title: 'Find Weakness',
     description:
       "Study your radar chart. Fix weak spots. Repeat until you're ready to fly.",
   },

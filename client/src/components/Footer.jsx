@@ -1,5 +1,6 @@
 import { Globe, GitBranch, BarChart2, Send } from 'lucide-react'
 import { useState } from 'react'
+import Logo from "./ui/Logo.jsx";
 
 const platformLinks = ['Courses', 'Mock Tests', 'Dashboard', 'Community', 'Results']
 const companyLinks = ['About Us', 'Help Center', 'Admin', 'Blog', 'Careers']
@@ -15,12 +16,11 @@ export default function Footer() {
           {/* Brand col */}
           <div className="lg:col-span-2">
             <a href="/" className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">P</span>
+              <Logo className="w-10 h-10 text-blue-600"/>
+              <div className="text-gray-800 text-2xl font-bold mx-4 ml-2">
+                <p className="text-black inline">Prep</p>
+                <p className="text-blue-700 inline">Edge</p>
               </div>
-              <span className="text-gray-900 font-semibold text-sm">
-                Prep<span className="font-bold">Edge</span>
-              </span>
             </a>
             <p className="text-gray-500 text-xs leading-relaxed mb-5 max-w-xs">
               The intelligent interview preparation platform for ambitious developers. Master DSA,
@@ -39,21 +39,21 @@ export default function Footer() {
             </div>
 
             {/* Newsletter */}
-            <div className="mt-7 bg-white rounded-xl border border-gray-200 p-4">
-              <p className="text-gray-900 text-xs font-semibold pb-3">Stay updated</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 transition-colors"
-                />
-                <button className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors">
-                  <Send className="w-3.5 h-3.5 text-white" />
-                </button>
-              </div>
-            </div>
+            {/*<div className="mt-7 bg-white rounded-xl border border-gray-200 p-4">*/}
+            {/*  <p className="text-gray-900 text-xs font-semibold pb-3">Stay updated</p>*/}
+            {/*  <div className="flex items-center gap-2">*/}
+            {/*    <input*/}
+            {/*      type="email"*/}
+            {/*      placeholder="your@email.com"*/}
+            {/*      value={email}*/}
+            {/*      onChange={(e) => setEmail(e.target.value)}*/}
+            {/*      className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 transition-colors"*/}
+            {/*    />*/}
+            {/*    <button className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors">*/}
+            {/*      <Send className="w-3.5 h-3.5 text-white" />*/}
+            {/*    </button>*/}
+            {/*  </div>*/}
+            {/*</div>*/}
           </div>
 
           {/* Platform */}

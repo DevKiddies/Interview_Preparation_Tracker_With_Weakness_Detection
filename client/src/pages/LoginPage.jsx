@@ -2,11 +2,11 @@ import { User, Mail, Lock, Menu, X, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 // UI import for the navigation bar and error alert component
-import ErrorAlert from "./ui/ErrorAlert";
-import InputField from "./ui/InputFields";
+import ErrorAlert from "../components/ui/ErrorAlert.jsx";
+import InputField from "../components/ui/InputFields.jsx";
 
 // Validation utility import for the sign-up form
-import { validateSignupForm } from "../utils/validation";
+import { validateSignupForm } from "../utils/validation.jsx";
 
 function SignUpPage() {
   // Form state and error handling for the sign-up form
@@ -17,12 +17,14 @@ function SignUpPage() {
 
   // Form data state for the sign-up form.
   const [formData, setFormData] = useState({
-    fullName: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
     terms: false,
   });
+
+  const [success, setSuccess] = useState("");
 
   // FIXED: Consolidated to cleanly handle both standard inputs AND checkboxes dynamically
   const handleChange = (e) => {
@@ -34,43 +36,53 @@ function SignUpPage() {
   };
 
   // Handle form submission and update the inline error block instead of using browser alerts
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); // Clear previous errors
 
     // Run the external validation utility
     const validationError = validateSignupForm(formData);
-
     // If the utility returned a string error message, display it and stop submission
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    // Final payload preparation using your clean data from the form state.
-    // If it returned null, everything is clean! Proceed with submission logic.
-    const submissionPayload = {
-      fullName: formData.fullName.trim(),
-      email: formData.email.trim(),
-      password: formData.password,
-      terms: formData.terms,
-    };
-
-    console.log("Form Submitted Successfully:", submissionPayload);
-    // Next Step: Send submissionPayload to your backend API route here!
+    try { // Final payload preparation using your clean data from the form state.
+      // If it returned null, everything is clean! Proceed with submission logic.
+      const response = await fetch( "http://localhost:8080/api/auth/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+        }),
+      });
+      if(response.ok){
+        setSuccess("Account Created Successfully.");
+        setFormData({username: "", email: "", password: "", confirmPassword: "", terms: false});
+      }else{
+        const message = await response.text();
+        setError(message);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   return (
     <>
-      <div className="text-2xl text-center mx-auto border border-gray-300 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8">
+      {/*Added new wrap around to maintain the viewport to signup box only*/}
+      <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] w-full p-4 sm:p-6">
+
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm w-full max-w-sm p-6 sm:p-8">
         <form
           className="flex flex-col items-stretch justify-center gap-0.5 w-full"
           onSubmit={handleSubmit}
         >
           <div className="my-1 text-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-1 shadow-md">
-              <span className="text-2xl text-blue-700 font-bold">JD</span>
-            </div>
             <h2 className="text-xl font-bold">Create Your Account</h2>
             <p className="text-sm text-gray-400 font-light mb-6">
               Start your interview preparation with us today!
@@ -79,15 +91,20 @@ function SignUpPage() {
 
           {/* DYNAMIC ERROR MESSAGE WINDOW */}
           {error && <ErrorAlert message={error} />}
+          {success && (
+              <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-4 py-2.5 text-xs w-full mb-2">
+                {success}
+              </div>
+          )}
 
           {/* Full Name */}
           <InputField
-            label="Full Name"
-            id="fullName"
-            name="fullName"
+            label="Username"
+            id="username"
+            name="username"
             placeholder="John Doe"
             Icon={User}
-            value={formData.fullName}
+            value={formData.username}
             onChange={handleChange}
           />
 
@@ -166,20 +183,21 @@ function SignUpPage() {
 
           {/* Submit Button */}
           <button
-            className="bg-gradient-to-r from-blue-600 to-blue-500 text-white mt-2 border-blue-500 rounded-4xl py-2 px-4 hover:from-blue-700 hover:to-blue-600 [box-shadow:0_2px_6px_rgba(0,0,255,0.35)] text-center text-sm w-full cursor-pointer transition-all"
-            id="signUp"
-            type="submit"
+              className="bg-blue-600 text-white mt-2 rounded-lg py-2.5 px-4 hover:bg-blue-700 shadow-md shadow-blue-500/20 text-center text-sm w-full font-medium cursor-pointer transition-all"
+              id="signUp"
+              type="submit"
           >
             Sign Up
           </button>
 
-          <p className="text-sm text-gray-400 font-semilight mt-3 text-center w-full">
+          <p className="text-xs text-gray-500 font-normal mt-4 text-center w-full">
             Already have an account?{" "}
             <a href="/login" className="text-blue-500 hover:underline">
               Log in
             </a>
           </p>
         </form>
+      </div>
       </div>
     </>
   );

@@ -1,15 +1,15 @@
 import { CirclePlay, CheckCircle2, X } from 'lucide-react'
 
-const codeSnippet = `function twoSum(nums, target) {
-  const map = new Map();
-  for (let i = 0; i < nums.length; i++) {
-    const complement = target - nums[i];
-    if (map.has(complement)) {
-      return [map.get(complement), i];
-    }
-    map.set(nums[i], i);
-  }
-}`
+// const codeSnippet = `function twoSum(nums, target) {
+//   const map = new Map();
+//   for (let i = 0; i < nums.length; i++) {
+//     const complement = target - nums[i];
+//     if (map.has(complement)) {
+//       return [map.get(complement), i];
+//     }
+//     map.set(nums[i], i);
+//   }
+// }`
 
 export default function HeroSection() {
   return (
@@ -18,14 +18,6 @@ export default function HeroSection() {
         <div className="flex flex-col lg:flex-row items-center gap-12">
           {/* Left */}
           <div className="flex-1 max-w-xl">
-            <div className="inline-flex items-center gap-2 border border-indigo-200 bg-white text-indigo-700 text-xs font-medium px-3 py-1.5 rounded-full mb-6">
-              <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                NEW
-              </span>
-              System Design Masterclass is Live!
-              <X className="w-3 h-3 text-gray-400 cursor-pointer" />
-            </div>
-
             <h1 className="text-4xl md:text-5xl  leading-tight mb-4">
               <span className='font-bold text-gray-900'>Master the interview</span>
               <br />
