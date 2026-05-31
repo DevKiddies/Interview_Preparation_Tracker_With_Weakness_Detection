@@ -16,7 +16,7 @@ const LandingPage= () => {
               <FeaturesSection />
               <TestimonialsSection />
               <CTASection />
-              <Footer />
+
         </>      
     )
 }

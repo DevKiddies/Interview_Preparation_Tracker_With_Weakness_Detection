@@ -2,7 +2,6 @@ import { User, Mail, Lock, Menu, X, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 // UI import for the navigation bar and error alert component
-import Navbar from "./Navbar";
 import ErrorAlert from "./ui/ErrorAlert";
 import InputField from "./ui/InputFields";
 
@@ -63,8 +62,6 @@ function SignUpPage() {
 
   return (
     <>
-      <Navbar />
-
       <div className="text-2xl text-center mx-auto border border-gray-300 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8">
         <form
           className="flex flex-col items-stretch justify-center gap-0.5 w-full"
@@ -116,7 +113,15 @@ function SignUpPage() {
             Icon={Lock}
             value={formData.password}
             onChange={handleChange}
-          />
+          >
+            <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </InputField>
 
           {/* Confirm Password */}
           <InputField
@@ -126,9 +131,17 @@ function SignUpPage() {
             type={showPassword ? "text" : "password"}
             placeholder="Confirm Password"
             Icon={Lock}
-            value={formData.password}
+            value={formData.confirmPassword}
             onChange={handleChange}
-          />
+          >
+            <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            </InputField>
 
           {/* Terms Checkbox */}
           <div className="flex items-start mt-3 mb-4 text-left">

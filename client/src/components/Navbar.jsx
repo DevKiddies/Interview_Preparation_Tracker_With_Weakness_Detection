@@ -1,6 +1,7 @@
 import { User, Mail, Lock, Menu, X, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import Logo from "./ui/Logo";
+import {Link} from "react-router-dom";
 
 export default function Navbar() {
   // State for mobile menu toggle in the navigation bar.
@@ -9,11 +10,13 @@ export default function Navbar() {
     <>
       <nav className="bg-blue-50 px-4 py-3 sticky top-0 z-50 shadow-md">
         <div className="flex items-center">
-          <Logo className="w-10 h-10 text-blue-600" />
-          <div className="text-gray-800 text-2xl font-bold mx-4 ml-2">
-            <p className="text-black inline">Prep</p>
-            <p className="text-blue-700 inline">Edge</p>
-          </div>
+          <Link to="/" className="flex items-center">
+            <Logo className="w-10 h-10 text-blue-600"/>
+            <div className="text-gray-800 text-2xl font-bold mx-4 ml-2">
+              <p className="text-black inline">Prep</p>
+              <p className="text-blue-700 inline">Edge</p>
+            </div>
+          </Link>
 
           <div className="hidden sm:flex items-center">
             <a href="/courses" className="text-gray-800 mx-4 cursor-pointer">
