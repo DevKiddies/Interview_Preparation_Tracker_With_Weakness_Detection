@@ -3,7 +3,7 @@ function InputField({ label, id, name, type = "text", placeholder, value, onChan
     <div className="flex flex-col items-start mt-2 w-full">
       <label htmlFor={id} className="text-xs mb-1">{label}</label>
       <div className="relative w-full">
-        {Icon && <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />}
+        {Icon && <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1 text-gray-400" />}
         <input
           type={type}
           id={id}
