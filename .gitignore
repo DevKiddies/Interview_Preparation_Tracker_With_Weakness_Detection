@@ -14,3 +14,8 @@ server/.env
 # Misc
 tree.txt
 .DS_Store
+
+# For password not to push to GitHub
+application.yaml
+.env
+target/

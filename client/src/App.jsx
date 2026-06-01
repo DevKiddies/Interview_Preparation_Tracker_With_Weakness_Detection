@@ -5,39 +5,46 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-import LoginPage from "./components/LoginPage";
+
+// Shared Layout Components
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+
+// Pages & Feature Components
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./components/SignUpPage";
 import SignUpVerification from "./components/SignUpVerification";
 import OnBoardingPage from "./components/OnBoardingPage";
-// Import the Home component (Placeholder for your teammate's branch sync)
-import HomePage from "./components/HomePage"; 
-
-function App() {
+const App = () => {
   return (
-    <Router>
-      <Routes>
-        {/* 1. Root path automatically redirects users to the login screen */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+    <div className="flex min-h-screen flex-col bg-white">
+      {/* Global Header Layout Component from Suhani's Branch */}
+      <Navbar />
+      
+      {/* Dynamic Route Content Block */}
+      <main className="flex-grow">
+        <Routes>
+          {/* 1. Public Marketing Landing Page */}
+          <Route path="/" element={<LandingPage />} />
 
-        {/* 2. Authentication Application Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
+          {/* 2. Authentication Flow Channels */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/verify" element={<SignUpVerification />} />
 
-        {/* 3. Verification route */}
-        <Route path="/verify" element={<SignUpVerification />} />
+          {/* 3. Personalized User Onboarding Wizard */}
+          <Route path="/onboarding" element={<OnBoardingPage />} />
 
-        {/* 4. Onboarding route for new users after successful signup */}
-        <Route path="/onboarding" element={<OnBoardingPage />} />
+          {/* 4. Global Fallback Route (Ensures broken paths loop safely to root) */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
 
-        {/* 5. Main Platform Landing/Dashboard (Pulled from your teammate's branch) */}
-        <Route path="/dashboard" element={<HomePage />} />
-
-        {/* 6. CRITICAL FALLBACK (MUST BE LAST): 
-             Catches unknown routes and handles redirection without breaking real paths */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+      {/* Global Footer Layout Component from Suhani's Branch */}
+      <Footer />
+    </div>
   );
-}
+};
 
 export default App;
