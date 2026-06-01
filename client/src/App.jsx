@@ -9,6 +9,8 @@ import LoginPage from "./components/LoginPage";
 import SignUpPage from "./components/SignUpPage";
 import SignUpVerification from "./components/SignUpVerification";
 import OnBoardingPage from "./components/OnBoardingPage";
+// Import the Home component (Placeholder for your teammate's branch sync)
+import HomePage from "./components/HomePage"; 
 
 function App() {
   return (
@@ -21,15 +23,18 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
 
-        {/* 3. Verification route accepts an optional email parameter via URL query.
-           (e.g., /verify?email=user@example.com)
-         */}
+        {/* 3. Verification route */}
         <Route path="/verify" element={<SignUpVerification />} />
 
-        {/* 4. Fallback 404 Route - Redirects back to login if path doesn't exist */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-        {/* 5. Onboarding route for new users after successful signup */}
+        {/* 4. Onboarding route for new users after successful signup */}
         <Route path="/onboarding" element={<OnBoardingPage />} />
+
+        {/* 5. Main Platform Landing/Dashboard (Pulled from your teammate's branch) */}
+        <Route path="/dashboard" element={<HomePage />} />
+
+        {/* 6. CRITICAL FALLBACK (MUST BE LAST): 
+             Catches unknown routes and handles redirection without breaking real paths */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
