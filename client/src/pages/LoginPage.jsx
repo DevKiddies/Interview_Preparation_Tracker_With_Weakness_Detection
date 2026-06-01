@@ -72,6 +72,34 @@ function LoginPage() {
               </p>
             </div>
 
+            {/* RESTORED: Your Social Authentication Integration */}
+            <div className="flex flex-col gap-2.5">
+              <button
+                className="flex items-center justify-center gap-2 border border-gray-300 rounded-4xl py-2 px-4 hover:bg-gray-100 cursor-pointer transition-colors w-full"
+                type="button"
+              >
+                <img src="https://img.icons8.com/fluency/96/google-logo.png" alt="Google" className="w-5 h-5"/>
+                <span className="text-sm font-medium text-gray-700">Sign in with Google</span>
+              </button>
+              <button
+                className="flex items-center justify-center gap-2 border border-gray-300 rounded-4xl py-2 px-4 hover:bg-gray-100 cursor-pointer transition-colors w-full"
+                type="button"
+              >
+                <img src="https://img.icons8.com/fluency/96/github.png" alt="GitHub" className="w-5 h-5"/>
+                <span className="text-sm font-medium text-gray-700">Sign in with GitHub</span>
+              </button>
+            </div>
+
+            {/* RESTORED: Your Decorative Divider Split */}
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-3 text-gray-400 font-medium">Or continue with</span>
+              </div>
+            </div>
+
             {/* DYNAMIC ERROR MESSAGE WINDOW */}
             {error && <ErrorAlert message={error} />}
 

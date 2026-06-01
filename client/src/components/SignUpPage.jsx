@@ -4,7 +4,6 @@ import { Link } from "react-router-dom"; // <-- Importing Link for client-side n
 import { useNavigate } from "react-router-dom"; // <-- Importing useNavigate for programmatic navigation
 
 // UI import for the navigation bar and error alert component
-import Navbar from "./Navbar";
 import ErrorAlert from "./ui/ErrorAlert";
 import InputField from "./ui/InputFields";
 
@@ -65,8 +64,6 @@ function SignUpPage() {
 
   return (
     <>
-      <Navbar />
-
       <div className="text-2xl text-center mx-auto border border-gray-300 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8">
         <form
           className="flex flex-col items-stretch justify-center gap-0.5 w-full"
