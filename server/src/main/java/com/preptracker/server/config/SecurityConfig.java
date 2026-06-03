@@ -15,16 +15,15 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(){
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("http://localhost:5173"));
-        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
         config.setAllowedHeaders(List.of("*"));
-        return source ->{
-            UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
-            s.registerCorsConfiguration("/**",config);
-            return s.getCorsConfiguration(source);
-        };
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     @Bean
@@ -33,12 +32,22 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
-        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable()) //CSRF:Cross Site Request Forgery is disabled because we are using JWT for auth.
-                .authorizeHttpRequests(auth-> auth
-                        .requestMatchers("/api/auth/**").permitAll() // if api/auth/<anything> is permitted
-                .anyRequest() .authenticated()); //else check for token
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                // 1. Explicitly enable CORS and link your configuration source
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // 2. Disable CSRF (fine for JWT/stateless APIs)
+                .csrf(csrf -> csrf.disable())
+
+                // 3. Configure your requests
+                .authorizeHttpRequests(auth -> auth
+                        // You don't actually need the manual OPTIONS matcher if CORS is configured correctly above,
+                        // but keeping it or letting Spring handle it is fine.
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .anyRequest().authenticated()
+                );
+
         return http.build();
     }
 }

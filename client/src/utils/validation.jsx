@@ -24,13 +24,13 @@ export const validateSignupForm = (formData) => {
 
   // Name Rules
   if (!usernameRegex.test(usernameTrimmed)) {
-    return "Name can only contain letters and spaces.";
+    return "Username can only contain letters, numbers, and underscores.";
   }
   if (usernameTrimmed.length < 3) {
     return "Name must be at least 3 characters.";
   }
-  if (usernameTrimmed.length > 50) {
-    return "Name cannot exceed 50 characters.";
+  if (usernameTrimmed.length > 20) {
+    return "Username cannot exceed 20 characters.";
   }
 
   // Email Rules

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import Navbar from "./Navbar";
-import FormStepper from "./ui/FormStepper";
-import Card from "./ui/Card";
+import Navbar from "../components/Navbar.jsx";
+import FormStepper from "../components/ui/FormStepper.jsx";
+import Card from "../components/ui/Card.jsx";
 
 function OnBoardingPage() {
   const steps = [

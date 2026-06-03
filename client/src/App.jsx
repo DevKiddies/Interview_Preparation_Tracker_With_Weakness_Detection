@@ -13,9 +13,9 @@ import Footer from "./components/Footer";
 // Pages & Feature Components
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
-import SignUpPage from "./components/SignUpPage";
+import SignUpPage from "./pages/SignUpPage.jsx";
 import SignUpVerification from "./components/SignUpVerification";
-import OnBoardingPage from "./components/OnBoardingPage";
+import OnBoardingPage from "./pages/OnBoardingPage.jsx";
 const App = () => {
   return (
     <div className="flex min-h-screen flex-col bg-white">
