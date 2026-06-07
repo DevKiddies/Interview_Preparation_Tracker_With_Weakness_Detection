@@ -14,8 +14,9 @@ import Footer from "./components/Footer";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage.jsx";
-import SignUpVerification from "./components/SignUpVerification";
+import UserVerificationPage from "./pages/UserVerificationPage";
 import OnBoardingPage from "./pages/OnBoardingPage.jsx";
+import WorkInProgress from "./pages/WorkInProgress.jsx";
 const App = () => {
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -31,13 +32,13 @@ const App = () => {
           {/* 2. Authentication Flow Channels */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/verify" element={<SignUpVerification />} />
+          <Route path="/verify" element={<UserVerificationPage />} />
 
           {/* 3. Personalized User Onboarding Wizard */}
           <Route path="/onboarding" element={<OnBoardingPage />} />
 
           {/* 4. Global Fallback Route (Ensures broken paths loop safely to root) */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<WorkInProgress />} />
         </Routes>
       </main>
 

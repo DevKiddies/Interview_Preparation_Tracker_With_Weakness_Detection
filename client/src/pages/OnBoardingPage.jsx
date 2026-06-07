@@ -52,8 +52,6 @@ function OnBoardingPage() {
 
   return (
     <>
-      <Navbar />
-      
       {/* Visual Form Progress Tracker */}
       <div className="max-w-xl mx-auto mt-8 px-4">
         <FormStepper steps={steps} currentStep={currentStep} />

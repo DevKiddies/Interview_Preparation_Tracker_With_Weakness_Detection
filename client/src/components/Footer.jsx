@@ -1,113 +1,80 @@
-import { Globe, GitBranch, BarChart2, Send } from 'lucide-react'
-import { useState } from 'react'
+import { Send } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Logo from "./ui/Logo.jsx";
 
-const platformLinks = ['Courses', 'Mock Tests', 'Dashboard', 'Community', 'Results']
-const companyLinks = ['About Us', 'Help Center', 'Admin', 'Blog', 'Careers']
-const legalLinks = ['Terms of Service', 'Privacy Policy', 'Cookie Policy', 'Security']
-
 export default function Footer() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState('');
+
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    setEmail('');
+  };
 
   return (
-    <footer className="bg-[#eef0f8] border-t border-gray-200">
-      <div className="max-w-7xl mx-auto px-6 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
-          {/* Brand col */}
-          <div className="lg:col-span-2">
-            <a href="/" className="flex items-center gap-2 mb-3">
-              <Logo className="w-10 h-10 text-blue-600"/>
-              <div className="text-gray-800 text-2xl font-bold mx-4 ml-2">
-                <p className="text-black inline">Prep</p>
-                <p className="text-blue-700 inline">Edge</p>
-              </div>
-            </a>
-            <p className="text-gray-500 text-xs leading-relaxed mb-5 max-w-xs">
-              The intelligent interview preparation platform for ambitious developers. Master DSA,
-              system design, and land your dream role.
-            </p>
-            <div className="flex items-center gap-3">
-              {[Globe, GitBranch, BarChart2].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-                >
-                  <Icon className="w-4 h-4 text-gray-500" />
-                </a>
-              ))}
+      <footer className="border-t border-slate-100 bg-slate-50/50 px-6 py-10">
+        <div className="max-w-7xl mx-auto">
+
+          {/* Main Grid: Clean structural split */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pb-8 border-b border-slate-200/60">
+
+            {/* Left Column: Vertical Brand Stacking */}
+            <div className="flex flex-col items-center md:items-start text-center md:text-left">
+              <Link to="/" className="flex items-center gap-2 group mb-2.5">
+                <Logo className="w-6 h-6 text-blue-600 transition-transform group-hover:rotate-6" />
+                <span className="text-lg font-black tracking-tight">
+                <span className="text-slate-900">Prep</span>
+                <span className="text-blue-600">Edge</span>
+              </span>
+              </Link>
+              <p className="text-xs font-medium text-slate-400 max-w-xs leading-relaxed">
+                The intelligent interview preparation platform for ambitious software engineers.
+              </p>
             </div>
 
-            {/* Newsletter */}
-            {/*<div className="mt-7 bg-white rounded-xl border border-gray-200 p-4">*/}
-            {/*  <p className="text-gray-900 text-xs font-semibold pb-3">Stay updated</p>*/}
-            {/*  <div className="flex items-center gap-2">*/}
-            {/*    <input*/}
-            {/*      type="email"*/}
-            {/*      placeholder="your@email.com"*/}
-            {/*      value={email}*/}
-            {/*      onChange={(e) => setEmail(e.target.value)}*/}
-            {/*      className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 transition-colors"*/}
-            {/*    />*/}
-            {/*    <button className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center justify-center transition-colors">*/}
-            {/*      <Send className="w-3.5 h-3.5 text-white" />*/}
-            {/*    </button>*/}
-            {/*  </div>*/}
-            {/*</div>*/}
+            {/* Right Column: Interactive Elements & Links */}
+            <div className="flex flex-col items-center md:items-end gap-6">
+              {/* Targeted Micro-Newsletter */}
+              <div className="w-full max-w-xs">
+                <label htmlFor="footer-email" className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 text-center md:text-left">
+                  Get system updates
+                </label>
+                <form
+                    onSubmit={handleSubscribe}
+                    className="relative flex items-center bg-white border border-slate-200 rounded-full p-1 focus-within:border-blue-500 transition-colors h-9 shadow-sm"
+                >
+                  <input
+                      id="footer-email"
+                      type="email"
+                      placeholder="name@domain.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="flex-1 bg-transparent text-xs text-slate-800 px-3 outline-none placeholder-slate-400"
+                  />
+                  <button
+                      type="submit"
+                      className="bg-blue-600  hover:from-blue-700 text-white p-1.5 rounded-full transition-all active:scale-95 shrink-0 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30"
+                      aria-label="Subscribe"
+                  >
+                    <Send className="w-3 h-3" />
+                  </button>
+                </form>
+              </div>
+            </div>
+
           </div>
 
-          {/* Platform */}
-          <div>
-            <p className="text-gray-900 text-xs font-semibold mb-4">Platform</p>
-            <ul className="space-y-2.5">
-              {platformLinks.map((link) => (
-                <li key={link}>
-                  <a href="#" className="text-gray-500 text-xs hover:text-gray-800 transition-colors">
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
+          {/* Bottom Meta Bar: Perfect Horizontal Baseline Alignment */}
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-semibold text-slate-400 tracking-wider uppercase">
+            <p className="select-none">© 2026 PREPEDGE. ALL RIGHTS RESERVED.</p>
+            <div className="flex items-center gap-6 font-bold text-slate-500 normal-case tracking-normal">
+              <Link to="/about" className="hover:text-blue-600 transition-colors">About</Link>
+              <Link to="/help" className="hover:text-blue-600 transition-colors">Help</Link>
+            </div>
           </div>
 
-          {/* Company */}
-          <div>
-            <p className="text-gray-900 text-xs font-semibold mb-4">Company</p>
-            <ul className="space-y-2.5">
-              {companyLinks.map((link) => (
-                <li key={link}>
-                  <a href="#" className="text-gray-500 text-xs hover:text-gray-800 transition-colors">
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <p className="text-gray-900 text-xs font-semibold mb-4">Legal</p>
-            <ul className="space-y-2.5">
-              {legalLinks.map((link) => (
-                <li key={link}>
-                  <a href="#" className="text-gray-500 text-xs hover:text-gray-800 transition-colors">
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
-      </div>
-
-      <div className="border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <p className="text-gray-400 text-xs">
-            © 2026 PrepEdge. All rights reserved. Built with{' '}
-            <span className="text-red-500">♥</span> for developers.
-          </p>
-        </div>
-      </div>
-    </footer>
-  )
+      </footer>
+  );
 }
