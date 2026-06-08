@@ -10,6 +10,7 @@ import com.preptracker.server.repository.UserRepository;
 import com.preptracker.server.repository.VerificationTokenRepository;
 import com.preptracker.server.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
+    private final TokenBlackListService tokenBlackListService;
 
     public AuthResponse register(RegisterRequest request){
 
@@ -93,5 +95,17 @@ public class AuthService {
         verificationTokenRepository.save(verificationToken);
         userRepository.save(user);
         return new AuthResponse(token);
+    }
+
+    @Value("${jwt.expiration}")
+    private long expirationMs;
+
+    public AuthResponse logout(String authHeader){
+        if(authHeader==null || !authHeader.startsWith("Bearer ")){
+            throw new RuntimeException("Invalid Authorization Header");
+        }
+        String token = authHeader.substring(7);
+        tokenBlackListService.blacklistToken(token, expirationMs);
+        return new AuthResponse("Logged Out Successfully");
     }
 }
