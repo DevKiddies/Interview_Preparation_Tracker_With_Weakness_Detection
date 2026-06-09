@@ -71,10 +71,12 @@ public class AuthService {
             user = userRepository.findByUsername(request.getIdentifier())
                     .orElseThrow(()->new RuntimeException("Username Do Not Exist"));
         }
+        if(!user.getIsVerified()){
+            throw new RuntimeException("Email Not Verified!");
+        }
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())){
             throw new RuntimeException("Invalid Password");
         }
-
         String token = jwtUtil.generateToken(user);
         return new AuthResponse(token);
     }
