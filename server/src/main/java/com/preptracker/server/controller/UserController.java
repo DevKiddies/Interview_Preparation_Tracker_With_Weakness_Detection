@@ -1,23 +1,19 @@
 package com.preptracker.server.controller;
 
-import java.util.UUID;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.preptracker.server.dto.OnboardingRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
 import com.preptracker.server.model.User;
 import com.preptracker.server.service.UserService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,13 +22,11 @@ public class UserController {
 
     private final UserService userService;
 
-    // GET /api/users/{id}
     @GetMapping("/{id}")
     public ResponseEntity<User> getUser(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    // PUT /api/users/{id}/username
     @PutMapping("/{id}/username")
     public ResponseEntity<User> updateUsername(
             @PathVariable UUID id,
@@ -40,7 +34,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUsername(id, request));
     }
 
-    // PUT /api/users/{id}/password
     @PutMapping("/{id}/password")
     public ResponseEntity<String> updatePassword(
             @PathVariable UUID id,
@@ -49,10 +42,32 @@ public class UserController {
         return ResponseEntity.ok("Password updated successfully");
     }
 
-    // DELETE /api/users/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);
         return ResponseEntity.ok("User deleted successfully");
+    }
+
+    @PostMapping("/onboarding")
+    public ResponseEntity<String> completeOnboarding(@RequestBody OnboardingRequest request) {
+        String userId = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        userService.completeOnboarding(UUID.fromString(userId), request);
+        return ResponseEntity.ok("Onboarding complete!");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<Map<String, Object>> getMe() {
+        String userId = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        User user = userService.getUserById(UUID.fromString(userId));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", user.getId());
+        response.put("email", user.getEmail());
+        response.put("username", user.getUsername());
+        response.put("onboarded", user.getIsOnboarded());
+
+        return ResponseEntity.ok(response);
     }
 }

@@ -1,31 +1,31 @@
 package com.preptracker.server.service;
 
-import java.util.UUID;
-
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-
+import com.preptracker.server.dto.OnboardingRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
 import com.preptracker.server.model.User;
+import com.preptracker.server.model.UserProfile;
+import com.preptracker.server.repository.UserProfileRepository;
 import com.preptracker.server.repository.UserRepository;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor  // Lombok generates constructor injection (same style as AuthController)
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder; // Injected from SecurityConfig @Bean
+    private final PasswordEncoder passwordEncoder;
+    private final UserProfileRepository userProfileRepository; 
 
-    // READ - Get user by ID
     public User getUserById(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
-    // UPDATE - Change username
     public User updateUsername(UUID id, UpdateUsernameRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
@@ -35,15 +35,13 @@ public class UserService {
         }
 
         user.setUsername(request.getNewUsername());
-        return userRepository.save(user); // @UpdateTimestamp on updatedAt auto-fires here
+        return userRepository.save(user);
     }
 
-    // UPDATE - Change password
     public void updatePassword(UUID id, UpdatePasswordRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
 
-        // BCrypt check against stored hashed password (from your SecurityConfig)
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new RuntimeException("Old password is incorrect");
         }
@@ -56,11 +54,29 @@ public class UserService {
         userRepository.save(user);
     }
 
-    // DELETE - Remove user
     public void deleteUser(UUID id) {
         if (!userRepository.existsById(id)) {
             throw new RuntimeException("User not found with id: " + id);
         }
         userRepository.deleteById(id);
+    }
+
+    public void completeOnboarding(UUID userId, OnboardingRequest request) {
+        // 1. Save/update profile in user_profiles table
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElse(new UserProfile()); 
+
+        profile.setUserId(userId);
+        profile.setTargetCompany(request.getTargetCompany());
+        profile.setInterviewDate(request.getInterviewDate());
+        profile.setExperienceLevel(request.getExperienceLevel());
+        profile.setFocusTopics(String.join(",", request.getFocusTopics()));
+        userProfileRepository.save(profile);
+
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+        user.setIsOnboarded(true);
+        userRepository.save(user);
     }
 }
