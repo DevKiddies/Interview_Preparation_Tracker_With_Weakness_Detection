@@ -17,5 +17,5 @@ tree.txt
 
 # For password not to push to GitHub
 application.yaml
-.env
+
 target/

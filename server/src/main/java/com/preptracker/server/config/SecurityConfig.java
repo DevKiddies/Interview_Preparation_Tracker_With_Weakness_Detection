@@ -33,7 +33,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder(){ // This is not class, this is method!, By using @Bean it makes the method injectable anywhere!, like in this case in AuthService.
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
@@ -58,3 +58,6 @@ public class SecurityConfig {
         return http.build();
     }
 }
+
+// Important: The .permitAll() on /api/users/** is temporary for testing. Once your team implements JWT token 
+// parsing (a JwtAuthFilter), change it to .authenticated() so users can only modify their own data with a valid token.
