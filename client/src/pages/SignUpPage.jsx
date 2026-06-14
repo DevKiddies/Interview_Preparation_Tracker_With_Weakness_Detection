@@ -1,6 +1,6 @@
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate} from "react-router-dom";
 
 import ErrorAlert from "../components/ui/ErrorAlert.jsx";
 import InputField from "../components/ui/InputFields.jsx";
@@ -18,7 +18,7 @@ function SignUpPage() {
     confirmPassword: "",
     terms: false,
   });
-
+  const navigate = useNavigate();
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -51,8 +51,7 @@ function SignUpPage() {
       });
 
       if (response.ok) {
-        setSuccess("Account created successfully! You can now log in.");
-        setFormData({ username: "", email: "", password: "", confirmPassword: "", terms: false });
+        navigate("/verify");
       } else {
         const message = await response.text();
         setError(message);
@@ -64,13 +63,11 @@ function SignUpPage() {
 
   return (
       <>
+
         <div className="text-2xl text-center mx-auto border border-gray-300 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8">
           <form className="flex flex-col items-stretch justify-center gap-0.5 w-full" onSubmit={handleSubmit}>
 
             <div className="my-1 text-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-1 shadow-md">
-                <span className="text-2xl text-blue-700 font-bold">JD</span>
-              </div>
               <h2 className="text-xl font-bold">Create Your Account</h2>
               <p className="text-sm text-gray-400 font-light mb-6">
                 Start your interview preparation with us today!

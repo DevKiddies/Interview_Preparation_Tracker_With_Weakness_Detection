@@ -1,47 +1,63 @@
-// src/App.jsx
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-// Shared Layout Components
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-
-// Pages & Feature Components
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage.jsx";
-import SignUpVerification from "./components/SignUpVerification";
+import UserVerificationPage from "./pages/UserVerificationPage";
 import OnBoardingPage from "./pages/OnBoardingPage.jsx";
+import WorkInProgress from "./pages/WorkInProgress.jsx";
+
+function GitHubCallback() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    const error = params.get("error");
+
+    if (error || !token) {
+      navigate("/login?error=github_login_failed", { replace: true });
+      return;
+    }
+
+    localStorage.setItem("token", token);
+
+    fetch("http://localhost:8080/api/users/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((me) => {
+        navigate(me.onboarded ? "/dashboard" : "/onboarding", { replace: true });
+      })
+      .catch(() => {
+        navigate("/login?error=something_went_wrong", { replace: true });
+      });
+  }, [location.search, navigate]);
+
+  return <p className="text-center mt-20 text-gray-500">Signing you in...</p>;
+}
+
 const App = () => {
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      {/* Global Header Layout Component from Suhani's Branch */}
       <Navbar />
-      
-      {/* Dynamic Route Content Block */}
       <main className="flex-grow">
         <Routes>
-          {/* 1. Public Marketing Landing Page */}
           <Route path="/" element={<LandingPage />} />
-
-          {/* 2. Authentication Flow Channels */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/verify" element={<SignUpVerification />} />
-
-          {/* 3. Personalized User Onboarding Wizard */}
+          <Route path="/verify" element={<UserVerificationPage />} />
           <Route path="/onboarding" element={<OnBoardingPage />} />
-
-          {/* 4. Global Fallback Route (Ensures broken paths loop safely to root) */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/auth/callback" element={<GitHubCallback />} />
+          <Route path="/dashboard" element={<WorkInProgress />} />
+          <Route path="*" element={<WorkInProgress />} />
         </Routes>
       </main>
-
-      {/* Global Footer Layout Component from Suhani's Branch */}
       <Footer />
     </div>
   );
