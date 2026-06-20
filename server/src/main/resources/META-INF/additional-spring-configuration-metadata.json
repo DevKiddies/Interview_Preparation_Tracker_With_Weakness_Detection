@@ -1,0 +1,14 @@
+{
+  "properties": [
+    { "name": "jwt.secret", "type": "java.lang.String", "description": "JWT signing secret key." },
+    { "name": "jwt.expiration", "type": "java.lang.Long", "description": "JWT token expiration in milliseconds." },
+    { "name": "brevo.api-key", "type": "java.lang.String", "description": "Brevo (Sendinblue) API key for email sending." },
+    { "name": "brevo.sender-email", "type": "java.lang.String", "description": "Brevo sender email address." },
+    { "name": "brevo.sender-name", "type": "java.lang.String", "description": "Brevo sender display name." },
+    { "name": "google.client-id", "type": "java.lang.String", "description": "Google OAuth2 client ID." },
+    { "name": "github.client-id", "type": "java.lang.String", "description": "GitHub OAuth2 client ID." },
+    { "name": "github.client-secret", "type": "java.lang.String", "description": "GitHub OAuth2 client secret." },
+    { "name": "github.redirect-uri", "type": "java.lang.String", "description": "GitHub OAuth2 redirect URI." },
+    { "name": "github.frontend-url", "type": "java.lang.String", "description": "Frontend URL for GitHub OAuth redirect." }
+  ]
+}

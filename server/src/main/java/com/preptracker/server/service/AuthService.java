@@ -11,6 +11,7 @@ import com.preptracker.server.repository.VerificationTokenRepository;
 import com.preptracker.server.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -149,11 +150,11 @@ public class AuthService {
             headers.setBearerAuth(accessToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<Map> googleResponse = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> googleResponse = restTemplate.exchange(
                     "https://www.googleapis.com/oauth2/v3/userinfo",
                     HttpMethod.GET,
                     entity,
-                    Map.class);
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             Map<String, Object> userInfo = googleResponse.getBody();
             if (userInfo == null) {
@@ -210,8 +211,9 @@ public class AuthService {
             tokenHeaders.set("Accept", "application/json");
             HttpEntity<String> tokenEntity = new HttpEntity<>(tokenHeaders);
 
-            ResponseEntity<Map> tokenResponse = restTemplate.exchange(
-                    tokenUrl, HttpMethod.POST, tokenEntity, Map.class);
+            ResponseEntity<Map<String, Object>> tokenResponse = restTemplate.exchange(
+                    tokenUrl, HttpMethod.POST, tokenEntity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             String accessToken = (String) tokenResponse.getBody().get("access_token");
             if (accessToken == null) {
@@ -222,9 +224,10 @@ public class AuthService {
             userHeaders.setBearerAuth(accessToken);
             HttpEntity<String> userEntity = new HttpEntity<>(userHeaders);
 
-            ResponseEntity<Map> userResponse = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> userResponse = restTemplate.exchange(
                     "https://api.github.com/user",
-                    HttpMethod.GET, userEntity, Map.class);
+                    HttpMethod.GET, userEntity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             Map<String, Object> userInfo = userResponse.getBody();
             String githubId = String.valueOf(userInfo.get("id"));
@@ -233,9 +236,10 @@ public class AuthService {
 
             String email = (String) userInfo.get("email");
             if (email == null) {
-                ResponseEntity<List> emailResponse = restTemplate.exchange(
+                ResponseEntity<List<Map<String, Object>>> emailResponse = restTemplate.exchange(
                         "https://api.github.com/user/emails",
-                        HttpMethod.GET, userEntity, List.class);
+                        HttpMethod.GET, userEntity,
+                        new ParameterizedTypeReference<List<Map<String, Object>>>() {});
                 List<Map<String, Object>> emails = emailResponse.getBody();
                 email = emails.stream()
                         .filter(e -> Boolean.TRUE.equals(e.get("primary")))

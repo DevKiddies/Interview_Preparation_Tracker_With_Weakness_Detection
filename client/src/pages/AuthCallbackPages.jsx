@@ -27,7 +27,7 @@ function AuthCallbackPage() {
       .catch(() => {
         navigate("/login?error=something_went_wrong");
       });
-  }, []);
+  }, [navigate, searchParams]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#f8fafc]">
