@@ -1,6 +1,7 @@
 package com.preptracker.server.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,10 +21,13 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
 
+    @Value("${github.frontend-url}")
+    private String frontendUrl;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOrigins(List.of(frontendUrl));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
         config.setAllowedHeaders(List.of("*"));
 
@@ -40,16 +44,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Explicitly enable CORS and link your configuration source
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // 2. Disable CSRF (fine for JWT/stateless APIs)
                 .csrf(csrf -> csrf.disable())
-
-                // 3. Configure your requests
                 .authorizeHttpRequests(auth -> auth
-                        // You don't actually need the manual OPTIONS matcher if CORS is configured correctly above,
-                        // but keeping it or letting Spring handle it is fine.w
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -58,6 +55,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-
-// Important: The .permitAll() on /api/users/** is temporary for testing. Once your team implements JWT token 
-// parsing (a JwtAuthFilter), change it to .authenticated() so users can only modify their own data with a valid token.

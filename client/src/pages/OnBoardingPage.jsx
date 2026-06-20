@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FormStepper from "../components/ui/FormStepper.jsx";
 import Card from "../components/ui/Card.jsx";
+import API_BASE from "../utils/api.js";
 
 function OnBoardingPage() {
   const steps = [
@@ -44,7 +45,7 @@ function OnBoardingPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8080/api/users/onboarding", {
+      const response = await fetch(`${API_BASE}/api/users/onboarding`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -144,7 +145,7 @@ function TargetStep({ formData, setFormData }) {
             <div
               key={target.id}
               onClick={() => setFormData({ ...formData, targetCompany: target.id })}
-              className={`w-full sm:w-[calc(50%-0.5rem)] p-6 rounded-xl cursor-pointer transition-all flex flex-col items-center justify-center min-h-[120px] box-border border ${
+              className={`w-full sm:w-[calc(50%-0.5rem)] p-6 rounded-xl cursor-pointer transition-all flex flex-col items-center justify-center min-h-30 box-border border ${
                 isSelected
                   ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100"
                   : "bg-white border-gray-200 text-slate-700 hover:bg-slate-50"
