@@ -48,13 +48,12 @@ public class User {
     private String googleId;
 
     @Column(name = "github_id", nullable = true)
-private String githubId;
+    private String githubId;
 
     @Column(name = "auth_provider", nullable = false)
     private String authProvider = "LOCAL";
 
     @Column(name = "is_onboarded", nullable = false)
     private Boolean isOnboarded = false;
-
 
 }
