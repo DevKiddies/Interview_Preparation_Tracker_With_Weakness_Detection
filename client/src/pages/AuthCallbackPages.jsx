@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import API_BASE from "../utils/api.js";
 
 function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -16,7 +17,7 @@ function AuthCallbackPage() {
 
     localStorage.setItem("token", token);
 
-    fetch("http://localhost:8080/api/users/me", {
+    fetch(`${API_BASE}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -26,7 +27,7 @@ function AuthCallbackPage() {
       .catch(() => {
         navigate("/login?error=something_went_wrong");
       });
-  }, []);
+  }, [navigate, searchParams]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#f8fafc]">

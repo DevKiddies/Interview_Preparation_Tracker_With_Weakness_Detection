@@ -2,6 +2,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
+import API_BASE from "../utils/api.js";
 
 import ErrorAlert from "../components/ui/ErrorAlert.jsx";
 import InputField from "../components/ui/InputFields.jsx";
@@ -32,7 +33,7 @@ function LoginPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -46,7 +47,7 @@ function LoginPage() {
         localStorage.setItem("token", data.token);
 
         // Check if already onboarded
-        const meRes = await fetch("http://localhost:8080/api/users/me", {
+        const meRes = await fetch(`${API_BASE}/api/users/me`, {
           headers: { Authorization: `Bearer ${data.token}` },
         });
         const me = await meRes.json();
@@ -67,7 +68,7 @@ function LoginPage() {
       setGoogleLoading(true);
       setError("");
       try {
-        const response = await fetch("http://localhost:8080/api/auth/google", {
+        const response = await fetch(`${API_BASE}/api/auth/google`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idToken: tokenResponse.access_token }),
@@ -76,7 +77,7 @@ function LoginPage() {
         if (response.ok) {
           const data = await response.json();
           localStorage.setItem("token", data.token);
-          const meRes = await fetch("http://localhost:8080/api/users/me", {
+          const meRes = await fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${data.token}` },
           });
           const me = await meRes.json();
@@ -98,21 +99,21 @@ function LoginPage() {
 
   return (
     <>
-      <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] w-full p-4 sm:p-6">
+      <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
         <div className="my-1 text-center justify-center">
-          <h2 className="text-xl font-bold">Welcome Back</h2>
-          <p className="text-xs text-gray-400 font-light mb-6">
+          <h2 className="text-xl font-bold dark:text-white">Welcome Back</h2>
+          <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
             Sign in to continue your interview preparation!
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm w-full max-w-sm p-6 sm:p-8 mt-6">
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm w-full max-w-sm p-6 sm:p-8 mt-6 transition-colors duration-200">
           <form
             className="flex flex-col items-stretch justify-center gap-0.5 w-full"
             onSubmit={handleSubmit}
           >
             <div className="flex flex-col gap-2.5">
               <button
-                className="flex items-center justify-center gap-2 border border-gray-300 rounded-4xl py-2 px-4 hover:bg-gray-100 cursor-pointer transition-colors w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 border border-gray-300 dark:border-slate-600 rounded-4xl py-2 px-4 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition-colors w-full disabled:opacity-60 disabled:cursor-not-allowed"
                 type="button"
                 onClick={() => handleGoogleLogin()}
                 disabled={googleLoading}
@@ -122,17 +123,17 @@ function LoginPage() {
                   alt="Google"
                   className="w-5 h-5"
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
                   {googleLoading ? "Signing in..." : "Sign in with Google"}
                 </span>
               </button>
 
               <button
-                className="flex items-center justify-center gap-2 border border-gray-300 rounded-4xl py-2 px-4 hover:bg-gray-100 cursor-pointer transition-colors w-full"
+                className="flex items-center justify-center gap-2 border border-gray-300 dark:border-slate-600 rounded-4xl py-2 px-4 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer transition-colors w-full"
                 type="button"
                 onClick={() =>
                   (window.location.href =
-                    "http://localhost:8080/api/auth/github")
+                    `${API_BASE}/api/auth/github`)
                 }
               >
                 <img
@@ -140,7 +141,7 @@ function LoginPage() {
                   alt="GitHub"
                   className="w-5 h-5"
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
                   Sign in with GitHub
                 </span>
               </button>
@@ -148,10 +149,10 @@ function LoginPage() {
 
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-gray-200 dark:border-slate-700"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-gray-400 font-medium">
+                <span className="bg-white dark:bg-slate-900 px-3 text-gray-400 dark:text-slate-500 font-medium">
                   Or continue with
                 </span>
               </div>
@@ -205,7 +206,7 @@ function LoginPage() {
               Login
             </button>
 
-            <p className="text-xs text-gray-500 font-normal mt-4 text-center w-full">
+            <p className="text-xs text-gray-500 dark:text-slate-400 font-normal mt-4 text-center w-full">
               Don't have an account?{" "}
               <Link
                 to="/signup"

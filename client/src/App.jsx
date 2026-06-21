@@ -1,64 +1,53 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import LandingPage from "./pages/LandingPage";
-import LoginPage from "./pages/LoginPage";
-import SignUpPage from "./pages/SignUpPage.jsx";
-import UserVerificationPage from "./pages/UserVerificationPage";
-import OnBoardingPage from "./pages/OnBoardingPage.jsx";
-import WorkInProgress from "./pages/WorkInProgress.jsx";
 
-function GitHubCallback() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get("token");
-    const error = params.get("error");
-
-    if (error || !token) {
-      navigate("/login?error=github_login_failed", { replace: true });
-      return;
-    }
-
-    localStorage.setItem("token", token);
-
-    fetch("http://localhost:8080/api/users/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((me) => {
-        navigate(me.onboarded ? "/dashboard" : "/onboarding", { replace: true });
-      })
-      .catch(() => {
-        navigate("/login?error=something_went_wrong", { replace: true });
-      });
-  }, [location.search, navigate]);
-
-  return <p className="text-center mt-20 text-gray-500">Signing you in...</p>;
-}
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+const UserVerificationPage = lazy(() => import("./pages/UserVerificationPage"));
+const OnBoardingPage = lazy(() => import("./pages/OnBoardingPage"));
+const WorkInProgress = lazy(() => import("./pages/WorkInProgress"));
+const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
+const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPages"));
+const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
+const OurTeamPage = lazy(() => import("./pages/OurTeamPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const FAQsPage = lazy(() => import("./pages/FAQsPage"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
 
 const App = () => {
+  const location = useLocation();
+  const hideLayout = ["/onboarding"].includes(location.pathname);
+
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <Navbar />
-      <main className="flex-grow">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/verify" element={<UserVerificationPage />} />
-          <Route path="/onboarding" element={<OnBoardingPage />} />
-          <Route path="/auth/callback" element={<GitHubCallback />} />
-          <Route path="/dashboard" element={<WorkInProgress />} />
-          <Route path="*" element={<WorkInProgress />} />
-        </Routes>
+    <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 transition-colors duration-200">
+      {!hideLayout && <Navbar />}
+      <main className="grow">
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/verify" element={<UserVerificationPage />} />
+            <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/dashboard" element={<WorkInProgress />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/dashboard" element={<WorkInProgress />} />
+            <Route path="/about/us" element={<AboutUsPage />} />
+            <Route path="/about/team" element={<OurTeamPage />} />
+            <Route path="/about/contact" element={<ContactPage />} />
+            <Route path="/help/faqs" element={<FAQsPage />} />
+            <Route path="/help/support" element={<SupportPage />} />
+            <Route path="*" element={<WorkInProgress />} />
+          </Routes>
+        </Suspense>
       </main>
-      <Footer />
+      {!hideLayout && <Footer />}
     </div>
   );
 };
