@@ -11,6 +11,7 @@ import com.preptracker.server.repository.VerificationTokenRepository;
 import com.preptracker.server.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +38,9 @@ public class AuthService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
     private final TokenBlackListService tokenBlackListService;
+    private final RestTemplate restTemplate;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -46,13 +51,10 @@ public class AuthService {
     @Value("${github.client-secret}")
     private String githubClientSecret;
 
-    @Value("${github.frontend-url}")
-    private String frontendUrl;
-
     @Value("${jwt.expiration}")
     private long expirationMs;
 
-    //appends a provider if not already present
+    // appends a provider if not already present
     // e.g. "LOCAL" + "GOOGLE" → "LOCAL,GOOGLE"
     private String appendProvider(String existing, String newProvider) {
         if (existing == null || existing.isBlank()) {
@@ -84,7 +86,7 @@ public class AuthService {
         user.setRole("USER");
         userRepository.save(user);
 
-        String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
+        String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setUserId(user.getId());
         verificationToken.setOtp(otp);
@@ -144,16 +146,15 @@ public class AuthService {
 
     public AuthResponse loginWithGoogle(String accessToken) {
         try {
-            RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(accessToken);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<Map> googleResponse = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> googleResponse = restTemplate.exchange(
                     "https://www.googleapis.com/oauth2/v3/userinfo",
                     HttpMethod.GET,
                     entity,
-                    Map.class);
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             Map<String, Object> userInfo = googleResponse.getBody();
             if (userInfo == null) {
@@ -168,13 +169,11 @@ public class AuthService {
                 throw new RuntimeException("Invalid user info from Google");
             }
 
-            // Already linked with Google ID — just login
             Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
             if (existingByGoogleId.isPresent()) {
                 return new AuthResponse(jwtUtil.generateToken(existingByGoogleId.get()));
             }
 
-            // Same email exists (LOCAL or GITHUB) — link Google to it
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
@@ -184,7 +183,6 @@ public class AuthService {
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
 
-            // Brand new user via Google
             User newUser = new User();
             newUser.setEmail(email);
             newUser.setUsername(generateUniqueUsername(name));
@@ -204,8 +202,6 @@ public class AuthService {
 
     public String loginWithGithub(String code) {
         try {
-            RestTemplate restTemplate = new RestTemplate();
-
             String tokenUrl = "https://github.com/login/oauth/access_token"
                     + "?client_id=" + githubClientId
                     + "&client_secret=" + githubClientSecret
@@ -215,8 +211,9 @@ public class AuthService {
             tokenHeaders.set("Accept", "application/json");
             HttpEntity<String> tokenEntity = new HttpEntity<>(tokenHeaders);
 
-            ResponseEntity<Map> tokenResponse = restTemplate.exchange(
-                    tokenUrl, HttpMethod.POST, tokenEntity, Map.class);
+            ResponseEntity<Map<String, Object>> tokenResponse = restTemplate.exchange(
+                    tokenUrl, HttpMethod.POST, tokenEntity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             String accessToken = (String) tokenResponse.getBody().get("access_token");
             if (accessToken == null) {
@@ -227,9 +224,10 @@ public class AuthService {
             userHeaders.setBearerAuth(accessToken);
             HttpEntity<String> userEntity = new HttpEntity<>(userHeaders);
 
-            ResponseEntity<Map> userResponse = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> userResponse = restTemplate.exchange(
                     "https://api.github.com/user",
-                    HttpMethod.GET, userEntity, Map.class);
+                    HttpMethod.GET, userEntity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
 
             Map<String, Object> userInfo = userResponse.getBody();
             String githubId = String.valueOf(userInfo.get("id"));
@@ -238,9 +236,10 @@ public class AuthService {
 
             String email = (String) userInfo.get("email");
             if (email == null) {
-                ResponseEntity<List> emailResponse = restTemplate.exchange(
+                ResponseEntity<List<Map<String, Object>>> emailResponse = restTemplate.exchange(
                         "https://api.github.com/user/emails",
-                        HttpMethod.GET, userEntity, List.class);
+                        HttpMethod.GET, userEntity,
+                        new ParameterizedTypeReference<List<Map<String, Object>>>() {});
                 List<Map<String, Object>> emails = emailResponse.getBody();
                 email = emails.stream()
                         .filter(e -> Boolean.TRUE.equals(e.get("primary")))
@@ -249,13 +248,11 @@ public class AuthService {
                         .orElseThrow(() -> new RuntimeException("No primary email found on GitHub account"));
             }
 
-            // Already linked with GitHub ID — just login
             Optional<User> existingByGithubId = userRepository.findByGithubId(githubId);
             if (existingByGithubId.isPresent()) {
                 return jwtUtil.generateToken(existingByGithubId.get());
             }
 
-            // Same email exists (LOCAL or GOOGLE) — link GitHub to it
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
@@ -265,7 +262,6 @@ public class AuthService {
                 return jwtUtil.generateToken(user);
             }
 
-            // Brand new user via GitHub
             User newUser = new User();
             newUser.setEmail(email);
             newUser.setUsername(generateUniqueUsername(login != null ? login : name));

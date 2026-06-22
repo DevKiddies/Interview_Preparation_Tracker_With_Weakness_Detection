@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: "optional:file:.env[.properties]"
   application:
     name: server
   datasource:
@@ -6,13 +8,13 @@ spring:
     url: ${DB_URL}
     password: ${DB_PASSWORD}
     username: ${DB_USERNAME}
-  hikari:
-    connection-timeout: 20000
-    maximum-pool-size: 5
-    minimum-idle: 1
-    idle-timeout: 60000 
-    max-lifetime: 120000
-    keepalive-time: 30000
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 60000
+      max-lifetime: 120000
+      keepalive-time: 30000
   jpa:
     hibernate:
       ddl-auto: validate

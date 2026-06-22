@@ -5,6 +5,7 @@ import { Link, useNavigate} from "react-router-dom";
 import ErrorAlert from "../components/ui/ErrorAlert.jsx";
 import InputField from "../components/ui/InputFields.jsx";
 import { validateSignupForm } from "../utils/validation.jsx";
+import API_BASE from "../utils/api.js";
 
 function SignUpPage() {
   const [error, setError] = useState("");
@@ -39,7 +40,7 @@ function SignUpPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/register", {
+      const response = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,12 +65,12 @@ function SignUpPage() {
   return (
       <>
 
-        <div className="text-2xl text-center mx-auto border border-gray-300 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8">
+        <div className="text-2xl text-center mx-auto border border-gray-300 dark:border-slate-700 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8 bg-white dark:bg-slate-900 transition-colors duration-200">
           <form className="flex flex-col items-stretch justify-center gap-0.5 w-full" onSubmit={handleSubmit}>
 
             <div className="my-1 text-center justify-center">
-              <h2 className="text-xl font-bold">Create Your Account</h2>
-              <p className="text-sm text-gray-400 font-light mb-6">
+              <h2 className="text-xl font-bold dark:text-white">Create Your Account</h2>
+              <p className="text-sm text-gray-400 dark:text-slate-500 font-light mb-6">
                 Start your interview preparation with us today!
               </p>
             </div>
@@ -134,18 +135,18 @@ function SignUpPage() {
             </InputField>
 
             <div className="flex items-start mt-3 mb-4 text-left">
-              <input type="checkbox" id="terms" name="terms" checked={formData.terms} onChange={handleChange} className="mt-0.5 mr-2 flex-shrink-0" />
-              <label htmlFor="terms" className="text-xs text-gray-400 select-none">
+              <input type="checkbox" id="terms" name="terms" checked={formData.terms} onChange={handleChange} className="mt-0.5 mr-2 shrink-0" />
+              <label htmlFor="terms" className="text-xs text-gray-400 dark:text-slate-500 select-none">
                 I agree to the{" "}
                 <Link to="/terms" className="text-blue-500 hover:underline">Terms and Conditions</Link>
               </label>
             </div>
 
-            <button className="bg-gradient-to-r from-blue-600 to-blue-500 text-white mt-2 border-blue-500 rounded-4xl py-2 px-4 hover:from-blue-700 hover:to-blue-600 [box-shadow:0_2px_6px_rgba(0,0,255,0.35)] text-center text-sm w-full cursor-pointer transition-all" type="submit">
+            <button className="bg-linear-to-r from-blue-600 to-blue-500 text-white mt-2 border-blue-500 rounded-4xl py-2 px-4 hover:from-blue-700 hover:to-blue-600 [box-shadow:0_2px_6px_rgba(0,0,255,0.35)] text-center text-sm w-full cursor-pointer transition-all" type="submit">
               Sign Up
             </button>
 
-            <p className="text-sm text-gray-400 font-semilight mt-3 text-center w-full">
+            <p className="text-sm text-gray-400 dark:text-slate-500 font-semilight mt-3 text-center w-full">
               Already have an account?{" "}
               <Link to="/login" className="text-blue-500 hover:underline">Log in</Link>
             </p>
