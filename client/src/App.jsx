@@ -11,6 +11,7 @@ const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const UserVerificationPage = lazy(() => import("./pages/UserVerificationPage"));
 const OnBoardingPage = lazy(() => import("./pages/OnBoardingPage"));
 const WorkInProgress = lazy(() => import("./pages/WorkInProgress"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage"));
 const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPages"));
 const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
@@ -35,7 +36,7 @@ const App = () => {
             <Route path="/verify" element={<UserVerificationPage />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/dashboard" element={<WorkInProgress />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />
             <Route path="/about/us" element={<AboutUsPage />} />
