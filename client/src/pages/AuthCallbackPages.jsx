@@ -22,6 +22,7 @@ function AuthCallbackPage() {
     })
       .then((res) => res.json())
       .then((me) => {
+        if (me.username) localStorage.setItem("username", me.username);
         navigate(me.onboarded ? "/dashboard" : "/onboarding");
       })
       .catch(() => {

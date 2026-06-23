@@ -66,7 +66,6 @@ public class UserController {
         response.put("id", user.getId());
         response.put("email", user.getEmail());
         response.put("username", user.getUsername());
-        response.put("role", user.getRole());
         response.put("onboarded", user.getIsOnboarded());
 
         return ResponseEntity.ok(response);

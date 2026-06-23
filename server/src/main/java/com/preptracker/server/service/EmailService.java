@@ -24,6 +24,37 @@ public class EmailService {
     @Value("${brevo.sender-name}")
     private String senderName;
 
+    public void sendPasswordResetEmail(String toEmail, String otp) {
+        RestTemplate restTemplate = new RestTemplate();
+
+        String body = """
+                {
+                    "sender":{"name":"%s", "email":"%s"},
+                    "to":[{"email":"%s"}],
+                    "subject":"PrepEdge - Password Reset OTP",
+                    "htmlContent":"<h2>Password Reset</h2><p>Your OTP to reset your password is: <strong>%s</strong></p><p>This OTP expires in 15 minutes. If you did not request a password reset, please ignore this email.</p>"
+                }
+                """.formatted(senderName, senderEmail, toEmail, otp);
+
+        HttpHeaders header = new HttpHeaders();
+        header.setContentType(MediaType.APPLICATION_JSON);
+        header.set("api-key", apiKey);
+
+        HttpEntity<String> entity = new HttpEntity<>(body, header);
+
+        try {
+            var response = restTemplate.postForEntity(
+                    "https://api.brevo.com/v3/smtp/email",
+                    entity,
+                    String.class
+            );
+            System.out.println("Brevo response status: " + response.getStatusCode());
+        } catch (Exception e) {
+            System.out.println("Password reset email sending failed: " + e.getMessage());
+            throw new RuntimeException("Failed to send password reset email: " + e.getMessage());
+        }
+    }
+
     public void sendOtpEmail(String toEmail, String otp){
         RestTemplate restTemplate = new RestTemplate();
 

@@ -4,16 +4,16 @@ import Logo from "./ui/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
+// ---- Admin Nav Structure ----
+const adminNavItems = [
+  { label: "Dashboard", to: "/admin/dashboard" },
+  { label: "User Management", to: "/admin/users" },
+  { label: "Question Management", to: "/admin/questions" },
+  { label: "Test Management", to: "/admin/tests" },
+];
+
 // ---- Guest (Public) Nav Structure ----
 const guestNavItems = [
-  {
-    label: "Courses",
-    items: [
-      { label: "All Courses", to: "/courses/all" },
-      { label: "By Topic", to: "/courses/by-topic" },
-      { label: "By Company", to: "/courses/by-company" },
-    ],
-  },
   {
     label: "Practice",
     items: [
@@ -26,9 +26,8 @@ const guestNavItems = [
     label: "Resources",
     items: [
       { label: "Notes", to: "/resources/notes" },
-      { label: "Short Notes", to: "/resources/short-notes" },
+      { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
       { label: "Interview Experiences", to: "/resources/interview-experiences" },
-      { label: "Blogs", to: "/resources/blogs" },
     ],
   },
   { label: "AI Interview", to: "/ai-interview" },
@@ -60,14 +59,6 @@ const studentNavItems = [
     ],
   },
   {
-    label: "Courses",
-    items: [
-      { label: "Browse", to: "/courses/browse" },
-      { label: "Enrolled", to: "/courses/enrolled" },
-      { label: "Continue Learning", to: "/courses/continue" },
-    ],
-  },
-  {
     label: "Practice",
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
@@ -78,7 +69,7 @@ const studentNavItems = [
     label: "Resources",
     items: [
       { label: "Notes", to: "/resources/notes" },
-      { label: "Short Notes", to: "/resources/short-notes" },
+      { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
       { label: "Saved Notes", to: "/resources/saved-notes" },
     ],
   },
@@ -253,11 +244,23 @@ export default function Navbar() {
   const [openMobileSection, setOpenMobileSection] = useState(null);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const adminToken = localStorage.getItem("adminToken");
+  const avatarUrl = localStorage.getItem("avatarUrl");
+  const username = localStorage.getItem("username");
+  const initials = username ? username.slice(0, 2).toUpperCase() : "U";
 
   const handleSignOut = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("avatarUrl");
+    localStorage.removeItem("username");
     setIsMenuOpen(false);
     navigate("/login");
+  };
+
+  const handleAdminSignOut = () => {
+    localStorage.removeItem("adminToken");
+    setIsMenuOpen(false);
+    navigate("/admin/login");
   };
 
   const goToAuth = (view) => {
@@ -265,13 +268,33 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  const navItems = token ? studentNavItems : guestNavItems;
+  const navItems = adminToken ? adminNavItems : token ? studentNavItems : guestNavItems;
+
+  const avatarLabel = (
+    <div className="flex items-center gap-2">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="Profile" className="w-7 h-7 rounded-full object-cover ring-2 ring-blue-100 dark:ring-slate-700" />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
+          {initials}
+        </div>
+      )}
+    </div>
+  );
 
   const profileItem = {
-    label: "Profile",
+    label: avatarLabel,
     items: [
       { label: "Settings", to: "/profile/settings" },
       { label: "Logout", action: handleSignOut },
+    ],
+  };
+
+  const adminItem = {
+    label: "Admin",
+    items: [
+      { label: "Dashboard", to: "/admin/dashboard" },
+      { label: "Logout", action: handleAdminSignOut },
     ],
   };
 
@@ -297,19 +320,18 @@ export default function Navbar() {
         {/* Desktop Action Area */}
         <div className="hidden md:flex items-center gap-3 text-sm font-semibold">
           <ThemeToggle />
-          {token ? (
+          {adminToken ? (
+            <NavDropdown {...adminItem} align="right" />
+          ) : token ? (
             <NavDropdown {...profileItem} align="right" />
           ) : (
             <>
-              <NavDropdown
-                label="Login"
-                align="right"
-                buttonClassName="flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 px-4 py-2 rounded-full"
-                items={[
-                  { label: "User Login", to: "/login" },
-                  { label: "Admin Login", to: "/admin/login" },
-                ]}
-              />
+              <button
+                onClick={() => goToAuth("login")}
+                className="flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 px-4 py-2 rounded-full font-semibold"
+              >
+                Login
+              </button>
               <button
                 onClick={() => goToAuth("signup")}
                 className="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-all duration-200 active:scale-95"
@@ -348,7 +370,14 @@ export default function Navbar() {
 
           <div className="h-px bg-slate-100 dark:bg-slate-700 my-2" />
 
-          {token ? (
+          {adminToken ? (
+            <MobileNavSection
+              {...adminItem}
+              openSection={openMobileSection}
+              setOpenSection={setOpenMobileSection}
+              onNavigate={() => setIsMenuOpen(false)}
+            />
+          ) : token ? (
             <MobileNavSection
               {...profileItem}
               openSection={openMobileSection}
@@ -357,16 +386,12 @@ export default function Navbar() {
             />
           ) : (
             <div className="flex flex-col gap-3 pt-1">
-              <MobileNavSection
-                label="Login"
-                items={[
-                  { label: "User Login", to: "/login" },
-                  { label: "Admin Login", to: "/admin/login" },
-                ]}
-                openSection={openMobileSection}
-                setOpenSection={setOpenMobileSection}
-                onNavigate={() => setIsMenuOpen(false)}
-              />
+              <button
+                onClick={() => goToAuth("login")}
+                className="text-left font-medium text-slate-700 dark:text-slate-200 py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Login
+              </button>
               <button
                 onClick={() => goToAuth("signup")}
                 className="flex justify-center items-center font-semibold text-white bg-blue-600 py-2.5 rounded-full hover:bg-blue-700 transition-colors"

@@ -1,5 +1,6 @@
 package com.preptracker.server.util;
 
+import com.preptracker.server.model.Admin;
 import com.preptracker.server.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -35,6 +36,21 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public String generateAdminToken(Admin admin) {
+        return Jwts.builder()
+                .setSubject(admin.getId().toString())
+                .claim("role", "ADMIN")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractRole(String token) {
+        Claims claims = getClaims(token);
+        return claims.get("role", String.class);
     }
 
     public String extractUserId(String token) {
