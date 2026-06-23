@@ -1,6 +1,7 @@
+// src/components/ui/QuizQuestionCard.jsx
 export default function QuizQuestionCard({ question, index, selectedOption, onSelect }) {
   return (
-    <div style={{ flex: 1 }}>
+    <div style={{ flex: 1, marginBottom: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', marginBottom: '15px' }}>
         <div>
           <span style={{ background: '#e0e7ff', padding: '4px 8px', borderRadius: '4px', marginRight: '5px' }}>{question.category}</span>
@@ -9,7 +10,7 @@ export default function QuizQuestionCard({ question, index, selectedOption, onSe
         <span>Q {index + 1} / 50</span>
       </div>
       
-      <h2>{question.text}</h2>
+      <h2 style={{ fontSize: 'calc(1.2rem + 0.3vw)' }}>{question.text}</h2>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '25px' }}>
         {question.options.map((option, idx) => {
@@ -28,7 +29,8 @@ export default function QuizQuestionCard({ question, index, selectedOption, onSe
                 cursor: 'pointer',
                 fontSize: '1rem',
                 display: 'flex',
-                gap: '15px'
+                gap: '15px',
+                transition: 'all 0.15s ease'
               }}
             >
               <strong style={{ color: isSelected ? '#2563eb' : '#666' }}>{labels[idx]}</strong>

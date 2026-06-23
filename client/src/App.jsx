@@ -25,8 +25,8 @@ const MockTestPage = lazy(() => import("./pages/MockTestPage"));
 const App = () => {
   const location = useLocation();
   
-  // 2. ADD "/mocktest" HERE TO HIDE THE GLOBAL NAVBAR & FOOTER
-  const hideLayout = ["/onboarding", "/mocktest"].includes(location.pathname);
+  // 2. ADD "/practice/mock-tests" HERE TO HIDE THE GLOBAL NAVBAR & FOOTER
+const hideLayout = ["/onboarding"].includes(location.pathname) || location.pathname.startsWith("/practice/mock-tests");
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 transition-colors duration-200">
@@ -43,7 +43,7 @@ const App = () => {
             <Route path="/dashboard" element={<WorkInProgress />} />
             
             {/* 3. ADD THE MOCK TEST ROUTE SEGMENT */}
-            <Route path="/mocktest" element={<MockTestPage />} />
+            <Route path="/practice/mock-tests/:testId" element={<MockTestPage />} />
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />
