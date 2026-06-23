@@ -19,9 +19,14 @@ const ContactPage = lazy(() => import("./pages/ContactPage"));
 const FAQsPage = lazy(() => import("./pages/FAQsPage"));
 const SupportPage = lazy(() => import("./pages/SupportPage"));
 
+// 1. ADD LAZY IMPORT FOR MOCK TEST PAGE
+const MockTestPage = lazy(() => import("./pages/MockTestPage"));
+
 const App = () => {
   const location = useLocation();
-  const hideLayout = ["/onboarding"].includes(location.pathname);
+  
+  // 2. ADD "/mocktest" HERE TO HIDE THE GLOBAL NAVBAR & FOOTER
+  const hideLayout = ["/onboarding", "/mocktest"].includes(location.pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 transition-colors duration-200">
@@ -36,6 +41,10 @@ const App = () => {
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/dashboard" element={<WorkInProgress />} />
+            
+            {/* 3. ADD THE MOCK TEST ROUTE SEGMENT */}
+            <Route path="/mocktest" element={<MockTestPage />} />
+
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />
             <Route path="/about/us" element={<AboutUsPage />} />
