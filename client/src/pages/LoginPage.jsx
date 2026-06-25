@@ -51,6 +51,7 @@ function LoginPage() {
           headers: { Authorization: `Bearer ${data.token}` },
         });
         const me = await meRes.json();
+        if (me.username) localStorage.setItem("username", me.username);
         navigate(me.onboarded ? "/dashboard" : "/onboarding");
       } else {
         const message = await response.text();
@@ -68,20 +69,27 @@ function LoginPage() {
       setGoogleLoading(true);
       setError("");
       try {
-        const response = await fetch(`${API_BASE}/api/auth/google`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken: tokenResponse.access_token }),
-        });
+        const [googleInfo, response] = await Promise.all([
+          fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          }).then((r) => r.json()),
+          fetch(`${API_BASE}/api/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: tokenResponse.access_token }),
+          }),
+        ]);
 
         if (response.ok) {
           const data = await response.json();
           localStorage.setItem("token", data.token);
+          if (googleInfo.picture) localStorage.setItem("avatarUrl", googleInfo.picture);
           const meRes = await fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${data.token}` },
           });
           const me = await meRes.json();
-          navigate(me.onboarded ? "/dashboard" : "/onboarding"); // always go to onboarding after OAuth
+          if (me.username) localStorage.setItem("username", me.username);
+          navigate(me.onboarded ? "/dashboard" : "/onboarding");
         } else {
           const message = await response.text();
           setError(message || "Google login failed.");

@@ -34,7 +34,7 @@ function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
+      const response = await fetch(`${API_BASE}/api/admin/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -45,20 +45,8 @@ function AdminLoginPage() {
 
       if (response.ok) {
         const data = await response.json();
-
-        const meRes = await fetch(`${API_BASE}/api/users/me`, {
-          headers: { Authorization: `Bearer ${data.token}` },
-        });
-        const me = await meRes.json();
-
-        if (me.role !== "ADMIN") {
-          setError("This account does not have admin access.");
-          setLoading(false);
-          return;
-        }
-
-        localStorage.setItem("token", data.token);
-        navigate("/admin/dashboard");
+        localStorage.setItem("adminToken", data.token);
+        navigate("/");
       } else {
         const message = await response.text();
         setError(message || "Invalid credentials.");

@@ -1,8 +1,10 @@
 package com.preptracker.server.service;
 
 import com.preptracker.server.dto.AuthResponse;
+import com.preptracker.server.dto.ForgotPasswordRequest;
 import com.preptracker.server.dto.LoginRequest;
 import com.preptracker.server.dto.RegisterRequest;
+import com.preptracker.server.dto.ResetPasswordRequest;
 import com.preptracker.server.dto.VerifyOtpRequest;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.VerificationToken;
@@ -18,6 +20,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
@@ -67,6 +70,7 @@ public class AuthService {
         return String.join(",", providers);
     }
 
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new RuntimeException("Password Do Not Match!");
@@ -83,7 +87,6 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setIsVerified(false);
         user.setAuthProvider("LOCAL");
-        user.setRole("USER");
         userRepository.save(user);
 
         String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
@@ -117,6 +120,7 @@ public class AuthService {
         return new AuthResponse(token);
     }
 
+    @Transactional
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
         VerificationToken verificationToken = verificationTokenRepository.findByOtp(request.getOtp())
                 .orElseThrow(() -> new RuntimeException("OTP Not Valid"));
@@ -142,6 +146,49 @@ public class AuthService {
         String token = authHeader.substring(7);
         tokenBlackListService.blacklistToken(token, expirationMs);
         return new AuthResponse("Logged Out Successfully");
+    }
+
+    @Transactional
+    public void requestPasswordReset(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+
+        // Invalidate all existing tokens for this user
+        List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
+        existing.forEach(token -> token.setUsed(true));
+        verificationTokenRepository.saveAll(existing);
+
+        String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
+        VerificationToken verificationToken = new VerificationToken();
+        verificationToken.setUserId(user.getId());
+        verificationToken.setOtp(otp);
+        verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        verificationToken.setUsed(false);
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendPasswordResetEmail(user.getEmail(), otp);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+
+        VerificationToken token = verificationTokenRepository.findByOtp(request.getOtp())
+                .orElseThrow(() -> new RuntimeException("Invalid OTP"));
+
+        if (!token.getUserId().equals(user.getId()))
+            throw new RuntimeException("Invalid OTP");
+        if (token.getUsed())
+            throw new RuntimeException("OTP has already been used");
+        if (token.getExpiresAt().isBefore(LocalDateTime.now()))
+            throw new RuntimeException("OTP has expired");
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        token.setUsed(true);
+        verificationTokenRepository.save(token);
     }
 
     public AuthResponse loginWithGoogle(String accessToken) {
@@ -190,7 +237,6 @@ public class AuthService {
             newUser.setGoogleId(googleId);
             newUser.setAuthProvider("GOOGLE");
             newUser.setIsVerified(true);
-            newUser.setRole("USER");
             userRepository.save(newUser);
 
             return new AuthResponse(jwtUtil.generateToken(newUser));
@@ -269,7 +315,6 @@ public class AuthService {
             newUser.setGithubId(githubId);
             newUser.setAuthProvider("GITHUB");
             newUser.setIsVerified(true);
-            newUser.setRole("USER");
             userRepository.save(newUser);
 
             return jwtUtil.generateToken(newUser);

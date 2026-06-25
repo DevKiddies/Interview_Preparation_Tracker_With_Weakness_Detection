@@ -21,16 +21,17 @@ const steps = [
 
 export default function HowItWorksSection() {
   return (
-    <section className="py-20 bg-blue-50">
+    <section className="relative py-20 bg-blue-50 dark:bg-slate-900 transition-colors duration-200">
+      <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-blue-500/40 to-transparent" />
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-12">
-          <span className="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full mb-4">
+          <span className="inline-block text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 border border-indigo-100 dark:border-indigo-800 px-3 py-1 rounded-full mb-4">
             Simple Process
           </span>
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
             Start cracking interviews in 3 steps
           </h2>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 dark:text-slate-400 text-sm">
             No complexity. Just structure, practice, and progress.
           </p>
         </div>
@@ -39,13 +40,13 @@ export default function HowItWorksSection() {
           {steps.map((step) => (
             <div
               key={step.number}
-              className="bg-white rounded-2xl p-8 shadow-md border border-gray-100 text-center hover:translate-y-2 hover:shadow-xl transition-transform duration-300 ease-in-out"
+              className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-md dark:shadow-slate-900/50 border border-gray-100 dark:border-slate-700 text-center hover:translate-y-2 hover:shadow-xl dark:hover:shadow-slate-900/70 transition-all duration-300 ease-in-out"
             >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center mx-auto mb-5">
+              <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-indigo-700 flex items-center justify-center mx-auto mb-5">
                 <span className="text-white text-sm font-bold">{step.number}</span>
               </div>
-              <h3 className="text-gray-900 font-semibold text-base mb-2">{step.title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">{step.description}</p>
+              <h3 className="text-gray-900 dark:text-slate-100 font-semibold text-base mb-2">{step.title}</h3>
+              <p className="text-gray-500 dark:text-slate-400 text-sm leading-relaxed">{step.description}</p>
             </div>
           ))}
         </div>

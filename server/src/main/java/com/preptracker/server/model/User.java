@@ -30,9 +30,6 @@ public class User {
     @Column(nullable = true)
     private String password;
 
-    @Column(nullable = false)
-    private String role = "USER";
-
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = false;
 
