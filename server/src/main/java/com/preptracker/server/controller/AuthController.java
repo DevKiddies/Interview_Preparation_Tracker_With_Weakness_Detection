@@ -1,9 +1,11 @@
 package com.preptracker.server.controller;
 
 import com.preptracker.server.dto.AuthResponse;
+import com.preptracker.server.dto.ForgotPasswordRequest;
 import com.preptracker.server.dto.GoogleAuthRequest;
 import com.preptracker.server.dto.LoginRequest;
 import com.preptracker.server.dto.RegisterRequest;
+import com.preptracker.server.dto.ResetPasswordRequest;
 import com.preptracker.server.dto.VerifyOtpRequest;
 import com.preptracker.server.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -55,6 +57,18 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request) {
         return ResponseEntity.ok(authService.loginWithGoogle(request.getIdToken()));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.requestPasswordReset(request);
+        return ResponseEntity.ok("OTP sent to your email");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok("Password reset successfully");
     }
 
     @GetMapping("/test")

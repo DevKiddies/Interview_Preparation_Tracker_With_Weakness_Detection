@@ -30,9 +30,6 @@ public class User {
     @Column(nullable = true)
     private String password;
 
-    @Column(nullable = false)
-    private String role = "USER";
-
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = false;
 
@@ -48,13 +45,12 @@ public class User {
     private String googleId;
 
     @Column(name = "github_id", nullable = true)
-private String githubId;
+    private String githubId;
 
     @Column(name = "auth_provider", nullable = false)
     private String authProvider = "LOCAL";
 
     @Column(name = "is_onboarded", nullable = false)
     private Boolean isOnboarded = false;
-
 
 }

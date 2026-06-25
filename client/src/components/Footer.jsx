@@ -1,5 +1,3 @@
-import { Send } from 'lucide-react';
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from "./ui/Logo.jsx";
 
@@ -10,7 +8,6 @@ const footerLinks = [
       { label: "About Us", to: "/about/us" },
       { label: "Our Team", to: "/about/team" },
       { label: "Contact Us", to: "/about/contact" },
-      { label: "Careers", to: "/careers" },
     ],
   },
   {
@@ -26,9 +23,8 @@ const footerLinks = [
     heading: "Resources",
     links: [
       { label: "Notes", to: "/resources/notes" },
-      { label: "Short Notes", to: "/resources/short-notes" },
+      { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
       { label: "Interview Experiences", to: "/resources/interview-experiences" },
-      { label: "Blogs", to: "/resources/blogs" },
     ],
   },
   {
@@ -96,15 +92,11 @@ const socialLinks = [
 ];
 
 export default function Footer() {
-  const [email, setEmail] = useState('');
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    setEmail('');
-  };
-
   return (
-    <footer className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+    <footer className="relative bg-slate-50 dark:bg-[#0d1117] transition-colors duration-200">
+      {/* Gradient separator line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-blue-500/60 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-16 bg-linear-to-b from-blue-500/5 to-transparent pointer-events-none" />
 
       {/* Main grid */}
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -138,32 +130,6 @@ export default function Footer() {
               ))}
             </div>
 
-            {/* Newsletter */}
-            <div className="mt-2">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                Get system updates
-              </p>
-              <form
-                onSubmit={handleSubscribe}
-                className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1 focus-within:border-blue-500 transition-colors h-9 shadow-sm max-w-xs"
-              >
-                <input
-                  type="email"
-                  placeholder="name@domain.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="flex-1 bg-transparent text-xs text-slate-800 dark:text-slate-200 px-3 outline-none placeholder-slate-400 dark:placeholder-slate-500"
-                />
-                <button
-                  type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-full transition-all active:scale-95 shrink-0 shadow-md shadow-blue-500/20"
-                  aria-label="Subscribe"
-                >
-                  <Send className="w-3 h-3" />
-                </button>
-              </form>
-            </div>
           </div>
 
           {/* Link columns */}
@@ -189,7 +155,8 @@ export default function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-slate-200 dark:border-slate-800">
+      <div className="relative">
+        <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-blue-500/30 to-transparent" />
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
           <p>© {new Date().getFullYear()} PrepEdge. All rights reserved.</p>
           <div className="flex items-center gap-5">
