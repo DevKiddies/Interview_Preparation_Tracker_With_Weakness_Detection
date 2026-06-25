@@ -9,38 +9,34 @@ import QuizFooterControls from "../components/ui/QuizFooterControls";
 export default function MockTestPage() {
   const { testId } = useParams();
   const navigate = useNavigate(); // 2. Initialize the navigation control hook
-  const [questions, setQuestions] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [statuses, setStatuses] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(5400);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const mockData = Array.from({ length: 50 }, (_, i) => ({
+  const [questions] = useState(()=>
+      Array.from({ length: 50 }, (_, i) => ({
       id: i + 1,
       text: `[Test #${testId}] What is the time complexity of finding an element in a hash map (average case) for problem #${i + 1}?`,
       options: ["O(1)", "O(n)", "O(log n)", "O(n²)"],
       category: "Arrays",
       difficulty: "Easy",
-    }));
+    }))
+  );
 
-    setQuestions(mockData);
-    setStatuses(Array(mockData.length).fill("unvisited"));
-    setLoading(false);
-  }, [testId]);
-
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [statuses, setStatuses] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(5400);
   useEffect(() => {
-    if (loading || timeLeft <= 0) {
-      if (timeLeft === 0) navigate("/dashboard"); // Auto-submit when time hits zero!
-      return;
-    }
-    const timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+    const timerId = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerId);
+          navigate("/dashboard");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000)
     return () => clearInterval(timerId);
-  }, [timeLeft, loading, navigate]);
-
-  if (loading)
-    return <div style={{ padding: "20px" }}>Loading Assessment...</div>;
+  }, [navigate]);
 
   const currentQuestion = questions[currentIndex];
   const isCurrentFlagged = statuses[currentIndex] === "flagged";
