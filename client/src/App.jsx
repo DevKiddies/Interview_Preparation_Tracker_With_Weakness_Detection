@@ -46,7 +46,7 @@ const App = () => {
             <Route path="/onboarding" element={<OnBoardingPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/dashboard" element={<WorkInProgress />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />
             <Route path="/admin/users" element={<WorkInProgress />} />
