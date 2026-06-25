@@ -15,6 +15,14 @@ const adminNavItems = [
 // ---- Guest (Public) Nav Structure ----
 const guestNavItems = [
   {
+    label: "Courses",
+    items: [
+      { label: "All Courses", to: "/courses/all" },
+      { label: "By Topic", to: "/courses/by-topic" },
+      { label: "By Company", to: "/courses/by-company" },
+    ],
+  },
+  {
     label: "Practice",
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
@@ -56,6 +64,14 @@ const studentNavItems = [
       { label: "My Progress", to: "/dashboard/progress" },
       { label: "Bookmarks", to: "/dashboard/bookmarks" },
       { label: "History", to: "/dashboard/history" },
+    ],
+  },
+  {
+    label: "Courses",
+    items: [
+      { label: "Browse", to: "/courses/browse" },
+      { label: "Enrolled", to: "/courses/enrolled" },
+      { label: "Continue Learning", to: "/courses/continue" },
     ],
   },
   {

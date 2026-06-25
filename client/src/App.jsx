@@ -64,8 +64,10 @@ const App = () => {
         </Suspense>
       </main>
       {!hideLayout && <Footer />}
+      {!hideLayout && <Footer />}
     </div>
   );
 };
 
 export default App;
+
