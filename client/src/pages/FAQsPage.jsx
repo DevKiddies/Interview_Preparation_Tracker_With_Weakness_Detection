@@ -64,21 +64,21 @@ function FAQItem({ q, a }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-slate-100 rounded-xl overflow-hidden">
+    <div className="border border-slate-100 dark:border-slate-700 rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left bg-white hover:bg-slate-50 transition-colors duration-150"
+        className="w-full flex items-center justify-between px-5 py-4 text-left bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150"
       >
-        <span className="font-semibold text-slate-800 text-sm pr-4">{q}</span>
+        <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm pr-4">{q}</span>
         <ChevronDown
           size={16}
-          className={`shrink-0 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && (
-        <div className="px-5 pb-4 bg-white">
-          <p className="text-slate-500 text-sm leading-relaxed">{a}</p>
+        <div className="px-5 pb-4 bg-white dark:bg-slate-800">
+          <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{a}</p>
         </div>
       )}
     </div>
@@ -87,19 +87,19 @@ function FAQItem({ q, a }) {
 
 export default function FAQsPage() {
   return (
-    <div className="bg-white">
+    <div className="bg-white dark:bg-slate-950 transition-colors duration-200">
       {/* Hero */}
-      <section className="bg-blue-50 pt-16 pb-20 px-6 text-center">
-        <span className="inline-block bg-blue-100 text-blue-600 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-4">
+      <section className="bg-blue-50 dark:bg-slate-800/60 pt-16 pb-20 px-6 text-center">
+        <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-4">
           Help Center
         </span>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-4 leading-tight">
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-4 leading-tight">
           Frequently Asked{" "}
           <span className="text-indigo-500 italic">Questions</span>
         </h1>
-        <p className="text-slate-500 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
+        <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
           Everything you need to know about PrepEdge. Can't find your answer?{" "}
-          <Link to="/help/support" className="text-blue-600 font-semibold hover:underline">
+          <Link to="/help/support" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
             Contact support.
           </Link>
         </p>
@@ -110,7 +110,7 @@ export default function FAQsPage() {
         <div className="max-w-3xl mx-auto flex flex-col gap-12">
           {faqs.map(({ category, items }) => (
             <div key={category}>
-              <h2 className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-4">
                 {category}
               </h2>
               <div className="flex flex-col gap-3">
@@ -124,11 +124,12 @@ export default function FAQsPage() {
       </section>
 
       {/* Still have questions */}
-      <section className="py-14 px-6 bg-slate-50/60 border-t border-slate-100 text-center">
-        <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-3">
+      <section className="relative py-14 px-6 bg-slate-50/60 dark:bg-slate-900/60 text-center">
+        <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-blue-500/40 to-transparent" />
+        <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white mb-3">
           Still have questions?
         </h2>
-        <p className="text-slate-500 mb-7 max-w-md mx-auto">
+        <p className="text-slate-500 dark:text-slate-400 mb-7 max-w-md mx-auto">
           Our support team is happy to help. Reach out and we'll get back to you within 24 hours.
         </p>
         <Link
