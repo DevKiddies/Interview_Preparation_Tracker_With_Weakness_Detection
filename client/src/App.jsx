@@ -24,13 +24,20 @@ const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 
+// 1. ADD LAZY IMPORT FOR MOCK TEST PAGE
+const MockTestPage = lazy(() => import("./pages/MockTestPage"));
+
 const App = () => {
   const location = useLocation();
   const isAdminRoute =
     location.pathname.startsWith("/admin") &&
     location.pathname !== "/admin/login";
+
+  // 2. ADD "/practice/mock-tests" HERE TO HIDE THE GLOBAL NAVBAR & FOOTER
   const hideLayout =
-    ["/onboarding"].includes(location.pathname) || isAdminRoute;
+    ["/onboarding"].includes(location.pathname) ||
+    location.pathname.startsWith("/practice/mock-tests") ||
+    isAdminRoute;
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 transition-colors duration-200">
@@ -47,6 +54,13 @@ const App = () => {
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+
+            {/* 3. ADD THE MOCK TEST ROUTE SEGMENT */}
+            <Route
+              path="/practice/mock-tests/:testId"
+              element={<MockTestPage />}
+            />
+
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />
             <Route path="/admin/users" element={<WorkInProgress />} />
