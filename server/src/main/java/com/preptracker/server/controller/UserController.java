@@ -12,6 +12,8 @@ import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
+import com.preptracker.server.exception.NotFoundException;
+import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.service.UserService;
@@ -110,7 +112,13 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe() {
         UUID uid = authenticatedUserId();
-        User user = userService.getUserById(uid);
+        User user;
+        try {
+            user = userService.getUserById(uid);
+        } catch (NotFoundException e) {
+            // JWT is valid but the user record no longer exists — force re-login
+            throw new UnauthorizedException("Session is no longer valid. Please log in again.");
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", user.getId());
