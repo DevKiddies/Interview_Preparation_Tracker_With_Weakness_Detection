@@ -13,4 +13,6 @@ public class OnboardingRequest {
     private String interviewDate;
     private String experienceLevel;
     private List<String> focusTopics;
+    private String username;
+    private String avatarUrl;
 }

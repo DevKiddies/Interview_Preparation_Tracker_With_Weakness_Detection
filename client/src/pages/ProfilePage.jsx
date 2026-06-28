@@ -4,12 +4,12 @@
 // since those accounts don't have a local password.
 // After saving, dispatches "user-profile-updated" so the Navbar avatar refreshes.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
 import {
   Edit2, Lock, Mail, CheckCircle, Award,
-  BookOpen, Zap, Calendar, X, Eye, EyeOff,
+  BookOpen, Zap, Calendar, X, Eye, EyeOff, Camera,
 } from "lucide-react";
 import API_BASE from "../utils/api.js";
 
@@ -39,8 +39,10 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile]     = useState(null);
   const [username, setUsername]   = useState(localStorage.getItem("username") || "");
-  const [avatarUrl]               = useState(() => localStorage.getItem("avatarUrl") || "");
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
   const [imgError, setImgError]   = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
 
   // modal
   const [showModal, setShowModal]         = useState(false);
@@ -94,6 +96,69 @@ export default function ProfilePage() {
     setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
     setError(""); setSuccess("");
     setShowModal(true);
+  };
+
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const MAX = 256;
+          let { width, height } = img;
+          if (width > height) {
+            if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
+          } else {
+            if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.75));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const [avatarError, setAvatarError] = useState("");
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Image must be under 5 MB.");
+      return;
+    }
+    const token = localStorage.getItem("token");
+    if (!token || !profile?.id) return;
+
+    setAvatarError("");
+    setUploadingAvatar(true);
+    try {
+      const dataUrl = await compressImage(file);
+      const res = await fetch(`${API_BASE}/api/users/${profile.id}/avatar`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ avatarUrl: dataUrl }),
+      });
+      if (res.ok) {
+        setAvatarUrl(dataUrl);
+        setImgError(false);
+        localStorage.setItem("avatarUrl", dataUrl);
+        window.dispatchEvent(new CustomEvent("user-profile-updated"));
+      } else {
+        const msg = await res.text();
+        setAvatarError(msg || "Failed to update photo.");
+      }
+    } catch {
+      setAvatarError("Network error. Please try again.");
+    }
+    setUploadingAvatar(false);
   };
 
   const handleSave = async () => {
@@ -207,7 +272,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="mb-4 inline-block">
+                <div className="mb-4 inline-block relative">
                   {avatarUrl && !imgError ? (
                     <img
                       src={avatarUrl}
@@ -220,7 +285,29 @@ export default function ProfilePage() {
                       {initials}
                     </div>
                   )}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    title="Change profile photo"
+                    className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-md ring-2 ring-white transition-colors hover:bg-blue-700 disabled:opacity-60 dark:ring-slate-900"
+                  >
+                    <Camera size={13} />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
                 </div>
+
+                {uploadingAvatar && (
+                  <p className="mb-1 text-xs text-blue-500">Uploading…</p>
+                )}
+                {avatarError && (
+                  <p className="mb-1 text-xs text-rose-500">{avatarError}</p>
+                )}
 
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">{username || "User"}</h2>
 

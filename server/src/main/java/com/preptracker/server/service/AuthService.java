@@ -71,6 +71,13 @@ public class AuthService {
      * We store all linked providers as a comma-separated string (e.g. "LOCAL,GOOGLE")
      * so we can detect and handle account-linking without a separate join table.
      */
+    // Returns true when the user has uploaded their own photo (stored as a base64 data URI).
+    // In that case OAuth logins should not overwrite it with the platform avatar.
+    private boolean hasCustomAvatar(User user) {
+        String url = user.getAvatarUrl();
+        return url != null && url.startsWith("data:");
+    }
+
     private String appendProvider(String existing, String newProvider) {
         if (existing == null || existing.isBlank()) {
             return newProvider;
@@ -259,7 +266,9 @@ public class AuthService {
             Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
             if (existingByGoogleId.isPresent()) {
                 User user = existingByGoogleId.get();
-                if (picture != null) user.setAvatarUrl(picture);
+                // Only apply the platform avatar when the user hasn't uploaded a custom photo.
+                // Custom uploads are stored as base64 data URIs; platform URLs are plain https.
+                if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
                 userRepository.save(user);
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
@@ -270,7 +279,7 @@ public class AuthService {
                 User user = existingByEmail.get();
                 user.setGoogleId(googleId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GOOGLE"));
-                if (picture != null) user.setAvatarUrl(picture);
+                if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
                 userRepository.save(user);
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
@@ -325,6 +334,7 @@ public class AuthService {
             String githubId = String.valueOf(userInfo.get("id"));
             String name = (String) userInfo.get("name");
             String login = (String) userInfo.get("login");
+            String githubAvatar = (String) userInfo.get("avatar_url");
 
             String email = (String) userInfo.get("email");
             if (email == null) {
@@ -344,7 +354,10 @@ public class AuthService {
 
             Optional<User> existingByGithubId = userRepository.findByGithubId(githubId);
             if (existingByGithubId.isPresent()) {
-                return jwtUtil.generateToken(existingByGithubId.get());
+                User user = existingByGithubId.get();
+                if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
+                userRepository.save(user);
+                return jwtUtil.generateToken(user);
             }
 
             Optional<User> existingByEmail = userRepository.findByEmail(email);
@@ -352,6 +365,7 @@ public class AuthService {
                 User user = existingByEmail.get();
                 user.setGithubId(githubId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GITHUB"));
+                if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
                 userRepository.save(user);
                 return jwtUtil.generateToken(user);
             }
@@ -363,6 +377,7 @@ public class AuthService {
             newUser.setGithubId(githubId);
             newUser.setAuthProvider("GITHUB");
             newUser.setIsVerified(true);
+            newUser.setAvatarUrl(githubAvatar);
             userRepository.save(newUser);
 
             return jwtUtil.generateToken(newUser);

@@ -8,6 +8,7 @@ package com.preptracker.server.controller;
 // without needing to know their UUID.
 
 import com.preptracker.server.dto.OnboardingRequest;
+import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
@@ -74,6 +75,17 @@ public class UserController {
         requireSelf(id);
         userService.deleteUser(id);
         return ResponseEntity.ok("User deleted successfully");
+    }
+
+    @PutMapping("/{id}/avatar")
+    public ResponseEntity<Map<String, Object>> updateAvatar(
+            @PathVariable UUID id,
+            @RequestBody UpdateAvatarRequest request) {
+        requireSelf(id);
+        User user = userService.updateAvatarUrl(id, request);
+        Map<String, Object> response = new HashMap<>();
+        response.put("avatarUrl", user.getAvatarUrl());
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/interview-date")

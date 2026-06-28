@@ -2,7 +2,7 @@
 // Displays the user's avatar, progress snapshot, nav links, and a logout button.
 // Hidden on mobile — the main Navbar handles navigation on small screens.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -27,8 +27,17 @@ const NAV_ITEMS = [
 export default function Sidebar({ username, targetLabel, experienceLabel, daysLeft }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [avatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      setAvatarUrl(localStorage.getItem("avatarUrl") || "");
+      setImgError(false);
+    };
+    window.addEventListener("user-profile-updated", sync);
+    return () => window.removeEventListener("user-profile-updated", sync);
+  }, []);
 
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
   const subtitle = targetLabel || experienceLabel || "Interview Prep";

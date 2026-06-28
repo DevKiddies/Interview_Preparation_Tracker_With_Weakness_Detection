@@ -6,6 +6,7 @@ package com.preptracker.server.service;
 // Password changes are blocked for OAuth-only accounts since they have no local password.
 
 import com.preptracker.server.dto.OnboardingRequest;
+import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
@@ -69,6 +70,13 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public User updateAvatarUrl(UUID id, UpdateAvatarRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        user.setAvatarUrl(request.getAvatarUrl());
+        return userRepository.save(user);
+    }
+
     public void deleteUser(UUID id) {
         if (!userRepository.existsById(id)) {
             throw new NotFoundException("User not found");
@@ -105,6 +113,21 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
         user.setIsOnboarded(true);
+
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            String newUsername = request.getUsername().trim();
+            if (!newUsername.equals(user.getUsername())) {
+                if (userRepository.existsByUsername(newUsername)) {
+                    throw new ConflictException("Username '" + newUsername + "' is already taken");
+                }
+                user.setUsername(newUsername);
+            }
+        }
+
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().isBlank()) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+
         userRepository.save(user);
     }
 }
