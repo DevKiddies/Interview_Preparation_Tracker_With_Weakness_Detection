@@ -2,9 +2,9 @@
 // After a successful login we always call /api/users/me to get the 'onboarded' flag
 // and redirect new users to /onboarding and returning users to /dashboard.
 
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, LogIn } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import API_BASE from "../utils/api.js";
 
@@ -16,6 +16,8 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectedFrom = location.state?.from;
 
   const [formData, setFormData] = useState({
     identifier: "",
@@ -116,11 +118,34 @@ function LoginPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
+        <div className="w-full max-w-sm mb-2">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
+            <ArrowLeft size={15} />
+            Back to Home
+          </Link>
+        </div>
         <div className="my-1 text-center justify-center">
-          <h2 className="text-xl font-bold dark:text-white">Welcome Back</h2>
-          <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
-            Sign in to continue your interview preparation!
-          </p>
+          {redirectedFrom ? (
+            <>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-500/10 mb-3">
+                <LogIn size={22} className="text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h2 className="text-xl font-bold dark:text-white">Login to Continue</h2>
+              <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
+                Sign in to access this feature and track your progress.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold dark:text-white">Welcome Back</h2>
+              <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
+                Sign in to continue your interview preparation!
+              </p>
+            </>
+          )}
         </div>
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm w-full max-w-sm p-6 sm:p-8 mt-6 transition-colors duration-200">
           <form

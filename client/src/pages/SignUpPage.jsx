@@ -3,7 +3,7 @@
 // to /api/auth/register. On success it redirects to /verify so the user can
 // confirm their email with a 6-digit OTP.
 
-import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate} from "react-router-dom";
 
@@ -67,6 +67,15 @@ function SignUpPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full px-4 py-8 sm:p-6 transition-colors duration-200">
+        <div className="w-full max-w-sm mb-2">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
+            <ArrowLeft size={15} />
+            Back to Home
+          </Link>
+        </div>
         <div className="text-center mx-auto border border-gray-300 dark:border-slate-700 rounded-xl shadow-lg w-full max-w-sm p-6 sm:p-8 bg-white dark:bg-slate-900 transition-colors duration-200">
           <form className="flex flex-col items-stretch justify-center gap-0.5 w-full" onSubmit={handleSubmit}>
 

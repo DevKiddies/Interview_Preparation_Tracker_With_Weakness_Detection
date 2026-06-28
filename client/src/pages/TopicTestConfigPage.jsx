@@ -70,7 +70,7 @@ const TOPIC_GROUPS = [
   },
 ];
 
-const QUESTION_OPTIONS = [5, 10, 15, 20, 30, 50];
+const QUESTION_OPTIONS = [5, 10, 15, 20, 30, 40];
 
 const TIME_OPTIONS = [
   { label: "10 min",  value: 600 },
@@ -85,10 +85,10 @@ const TIME_OPTIONS = [
 export default function TopicTestConfigPage() {
   const navigate = useNavigate();
 
-  const [search, setSearch]           = useState("");
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [questionCount, setQuestionCount] = useState(20);
-  const [duration, setDuration]           = useState(1800);
+  const [search, setSearch]               = useState("");
+  const [selectedTopics, setSelectedTopics] = useState([]);
+  const [questionCount, setQuestionCount]   = useState(20);
+  const [duration, setDuration]             = useState(1800);
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -98,22 +98,24 @@ export default function TopicTestConfigPage() {
       .filter((g) => g.topics.length > 0);
   }, [search]);
 
-  const selectedGroup = useMemo(
-    () => TOPIC_GROUPS.find((g) => g.topics.includes(selectedTopic)),
-    [selectedTopic]
-  );
+  const toggleTopic = (topic) => {
+    setSelectedTopics((prev) =>
+      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+    );
+  };
 
   const handleStart = () => {
-    if (!selectedTopic) return;
+    if (selectedTopics.length === 0) return;
+    const topicLabel = selectedTopics.length === 1 ? selectedTopics[0] : `${selectedTopics.length} Topics`;
     navigate("/practice/instructions", {
       state: {
         nextUrl:     "/practice/mock-tests/topic",
-        nextState:   { category: selectedTopic, limit: questionCount, duration },
-        testTitle:   `${selectedTopic} Practice Test`,
+        nextState:   { category: selectedTopics, limit: questionCount, duration },
+        testTitle:   `${topicLabel} Practice Test`,
         questions:   questionCount,
         timeMins:    Math.round(duration / 60),
         difficulty:  "Custom",
-        description: `${questionCount} questions focused on ${selectedTopic}`,
+        description: `${questionCount} questions focused on ${selectedTopics.join(", ")}`,
       },
     });
   };
@@ -172,11 +174,11 @@ export default function TopicTestConfigPage() {
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {group.topics.map((topic) => {
-                        const isActive = selectedTopic === topic;
+                        const isActive = selectedTopics.includes(topic);
                         return (
                           <button
                             key={topic}
-                            onClick={() => setSelectedTopic(isActive ? null : topic)}
+                            onClick={() => toggleTopic(topic)}
                             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 shadow-sm ${
                               isActive ? group.active : group.color
                             }`}
@@ -191,18 +193,33 @@ export default function TopicTestConfigPage() {
               )}
             </div>
 
-            {selectedTopic && (
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-indigo-50 dark:bg-indigo-500/10 px-4 py-2.5">
-                <span className="flex items-center gap-2 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                  <BookOpen size={14} />
-                  {selectedTopic}
-                </span>
-                <button
-                  onClick={() => setSelectedTopic(null)}
-                  className="text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200 transition-colors"
-                >
-                  <X size={14} />
-                </button>
+            {selectedTopics.length > 0 && (
+              <div className="mt-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 px-4 py-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                    <BookOpen size={13} />
+                    {selectedTopics.length} topic{selectedTopics.length > 1 ? "s" : ""} selected
+                  </span>
+                  <button
+                    onClick={() => setSelectedTopics([])}
+                    className="text-xs text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedTopics.map((t) => (
+                    <span
+                      key={t}
+                      className="flex items-center gap-1 rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white"
+                    >
+                      {t}
+                      <button onClick={() => toggleTopic(t)} className="ml-0.5 opacity-70 hover:opacity-100">
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -254,8 +271,10 @@ export default function TopicTestConfigPage() {
             <div className="mb-5 grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 rounded-xl bg-slate-50 dark:bg-slate-800 overflow-hidden">
               <div className="px-4 py-3 text-center">
                 <p className="text-base font-extrabold text-slate-900 dark:text-white">
-                  {selectedTopic ? (
-                    <span className="truncate block max-w-full text-sm">{selectedTopic}</span>
+                  {selectedTopics.length > 0 ? (
+                    <span className="truncate block max-w-full text-sm">
+                      {selectedTopics.length === 1 ? selectedTopics[0] : `${selectedTopics.length} Topics`}
+                    </span>
                   ) : (
                     <span className="text-slate-400 text-sm">—</span>
                   )}
@@ -274,16 +293,20 @@ export default function TopicTestConfigPage() {
 
             <button
               onClick={handleStart}
-              disabled={!selectedTopic}
+              disabled={selectedTopics.length === 0}
               className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-sm transition-all duration-150 active:scale-[0.98] ${
-                selectedTopic
+                selectedTopics.length > 0
                   ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20 cursor-pointer"
                   : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none"
               }`}
             >
               <PlayCircle size={16} />
-              {selectedTopic ? `Start ${selectedTopic} Test` : "Select a topic to begin"}
-              {selectedTopic && <ChevronRight size={14} />}
+              {selectedTopics.length === 0
+                ? "Select a topic to begin"
+                : selectedTopics.length === 1
+                ? `Start ${selectedTopics[0]} Test`
+                : `Start Test (${selectedTopics.length} Topics)`}
+              {selectedTopics.length > 0 && <ChevronRight size={14} />}
             </button>
           </div>
         </div>

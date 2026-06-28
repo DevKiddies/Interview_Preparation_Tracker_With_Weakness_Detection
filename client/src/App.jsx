@@ -2,7 +2,7 @@
 // Navbar and Footer are conditionally hidden on full-screen pages (quiz, onboarding, admin).
 
 import { lazy, Suspense } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -35,6 +35,12 @@ const TestResultPage         = lazy(() => import("./pages/TestResultPage"));
 const TestInstructionsPage   = lazy(() => import("./pages/TestInstructionsPage"));
 const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
 
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("token");
+  const location = useLocation();
+  return token ? children : <Navigate to="/login" state={{ from: location.pathname }} replace />;
+}
+
 const App = () => {
   const location = useLocation();
   const isAdminRoute =
@@ -66,11 +72,13 @@ const App = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile/settings" element={<ProfilePage />} />
 
-            <Route path="/practice/mock-tests" element={<MockTestSelectionPage />} />
-            <Route path="/practice/mock-tests/:testId" element={<MockTestPage />} />
-            <Route path="/practice/topic-test" element={<TopicTestConfigPage />} />
-            <Route path="/practice/instructions" element={<TestInstructionsPage />} />
-            <Route path="/practice/results" element={<TestResultPage />} />
+            <Route path="/practice/mock-tests" element={<ProtectedRoute><MockTestSelectionPage /></ProtectedRoute>} />
+            <Route path="/practice/mock-tests/:testId" element={<ProtectedRoute><MockTestPage /></ProtectedRoute>} />
+            <Route path="/practice/topic-test" element={<ProtectedRoute><TopicTestConfigPage /></ProtectedRoute>} />
+            <Route path="/practice/instructions" element={<ProtectedRoute><TestInstructionsPage /></ProtectedRoute>} />
+            <Route path="/practice/results" element={<ProtectedRoute><TestResultPage /></ProtectedRoute>} />
+
+            <Route path="/resources/interview-experiences" element={<ProtectedRoute><WorkInProgress /></ProtectedRoute>} />
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/dashboard" element={<WorkInProgress />} />

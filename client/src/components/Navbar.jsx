@@ -27,7 +27,7 @@ const guestNavItems = [
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude", to: "/practice/aptitude" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
     ],
   },
   {
@@ -63,6 +63,7 @@ const studentNavItems = [
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
     ],
   },
   {
@@ -70,6 +71,7 @@ const studentNavItems = [
     items: [
       { label: "Notes", to: "/resources/notes" },
       { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
+      { label: "Interview Experiences", to: "/resources/interview-experiences" },
     ],
   },
   {

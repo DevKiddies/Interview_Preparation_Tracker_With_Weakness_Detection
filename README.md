@@ -311,11 +311,15 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
   <sub>Full Stack</sub>
 </td>
 <td align="center">
-  <b>Tanishq / Tanya</b><br/>
+  <b>Tanishq</b><br/>
   <sub>Full Stack</sub>
 </td>
 <td align="center">
   <b>Suhani</b><br/>
+  <sub>Full Stack</sub>
+</td>
+<td align="center">
+  <b>Saurabh</b><br/>
   <sub>Full Stack</sub>
 </td>
 </tr>

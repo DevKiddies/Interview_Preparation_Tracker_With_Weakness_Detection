@@ -22,11 +22,14 @@ export default function MockTestPage() {
   // Regular mock tests use hardcoded defaults (20 questions, 90-minute timer).
   const isTopicTest    = testId === "topic";
   const topicConfig    = isTopicTest ? (location.state || {}) : {};
-  const category       = topicConfig.category ?? null;
+  const category       = topicConfig.category ?? null; // string | string[] | null
   const questionLimit  = topicConfig.limit    ?? 20;
   const initialTime    = isTopicTest ? (topicConfig.duration ?? 1800) : 5400;
+  const categoryLabel  = Array.isArray(category)
+    ? (category.length === 1 ? category[0] : `${category.length} Topics`)
+    : (category ?? "Topic");
   const testTitle      = isTopicTest
-    ? `${category ?? "Topic"} Practice`
+    ? `${categoryLabel} Practice`
     : `DSA Assessment #${testId}`;
 
   const retakeUrl   = isTopicTest ? "/practice/mock-tests/topic" : `/practice/mock-tests/${testId}`;
@@ -57,8 +60,12 @@ export default function MockTestPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const qs    = new URLSearchParams({ limit: questionLimit });
-    if (category) qs.set("category", category);
-    else          qs.set("topic", "DSA");
+    if (category) {
+      const cats = Array.isArray(category) ? category : [category];
+      cats.forEach((c) => qs.append("category", c));
+    } else {
+      qs.set("topic", "DSA");
+    }
 
     fetch(`${API_BASE}/api/questions?${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -100,7 +107,7 @@ export default function MockTestPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          topic: category ?? "DSA",
+          topic: Array.isArray(category) ? category.join(", ") : (category ?? "DSA"),
           timeTaken: initialTime - tl,
           questionIds,
           answers,
@@ -173,7 +180,7 @@ export default function MockTestPage() {
   if (questions.length === 0) return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 bg-white dark:bg-slate-950">
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        No questions available for "{category ?? testId}" yet.
+        No questions available for "{categoryLabel ?? testId}" yet.
       </p>
       <button onClick={() => navigate("/practice/mock-tests")}
         className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">

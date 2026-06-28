@@ -137,6 +137,16 @@ function ForgotPasswordPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
 
+      <div className="w-full max-w-sm mb-2">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back to Home
+        </Link>
+      </div>
+
       {step === 1 && (
         <>
           <div className="my-1 text-center">

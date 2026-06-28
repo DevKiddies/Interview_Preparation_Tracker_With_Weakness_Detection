@@ -18,7 +18,7 @@ const footerLinks = [
     links: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude", to: "/practice/aptitude" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
       { label: "AI Interview", to: "/ai-interview" },
     ],
   },
