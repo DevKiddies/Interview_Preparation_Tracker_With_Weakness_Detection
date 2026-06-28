@@ -1,5 +1,8 @@
 package com.preptracker.server.dto;
 
+// Request body for PUT /api/users/{id}/username.
+// UserService checks uniqueness before saving — throws ConflictException if taken.
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

@@ -1,3 +1,8 @@
+// OnBoardingPage.jsx — 4-step wizard that collects the user's target company,
+// interview date, experience level, and focus topics right after registration.
+// Data is saved via /api/users/onboarding and the user is then sent to the dashboard.
+// The "Next" button stays disabled until the current step has a valid selection.
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FormStepper from "../components/ui/FormStepper.jsx";

@@ -1,9 +1,18 @@
 package com.preptracker.server.controller;
 
+// Manages authenticated user profile operations under /api/users.
+// All mutating endpoints enforce that a user can only modify their own account
+// (see requireSelf). Covers: fetching profile, updating username/password,
+// deleting account, setting interview date, and completing onboarding.
+// The /me endpoint is a convenience shortcut to get the current user's full profile
+// without needing to know their UUID.
+
 import com.preptracker.server.dto.OnboardingRequest;
+import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
 import com.preptracker.server.dto.UpdateUsernameRequest;
 import com.preptracker.server.model.User;
+import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,8 +32,23 @@ public class UserController {
 
     private final UserService userService;
 
+    private UUID authenticatedUserId() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return UUID.fromString(principal);
+    }
+
+    // Guards against IDOR — ensures a user can only read/modify their own data,
+    // not another user's by swapping the ID in the URL path.
+    private void requireSelf(UUID id) {
+        if (!authenticatedUserId().equals(id)) {
+            throw new RuntimeException("Access denied: you can only modify your own account");
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<User> getUser(@PathVariable UUID id) {
+        requireSelf(id);
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
@@ -31,6 +56,7 @@ public class UserController {
     public ResponseEntity<User> updateUsername(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUsernameRequest request) {
+        requireSelf(id);
         return ResponseEntity.ok(userService.updateUsername(id, request));
     }
 
@@ -38,14 +64,27 @@ public class UserController {
     public ResponseEntity<String> updatePassword(
             @PathVariable UUID id,
             @Valid @RequestBody UpdatePasswordRequest request) {
+        requireSelf(id);
         userService.updatePassword(id, request);
         return ResponseEntity.ok("Password updated successfully");
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable UUID id) {
+        requireSelf(id);
         userService.deleteUser(id);
         return ResponseEntity.ok("User deleted successfully");
+    }
+
+    @PutMapping("/{id}/interview-date")
+    public ResponseEntity<Map<String, Object>> updateInterviewDate(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateInterviewDateRequest request) {
+        requireSelf(id);
+        var profile = userService.updateInterviewDate(id, request);
+        Map<String, Object> response = new HashMap<>();
+        response.put("interviewDate", profile.getInterviewDate());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/onboarding")
@@ -58,15 +97,26 @@ public class UserController {
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe() {
-        String userId = (String) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal();
-        User user = userService.getUserById(UUID.fromString(userId));
+        UUID uid = authenticatedUserId();
+        User user = userService.getUserById(uid);
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", user.getId());
         response.put("email", user.getEmail());
         response.put("username", user.getUsername());
         response.put("onboarded", user.getIsOnboarded());
+        response.put("avatarUrl", user.getAvatarUrl());
+        response.put("authProvider", user.getAuthProvider());
+
+        UserProfile profile = userService.getUserProfile(uid);
+        if (profile != null) {
+            response.put("targetCompany", profile.getTargetCompany());
+            response.put("interviewDate", profile.getInterviewDate());
+            response.put("experienceLevel", profile.getExperienceLevel());
+            response.put("focusTopics", profile.getFocusTopics() != null
+                    ? List.of(profile.getFocusTopics().split(","))
+                    : List.of());
+        }
 
         return ResponseEntity.ok(response);
     }

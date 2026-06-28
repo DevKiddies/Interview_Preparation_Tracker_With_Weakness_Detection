@@ -1,80 +1,65 @@
-// src/components/ui/QuizFooterControls.jsx
-import { useState } from 'react';
+// QuizFooterControls.jsx — bottom action bar for the quiz question view.
+// Contains Prev/Next navigation, a Flag toggle (marks for review), and
+// a Clear button that only appears once the user has selected an answer.
 
-export default function QuizFooterControls({ onPrev, onFlag, onSaveNext, isFirst, isLast, isFlagged }) {
-  // Requirement 3: Manage mouse state triggers locally
-  const [hoveredBtn, setHoveredBtn] = useState(null);
+import { ChevronLeft, ChevronRight, Flag, RotateCcw } from "lucide-react";
 
-  const baseBtnStyle = {
-    padding: '10px 20px',
-    borderRadius: '6px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    outline: 'none'
-  };
-
-  const getPrevStyle = () => ({
-    ...baseBtnStyle,
-    border: '1px solid #ccc',
-    backgroundColor: isFirst ? '#f3f4f6' : (hoveredBtn === 'prev' ? '#e5e7eb' : 'white'),
-    color: isFirst ? '#9ca3af' : '#374151',
-    cursor: isFirst ? 'not-allowed' : 'pointer'
-  });
-
-  const getFlagStyle = () => {
-    // Requirement 2: Yellow hue background matching the sidebar state
-    if (isFlagged) {
-      return {
-        ...baseBtnStyle,
-        border: '1px solid #d97706',
-        backgroundColor: hoveredBtn === 'flag' ? '#fde68a' : '#fef3c7', 
-        color: '#d97706'
-      };
-    }
-    return {
-      ...baseBtnStyle,
-      border: '1px solid #d97706',
-      backgroundColor: hoveredBtn === 'flag' ? '#fef3c7' : 'transparent',
-      color: '#d97706'
-    };
-  };
-
-  const getSaveNextStyle = () => ({
-    ...baseBtnStyle,
-    border: 'none',
-    backgroundColor: hoveredBtn === 'savenext' ? '#1d4ed8' : '#2563eb', // Darker blue hover tone
-    color: 'white'
-  });
-
+export default function QuizFooterControls({
+  onPrev, onFlag, onSaveNext, onClear,
+  isFirst, isLast, isFlagged, hasAnswer,
+}) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #ddd', paddingTop: '15px', marginTop: 'auto', gap: '10px' }}>
-      <button 
-        onClick={onPrev} 
+    <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-4 mt-auto gap-3 transition-colors duration-200">
+      {/* Prev */}
+      <button
+        onClick={onPrev}
         disabled={isFirst}
-        onMouseEnter={() => setHoveredBtn('prev')}
-        onMouseLeave={() => setHoveredBtn(null)}
-        style={getPrevStyle()}
+        className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
-        ← Prev
+        <ChevronLeft size={16} />
+        <span className="hidden sm:inline">Previous</span>
       </button>
-      
-      <button 
-        onClick={onFlag}
-        onMouseEnter={() => setHoveredBtn('flag')}
-        onMouseLeave={() => setHoveredBtn(null)}
-        style={getFlagStyle()}
-      >
-        {isFlagged ? '⚑ Flagged' : '⚑ Flag'}
-      </button>
-      
-      <button 
+
+      {/* Centre: Clear + Flag */}
+      <div className="flex items-center gap-2">
+        {hasAnswer && (
+          <button
+            onClick={onClear}
+            title="Clear selection"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            <RotateCcw size={13} />
+            <span className="hidden sm:inline">Clear</span>
+          </button>
+        )}
+
+        <button
+          onClick={onFlag}
+          className={`flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+            isFlagged
+              ? "border-amber-400 bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400"
+              : "border-amber-300 dark:border-amber-600/50 bg-transparent text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+          }`}
+        >
+          <Flag size={14} />
+          {isFlagged ? "Flagged" : "Flag"}
+        </button>
+      </div>
+
+      {/* Save & Next */}
+      <button
         onClick={onSaveNext}
-        onMouseEnter={() => setHoveredBtn('savenext')}
-        onMouseLeave={() => setHoveredBtn(null)}
-        style={getSaveNextStyle()}
+        className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition-all"
       >
-        {isLast ? 'Save' : 'Save & Next →'}
+        {isLast ? (
+          "Save"
+        ) : (
+          <>
+            <span className="sm:hidden">Next</span>
+            <span className="hidden sm:inline">Save &amp; Next</span>
+            <ChevronRight size={16} />
+          </>
+        )}
       </button>
     </div>
   );

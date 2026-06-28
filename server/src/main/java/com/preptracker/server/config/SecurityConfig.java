@@ -1,5 +1,12 @@
 package com.preptracker.server.config;
 
+// Defines the security rules for the entire application:
+//   - Which endpoints are public (auth routes, admin login)
+//   - Which require a valid JWT (all other routes)
+//   - Which require ROLE_ADMIN in the token (admin management routes)
+// Also configures CORS (only the frontend origin is allowed) and plugs in
+// JwtFilter so it runs before Spring's own authentication filter.
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +32,7 @@ public class SecurityConfig {
     private String frontendUrl;
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(frontendUrl));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
@@ -37,18 +44,21 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // CSRF disabled — the app is stateless (JWT Bearer tokens, no cookies)
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // Auth endpoints are public (login, register, OTP, OAuth callbacks)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/auth/**").permitAll()
+                        // Admin panel routes require ROLE_ADMIN, which JwtFilter injects from the token's "role" claim
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

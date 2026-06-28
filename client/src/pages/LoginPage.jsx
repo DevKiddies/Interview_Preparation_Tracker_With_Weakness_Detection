@@ -1,3 +1,7 @@
+// LoginPage.jsx — handles email/password login as well as Google and GitHub OAuth.
+// After a successful login we always call /api/users/me to get the 'onboarded' flag
+// and redirect new users to /onboarding and returning users to /dashboard.
+
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -46,7 +50,8 @@ function LoginPage() {
         const data = await response.json();
         localStorage.setItem("token", data.token);
 
-        // Check if already onboarded
+        // Fetch the full profile to check if the user has completed onboarding,
+        // and to store their username so the Navbar can display it right away.
         const meRes = await fetch(`${API_BASE}/api/users/me`, {
           headers: { Authorization: `Bearer ${data.token}` },
         });
@@ -69,6 +74,8 @@ function LoginPage() {
       setGoogleLoading(true);
       setError("");
       try {
+        // Fire both requests in parallel to reduce wait time:
+        // Google's userinfo endpoint (for the avatar picture) and our backend auth.
         const [googleInfo, response] = await Promise.all([
           fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
@@ -76,19 +83,21 @@ function LoginPage() {
           fetch(`${API_BASE}/api/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: tokenResponse.access_token }),
+            body: JSON.stringify({ accessToken: tokenResponse.access_token }),
           }),
         ]);
 
         if (response.ok) {
           const data = await response.json();
           localStorage.setItem("token", data.token);
-          if (googleInfo.picture) localStorage.setItem("avatarUrl", googleInfo.picture);
           const meRes = await fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${data.token}` },
           });
           const me = await meRes.json();
           if (me.username) localStorage.setItem("username", me.username);
+          const avatar = me.avatarUrl || googleInfo.picture || "";
+          if (avatar) localStorage.setItem("avatarUrl", avatar);
+          window.dispatchEvent(new CustomEvent("user-profile-updated"));
           navigate(me.onboarded ? "/dashboard" : "/onboarding");
         } else {
           const message = await response.text();
@@ -106,8 +115,7 @@ function LoginPage() {
   });
 
   return (
-    <>
-      <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
+    <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
         <div className="my-1 text-center justify-center">
           <h2 className="text-xl font-bold dark:text-white">Welcome Back</h2>
           <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
@@ -225,8 +233,7 @@ function LoginPage() {
             </p>
           </form>
         </div>
-      </div>
-    </>
+    </div>
   );
 }
 

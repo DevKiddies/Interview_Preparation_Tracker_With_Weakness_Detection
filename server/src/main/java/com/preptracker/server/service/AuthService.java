@@ -1,11 +1,21 @@
 package com.preptracker.server.service;
 
+// Core authentication logic for the application.
+// Handles: user registration with email OTP verification, login (email or username),
+// OTP resend, logout (via JWT blacklist), password reset flow, and OAuth login
+// via Google and GitHub. Also handles account-linking — if a user registered with
+// email and later logs in with Google using the same address, both are merged
+// into one account rather than creating a duplicate.
+
 import com.preptracker.server.dto.AuthResponse;
 import com.preptracker.server.dto.ForgotPasswordRequest;
 import com.preptracker.server.dto.LoginRequest;
 import com.preptracker.server.dto.RegisterRequest;
 import com.preptracker.server.dto.ResetPasswordRequest;
 import com.preptracker.server.dto.VerifyOtpRequest;
+import com.preptracker.server.exception.ConflictException;
+import com.preptracker.server.exception.NotFoundException;
+import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.VerificationToken;
 import com.preptracker.server.repository.UserRepository;
@@ -30,7 +40,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -57,8 +66,11 @@ public class AuthService {
     @Value("${jwt.expiration}")
     private long expirationMs;
 
-    // appends a provider if not already present
-    // e.g. "LOCAL" + "GOOGLE" → "LOCAL,GOOGLE"
+    /**
+     * A user can sign up with LOCAL credentials and later log in via Google or GitHub.
+     * We store all linked providers as a comma-separated string (e.g. "LOCAL,GOOGLE")
+     * so we can detect and handle account-linking without a separate join table.
+     */
     private String appendProvider(String existing, String newProvider) {
         if (existing == null || existing.isBlank()) {
             return newProvider;
@@ -71,15 +83,15 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public void register(RegisterRequest request) {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Password Do Not Match!");
+            throw new RuntimeException("Passwords do not match");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email Already Exists!");
+            throw new ConflictException("Email is already registered");
         }
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username Already Taken!");
+            throw new ConflictException("Username is already taken");
         }
         User user = new User();
         user.setUsername(request.getUsername());
@@ -98,23 +110,22 @@ public class AuthService {
         verificationTokenRepository.save(verificationToken);
 
         emailService.sendOtpEmail(user.getEmail(), otp);
-        return new AuthResponse("Check Your Email For OTP Verification");
     }
 
     public AuthResponse login(LoginRequest request) {
         User user;
         if (request.getIdentifier().contains("@")) {
             user = userRepository.findByEmail(request.getIdentifier())
-                    .orElseThrow(() -> new RuntimeException("Email doesn't exist"));
+                    .orElseThrow(() -> new NotFoundException("No account found with that email"));
         } else {
             user = userRepository.findByUsername(request.getIdentifier())
-                    .orElseThrow(() -> new RuntimeException("Username Do Not Exist"));
+                    .orElseThrow(() -> new NotFoundException("No account found with that username"));
         }
         if (!user.getIsVerified()) {
-            throw new RuntimeException("Email Not Verified!");
+            throw new UnauthorizedException("Email not verified. Please check your inbox.");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid Password");
+            throw new UnauthorizedException("Invalid password");
         }
         String token = jwtUtil.generateToken(user);
         return new AuthResponse(token);
@@ -122,21 +133,49 @@ public class AuthService {
 
     @Transactional
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
-        VerificationToken verificationToken = verificationTokenRepository.findByOtp(request.getOtp())
-                .orElseThrow(() -> new RuntimeException("OTP Not Valid"));
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
+
+        VerificationToken verificationToken = verificationTokenRepository
+                .findByUserIdAndOtp(user.getId(), request.getOtp())
+                .orElseThrow(() -> new UnauthorizedException("Invalid OTP"));
+
         if (verificationToken.getUsed())
-            throw new RuntimeException("OTP already used");
+            throw new UnauthorizedException("OTP already used");
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now()))
-            throw new RuntimeException("OTP Expired");
+            throw new UnauthorizedException("OTP expired");
+
         verificationToken.setUsed(true);
-        UUID userId = verificationToken.getUserId();
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User Not Found"));
         user.setIsVerified(true);
         String token = jwtUtil.generateToken(user);
         verificationTokenRepository.save(verificationToken);
         userRepository.save(user);
         return new AuthResponse(token);
+    }
+
+    @Transactional
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
+
+        if (user.getIsVerified()) {
+            throw new RuntimeException("Account is already verified");
+        }
+
+        // Invalidate all previous OTPs before issuing a new one to prevent replay attacks
+        List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
+        existing.forEach(t -> t.setUsed(true));
+        verificationTokenRepository.saveAll(existing);
+
+        String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
+        VerificationToken verificationToken = new VerificationToken();
+        verificationToken.setUserId(user.getId());
+        verificationToken.setOtp(otp);
+        verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(20));
+        verificationToken.setUsed(false);
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendOtpEmail(user.getEmail(), otp);
     }
 
     public AuthResponse logout(String authHeader) {
@@ -151,7 +190,7 @@ public class AuthService {
     @Transactional
     public void requestPasswordReset(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
 
         // Invalidate all existing tokens for this user
         List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
@@ -172,17 +211,16 @@ public class AuthService {
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("No account found with that email address"));
+                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
 
-        VerificationToken token = verificationTokenRepository.findByOtp(request.getOtp())
-                .orElseThrow(() -> new RuntimeException("Invalid OTP"));
+        VerificationToken token = verificationTokenRepository
+                .findByUserIdAndOtp(user.getId(), request.getOtp())
+                .orElseThrow(() -> new UnauthorizedException("Invalid OTP"));
 
-        if (!token.getUserId().equals(user.getId()))
-            throw new RuntimeException("Invalid OTP");
         if (token.getUsed())
-            throw new RuntimeException("OTP has already been used");
+            throw new UnauthorizedException("OTP has already been used");
         if (token.getExpiresAt().isBefore(LocalDateTime.now()))
-            throw new RuntimeException("OTP has expired");
+            throw new UnauthorizedException("OTP has expired");
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
@@ -211,21 +249,28 @@ public class AuthService {
             String googleId = (String) userInfo.get("sub");
             String email = (String) userInfo.get("email");
             String name = (String) userInfo.get("name");
+            String picture = (String) userInfo.get("picture");
 
             if (googleId == null || email == null) {
                 throw new RuntimeException("Invalid user info from Google");
             }
 
+            // Fast path: user already linked this Google account
             Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
             if (existingByGoogleId.isPresent()) {
-                return new AuthResponse(jwtUtil.generateToken(existingByGoogleId.get()));
+                User user = existingByGoogleId.get();
+                if (picture != null) user.setAvatarUrl(picture);
+                userRepository.save(user);
+                return new AuthResponse(jwtUtil.generateToken(user));
             }
 
+            // Account-linking: same email already exists (e.g. registered with LOCAL) — link Google to it
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
                 user.setGoogleId(googleId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GOOGLE"));
+                if (picture != null) user.setAvatarUrl(picture);
                 userRepository.save(user);
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
@@ -237,6 +282,7 @@ public class AuthService {
             newUser.setGoogleId(googleId);
             newUser.setAuthProvider("GOOGLE");
             newUser.setIsVerified(true);
+            newUser.setAvatarUrl(picture);
             userRepository.save(newUser);
 
             return new AuthResponse(jwtUtil.generateToken(newUser));
@@ -282,6 +328,8 @@ public class AuthService {
 
             String email = (String) userInfo.get("email");
             if (email == null) {
+                // GitHub users with private email settings return null from /user.
+                // We fall back to the /user/emails endpoint and pick their primary address.
                 ResponseEntity<List<Map<String, Object>>> emailResponse = restTemplate.exchange(
                         "https://api.github.com/user/emails",
                         HttpMethod.GET, userEntity,
@@ -324,6 +372,7 @@ public class AuthService {
         }
     }
 
+    // Derives a username from the OAuth display name and appends a numeric suffix if it's taken.
     private String generateUniqueUsername(String name) {
         String base = name != null ? name.toLowerCase().replaceAll("\\s+", "") : "user";
         String username = base;

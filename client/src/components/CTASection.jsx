@@ -1,3 +1,6 @@
+// CTASection.jsx — final call-to-action banner at the bottom of the landing page.
+// Directs users to sign up. Placed last so it's the takeaway after reading all features.
+
 import { Rocket } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 

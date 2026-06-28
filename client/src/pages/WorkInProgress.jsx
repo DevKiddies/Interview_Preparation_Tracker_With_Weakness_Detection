@@ -1,9 +1,12 @@
+// WorkInProgress.jsx — placeholder page for features that are still being built.
+// Also used as the catch-all 404 route so unknown paths land here instead of crashing.
+
 import { Hammer, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function WorkInProgress() {
     return (
-        <div className="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-950 dark:to-slate-900/50 transition-colors duration-200">
+        <div className="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center bg-linear-to-b from-white to-slate-50/50 dark:from-slate-950 dark:to-slate-900/50 transition-colors duration-200">
 
             <div className="relative mb-6">
                 <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-full blur-xl opacity-60 animate-pulse" />

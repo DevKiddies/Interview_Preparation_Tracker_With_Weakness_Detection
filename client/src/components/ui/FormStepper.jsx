@@ -1,3 +1,7 @@
+// FormStepper.jsx — horizontal step indicator used in the onboarding flow.
+// Completed steps show a checkmark, the active step gets a ring highlight,
+// and future steps are greyed out so the user knows where they are.
+
 import React from "react";
 
 function FormStepper({ steps, currentStep }) {

@@ -1,3 +1,7 @@
+// RecommendedForYou.jsx — dashboard card showing AI-curated study recommendations.
+// Items are passed in as props so the parent (DashboardPage) controls the data source.
+// The onStart callback lets the parent decide where each CTA navigates to.
+
 import { BookOpen, PlayCircle, Code2 } from "lucide-react";
 import DashboardCard from "../ui/DashboardCard";
 
@@ -25,7 +29,7 @@ function RecommendationRow({ item, onStart }) {
   const Icon = ICONS[item.icon] ?? BookOpen;
   return (
     <div className="flex items-center gap-3 py-3">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${ICON_TONES[item.badgeTone]}`}>
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${ICON_TONES[item.badgeTone]}`}>
         <Icon size={20} />
       </span>
       <div className="min-w-0 flex-1">

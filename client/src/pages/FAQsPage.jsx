@@ -1,3 +1,6 @@
+// FAQsPage.jsx — accordion-style frequently asked questions page.
+// Each question expands on click to show the answer below it.
+
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";

@@ -6,12 +6,12 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-// import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-
-
-
+// Sends transactional emails via Brevo's REST API (https://api.brevo.com).
+// Currently handles two email types: OTP verification (sent after registration)
+// and password reset OTP. Brevo credentials and sender identity are read from
+// application.properties and injected via @Value.
 @Service
 @RequiredArgsConstructor
 public class EmailService {

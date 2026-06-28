@@ -1,3 +1,6 @@
+// ProgressByTopic.jsx — renders a labelled progress bar for each topic,
+// giving the user a quick visual read on which areas need more practice.
+
 import ProgressBar from "../ui/ProgressBar";
 
 export default function ProgressByTopic({ topics }) {

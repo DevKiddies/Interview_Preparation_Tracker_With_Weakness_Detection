@@ -1,5 +1,7 @@
-// Generic white surface card used across the dashboard.
-// Optional header with title/subtitle on the left and an action node on the right.
+// DashboardCard.jsx — generic card wrapper used by every dashboard widget.
+// Provides a consistent white card shell with an optional title, subtitle,
+// and action slot (e.g. a "View All" button). Content goes in children.
+
 export default function DashboardCard({
   title,
   subtitle,
