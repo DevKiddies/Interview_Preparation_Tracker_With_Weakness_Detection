@@ -34,5 +34,5 @@ build/
 
 
 # For password not to push to GitHub
-application.yaml
+application.properties
 target/
