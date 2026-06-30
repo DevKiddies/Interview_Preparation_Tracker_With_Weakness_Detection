@@ -1,5 +1,9 @@
 package com.preptracker.server.dto;
 
+// Request body for POST /api/auth/reset-password (step 2 of the reset flow).
+// All three fields must be provided: the user's email, the OTP they received,
+// and the new password they want to set.
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

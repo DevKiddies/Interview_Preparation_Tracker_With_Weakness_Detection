@@ -1,5 +1,10 @@
 package com.preptracker.server.model;
 
+// Stores the onboarding data collected from a user after their first login.
+// Kept separate from the User entity because not every user completes onboarding,
+// and this data can be updated independently without touching core auth fields.
+// focusTopics is stored as a comma-separated string (e.g. "DSA,System Design").
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -25,16 +30,17 @@ public class UserProfile {
     @Column(name = "user_id", nullable = false, unique = true)
     private UUID userId;
 
-    @Column(nullable = true)
+    @Column
     private String targetCompany;
 
-    @Column(nullable = true)
+    @Column
     private String interviewDate;
 
-    @Column(nullable = true)
+    @Column
     private String experienceLevel;
 
-    @Column(nullable = true)
+    // comma-separated list e.g. "DSA,System Design,OS" — split on the frontend before rendering
+    @Column
     private String focusTopics;
 
     @CreationTimestamp

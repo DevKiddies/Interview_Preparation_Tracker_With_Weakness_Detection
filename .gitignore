@@ -16,6 +16,6 @@ tree.txt
 .DS_Store
 
 # For password not to push to GitHub
-application.yaml
+application.properties
 
 target/

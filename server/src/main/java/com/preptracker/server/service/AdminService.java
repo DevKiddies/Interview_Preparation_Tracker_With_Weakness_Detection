@@ -1,5 +1,9 @@
 package com.preptracker.server.service;
 
+// Business logic for admin authentication.
+// Admins can log in with either their email or username. On success, returns a JWT
+// that carries a "role: ADMIN" claim, which SecurityConfig uses to gate /api/admin/** routes.
+
 import com.preptracker.server.dto.AdminLoginRequest;
 import com.preptracker.server.dto.AuthResponse;
 import com.preptracker.server.model.Admin;

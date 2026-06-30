@@ -1,5 +1,10 @@
 package com.preptracker.server.config;
 
+// Configures Redis to store keys and values as plain UTF-8 strings instead of
+// Java's binary serialization (which is Spring Boot's default). This matters
+// because we use Redis for the JWT blacklist — string storage lets you inspect
+// blacklisted tokens directly in redis-cli during debugging.
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -9,18 +14,15 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
-    /*This RedisTemplate is at start is autoconfigured by SpringBoot, but the problem is that it stored the data as binary(unreadable to humans) when under inspection
-    * THIS FILE REDIS CONFIG EXIST TO OVERRIDE THIS EXACT BEHAVIOR TO READABLE FORMAT
-    * */
+    // Spring Boot's default RedisTemplate serializes data using Java's binary serialization,
+    // which makes keys like "blacklist:<token>" show up as unreadable bytes in redis-cli.
+    // We override it here so both keys and values are stored as plain UTF-8 strings.
     @Bean
-    public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory)// This line creates a new Redis Template instance
-    /*This REDISCONNECTIONFACTORY is the object that manages connection, SpringBoot creates it automatically by reading "application.yaml"
-    * */
-    {
-        RedisTemplate<String, String> template = new RedisTemplate<>(); //Spring tool used to talk to Redis
-        template.setConnectionFactory(connectionFactory);// Due to this syntax TEMPLATE knows where Redis is and how to connect to it. THIS IS A BRIDGE TO TEMPLATE AND REDIS
-        template.setKeySerializer(new StringRedisSerializer()); //This line converts the Key to UTF8 String. When reading it back it again converts it into Java String
-        template.setValueSerializer(new StringRedisSerializer()); //Same shit but for values
-        return template; // Template is configured, Spring takes it and register it as Bean, this makes it injectable.
+    RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new StringRedisSerializer());
+        return template;
     }
 }

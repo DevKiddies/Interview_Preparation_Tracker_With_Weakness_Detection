@@ -1,3 +1,7 @@
+// WeaknessRadarChart.jsx — spider/radar chart showing the user's score across
+// multiple topics at a glance. Topics with a smaller "slice" are the weak areas
+// that the AI uses to generate targeted recommendations.
+
 import {
   Radar,
   RadarChart,

@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+// Stores OTP tokens for two flows: email verification (after registration) and password reset.
+// Both flows share this same table — the context is inferred by how the token is used.
+// Once consumed, tokens are marked used=true rather than deleted, so a replayed OTP
+// is rejected even if someone intercepts it after it was already accepted.
 @Entity
 @Table(name="verification_tokens")
 @Data

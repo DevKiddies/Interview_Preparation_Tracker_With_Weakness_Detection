@@ -32,7 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-
 # For password not to push to GitHub
 application.properties
 target/

@@ -1,3 +1,7 @@
+// TestimonialsSection.jsx — social proof section on the landing page showing
+// student success stories. Testimonials are static data — update them here
+// as real user reviews come in.
+
 import { Shield, RefreshCw, BadgeCheck, Star } from 'lucide-react'
 
 const testimonials = [

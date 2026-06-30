@@ -1,3 +1,6 @@
+// OurTeamPage.jsx — team introduction page listing the people who built PrepEdge.
+// Update the 'team' array below when new members join or roles change.
+
 import { ExternalLink, Globe, Mail } from "lucide-react";
 
 const team = [

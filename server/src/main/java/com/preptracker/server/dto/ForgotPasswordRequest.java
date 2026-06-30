@@ -1,5 +1,8 @@
 package com.preptracker.server.dto;
 
+// Request body for POST /api/auth/forgot-password (step 1 of the reset flow).
+// AuthService will invalidate any existing OTPs for this user and send a new one.
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;

@@ -1,3 +1,7 @@
+// LandingPage.jsx — public marketing page shown to visitors who aren't logged in.
+// Composed of independent section components stacked in order; each section
+// can be reordered or removed here without touching the individual components.
+
 import HeroSection from "../components/HeroSection.jsx"
 import CompaniesSection from "../components/CompaniesSection.jsx"
 import HowItWorksSection from "../components/HowItWorksSection.jsx"

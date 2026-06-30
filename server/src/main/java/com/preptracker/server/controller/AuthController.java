@@ -1,5 +1,10 @@
 package com.preptracker.server.controller;
 
+// Handles all user-facing authentication endpoints under /api/auth.
+// Covers the full auth lifecycle: register → verify OTP → login → logout,
+// plus OAuth flows for Google and GitHub (both redirect-based and token-based).
+// Password reset (forgot password → OTP → new password) also lives here.
+
 import com.preptracker.server.dto.AuthResponse;
 import com.preptracker.server.dto.ForgotPasswordRequest;
 import com.preptracker.server.dto.GoogleAuthRequest;
@@ -16,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -56,7 +62,17 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request) {
-        return ResponseEntity.ok(authService.loginWithGoogle(request.getIdToken()));
+        return ResponseEntity.ok(authService.loginWithGoogle(request.getAccessToken()));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<String> resendOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body("Email is required");
+        }
+        authService.resendOtp(email.trim());
+        return ResponseEntity.ok("Verification code resent");
     }
 
     @PostMapping("/forgot-password")
@@ -69,11 +85,6 @@ public class AuthController {
     public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok("Password reset successfully");
-    }
-
-    @GetMapping("/test")
-    public ResponseEntity<String> test() {
-        return ResponseEntity.ok("You are authenticated!");
     }
 
     @GetMapping("/github")

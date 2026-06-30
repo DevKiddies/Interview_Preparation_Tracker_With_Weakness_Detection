@@ -1,3 +1,7 @@
+// Card.jsx — generic centred card container used by standalone pages like
+// Onboarding and profile forms. Width and height are adjustable via props
+// so the same shell works across different content sizes.
+
 import React from 'react';
 
 function Card({ children, width = '480px', height = 'auto' }) {

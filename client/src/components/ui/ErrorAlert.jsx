@@ -1,3 +1,7 @@
+// ErrorAlert.jsx — inline error banner used below form headers.
+// Returns nothing when message is empty so callers don't need
+// to conditionally render it themselves.
+
 function ErrorAlert({ message }) {
   if (!message) return null;
 

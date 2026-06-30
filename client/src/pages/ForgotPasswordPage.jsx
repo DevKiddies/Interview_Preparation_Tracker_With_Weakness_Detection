@@ -1,3 +1,8 @@
+// ForgotPasswordPage.jsx — two-step password reset flow.
+// Step 1: user enters their email → server sends a 6-digit OTP.
+// Step 2: user enters the OTP + new password → server validates and resets.
+// On success a brief confirmation is shown before redirecting back to login.
+
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,7 +26,7 @@ function ForgotPasswordPage() {
   const otpRefs = useRef([]);
   const navigate = useNavigate();
 
-  // ── Step 1: send OTP ────────────────────────────────────────────────────────
+  // Step 1: sends a 6-digit OTP to the provided email via /api/auth/forgot-password
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError("");
@@ -46,7 +51,7 @@ function ForgotPasswordPage() {
     }
   };
 
-  // ── OTP input handlers ───────────────────────────────────────────────────────
+  // Individual digit inputs: auto-advance on entry, backtrack on delete, support paste
   const handleOtpChange = (el, index) => {
     const val = el.value;
     if (isNaN(val)) return;
@@ -70,7 +75,7 @@ function ForgotPasswordPage() {
     otpRefs.current[OTP_LENGTH - 1].focus();
   };
 
-  // ── Step 2: reset password ───────────────────────────────────────────────────
+  // Step 2: validates OTP + new password then calls /api/auth/reset-password
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setError("");
@@ -98,6 +103,7 @@ function ForgotPasswordPage() {
       });
       if (res.ok) {
         setSuccess(true);
+        // Give the user a moment to read the success screen before redirecting.
         setTimeout(() => navigate("/login"), 2500);
       } else {
         setError(await res.text() || "Failed to reset password. Please try again.");
@@ -109,7 +115,7 @@ function ForgotPasswordPage() {
     }
   };
 
-  // ── Success screen ───────────────────────────────────────────────────────────
+  // Success state shown after the password has been reset
   if (success) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 transition-colors duration-200">
@@ -131,7 +137,16 @@ function ForgotPasswordPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(101vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full p-4 sm:p-6 transition-colors duration-200">
 
-      {/* ── Step 1: Enter email ─────────────────────────────────────────────── */}
+      <div className="w-full max-w-sm mb-2">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back to Home
+        </Link>
+      </div>
+
       {step === 1 && (
         <>
           <div className="my-1 text-center">
@@ -175,7 +190,6 @@ function ForgotPasswordPage() {
         </>
       )}
 
-      {/* ── Step 2: OTP + new password ──────────────────────────────────────── */}
       {step === 2 && (
         <>
           <div className="my-1 text-center">
@@ -189,7 +203,6 @@ function ForgotPasswordPage() {
             <form onSubmit={handleResetPassword} className="flex flex-col gap-3">
               {error && <ErrorAlert message={error} />}
 
-              {/* OTP boxes */}
               <div>
                 <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-3">Verification Code</p>
                 <div className="flex gap-2 justify-center">
@@ -211,7 +224,6 @@ function ForgotPasswordPage() {
                 </div>
               </div>
 
-              {/* New password */}
               <InputField
                 label="New Password"
                 id="newPassword"
@@ -231,7 +243,6 @@ function ForgotPasswordPage() {
                 </button>
               </InputField>
 
-              {/* Confirm password */}
               <InputField
                 label="Confirm New Password"
                 id="confirmPassword"

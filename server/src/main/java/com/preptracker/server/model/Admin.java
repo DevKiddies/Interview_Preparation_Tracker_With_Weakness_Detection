@@ -1,5 +1,10 @@
 package com.preptracker.server.model;
 
+// Represents an admin account. Admins are separate from regular users and are
+// created manually in the database — there is no public registration for admins.
+// On login, AdminService issues a JWT with a "role: ADMIN" claim, which SecurityConfig
+// uses to protect all /api/admin/** routes.
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

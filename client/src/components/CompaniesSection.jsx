@@ -1,3 +1,6 @@
+// CompaniesSection.jsx — social proof strip on the landing page listing companies
+// that PrepEdge users have been placed at. Update this list as the team adds partners.
+
 const companies = ['Google', 'Meta', 'Amazon', 'Flipkart', 'Swiggy', 'Zomato', 'Razorpay', 'Zepto']
 
 export default function CompaniesSection() {

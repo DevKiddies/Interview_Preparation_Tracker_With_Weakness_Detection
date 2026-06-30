@@ -1,3 +1,7 @@
+// AdminLoginPage.jsx — login page for platform admins only (not regular users).
+// Uses a separate adminToken in localStorage so an admin can be logged in
+// alongside a regular user session without conflicts.
+
 import { Mail, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -45,6 +49,7 @@ function AdminLoginPage() {
 
       if (response.ok) {
         const data = await response.json();
+        // Store under 'adminToken', not 'token', to avoid colliding with the user session.
         localStorage.setItem("adminToken", data.token);
         navigate("/");
       } else {
@@ -52,7 +57,9 @@ function AdminLoginPage() {
         setError(message || "Invalid credentials.");
       }
     } catch {
-      setError("Something went wrong. Please check your connection and try again.");
+      setError(
+        "Something went wrong. Please check your connection and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -114,7 +121,10 @@ function AdminLoginPage() {
 
           <p className="text-xs text-gray-500 dark:text-slate-400 font-normal mt-4 text-center w-full">
             Not an admin?{" "}
-            <Link to="/login" className="text-blue-500 hover:underline font-medium">
+            <Link
+              to="/login"
+              className="text-blue-500 hover:underline font-medium"
+            >
               Go to user login
             </Link>
           </p>

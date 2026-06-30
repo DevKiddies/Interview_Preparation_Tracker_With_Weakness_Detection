@@ -1,21 +1,34 @@
+// HeroSection.jsx — landing page hero with a typewriter animation that cycles
+// through motivational phrases and context-aware CTA buttons (different for
+// logged-in vs guest users).
+
 import { BarChart2, CheckCircle2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const WORDS = ['dream job.', 'top offer.', 'FAANG role.', 'six figures.', 'your goals.']
-const TYPE_SPEED = 100
-const DELETE_SPEED = 50
-const PAUSE_MS = 1800
+// Typewriter timing constants — adjust these if the animation feels too fast/slow.
+const TYPE_SPEED = 100   // ms per character while typing
+const DELETE_SPEED = 50  // ms per character while deleting (faster feels snappier)
+const PAUSE_MS = 1800    // how long the fully typed word stays visible before deleting
 
 export default function HeroSection() {
   const [displayText, setDisplayText] = useState('')
   const [wordIndex, setWordIndex] = useState(0)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const navigate = useNavigate()
 
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem('token'))
+  }, [])
+
   const handleGetStarted = () => {
-    const token = localStorage.getItem('token')
-    navigate(token ? '/dashboard' : '/signup')
+    navigate(isLoggedIn ? '/dashboard' : '/signup')
+  }
+
+  const handleViewMockTests = () => {
+    navigate(isLoggedIn ? '/practice/mock-tests' : '/login')
   }
 
   useEffect(() => {
@@ -23,13 +36,17 @@ export default function HeroSection() {
 
     const timeout = setTimeout(() => {
       if (!isDeleting) {
+        // Keep appending one character until the whole word is typed.
         setDisplayText(current.slice(0, displayText.length + 1))
         if (displayText.length + 1 === current.length) {
+          // Word fully typed — wait a bit, then start deleting.
           setTimeout(() => setIsDeleting(true), PAUSE_MS)
         }
       } else {
+        // Remove one character at a time until the string is empty.
         setDisplayText(current.slice(0, displayText.length - 1))
         if (displayText.length - 1 === 0) {
+          // Done deleting — advance to the next word (wraps around).
           setIsDeleting(false)
           setWordIndex((i) => (i + 1) % WORDS.length)
         }
@@ -65,15 +82,15 @@ export default function HeroSection() {
                 onClick={handleGetStarted}
                 className="bg-gray-900 hover:bg-gray-800 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white text-sm font-semibold px-6 py-3 rounded-full transition-colors"
               >
-                Get Started
+                {isLoggedIn ? 'Go to Dashboard' : 'Get Started'}
               </button>
-              <a
-                href="#"
+              <button
+                onClick={handleViewMockTests}
                 className="inline-flex items-center gap-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 text-sm font-semibold px-6 py-3 rounded-full transition-colors"
               >
                 <BarChart2 className="w-4 h-4 text-gray-500 dark:text-slate-400" />
                 View Mock Tests
-              </a>
+              </button>
             </div>
 
             <div className="flex items-center gap-8">

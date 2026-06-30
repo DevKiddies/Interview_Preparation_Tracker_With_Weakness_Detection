@@ -1,3 +1,6 @@
+// PrivacyPolicyPage.jsx — static page outlining how PrepEdge collects, stores,
+// and uses user data. Update this whenever data practices change.
+
 import { Link } from "react-router-dom";
 import { Shield } from "lucide-react";
 

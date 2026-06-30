@@ -1,5 +1,9 @@
 package com.preptracker.server.dto;
 
+// Request body for PUT /api/users/{id}/password.
+// Requires the current password (oldPassword) to confirm identity before changing.
+// Not available for OAuth-only accounts — they have no local password stored.
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
