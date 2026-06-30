@@ -1,4 +1,4 @@
-﻿package com.preptracker.server.config;
+package com.preptracker.server.config;
 
 // Registers RestTemplate as a Spring bean so it can be injected anywhere we need
 // to call external HTTP APIs - currently used for Google OAuth (userinfo endpoint)
