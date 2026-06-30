@@ -15,9 +15,39 @@ import API_BASE from "../utils/api.js";
 // ---- Admin Nav Structure ----
 const adminNavItems = [
   { label: "Dashboard", to: "/admin/dashboard" },
-  { label: "User Management", to: "/admin/users" },
-  { label: "Question Management", to: "/admin/questions" },
-  { label: "Test Management", to: "/admin/tests" },
+  {
+    label: "Users",
+    items: [
+      { label: "All Users", to: "/admin/users" },
+      { label: "User Results", to: "/admin/users/results" },
+      { label: "Banned Users", to: "/admin/users/banned" },
+    ],
+  },
+  {
+    label: "Questions",
+    items: [
+      { label: "Question Bank", to: "/admin/questions" },
+      { label: "Add Question", to: "/admin/questions/add" },
+      { label: "Categories & Topics", to: "/admin/questions/categories" },
+    ],
+  },
+  {
+    label: "Tests",
+    items: [
+      { label: "All Tests", to: "/admin/tests" },
+      { label: "Create Mock Test", to: "/admin/tests/create" },
+      { label: "Test Results", to: "/admin/tests/results" },
+    ],
+  },
+  {
+    label: "Analytics",
+    items: [
+      { label: "Platform Overview", to: "/admin/analytics" },
+      { label: "User Reports", to: "/admin/analytics/users" },
+      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses" },
+    ],
+  },
+  { label: "Settings", to: "/admin/settings" },
 ];
 
 // ---- Guest (Public) Nav Structure ----
@@ -336,6 +366,11 @@ export default function Navbar() {
     label: "Admin",
     items: [
       { label: "Dashboard", to: "/admin/dashboard" },
+      { label: "All Users", to: "/admin/users" },
+      { label: "Question Bank", to: "/admin/questions" },
+      { label: "All Tests", to: "/admin/tests" },
+      { label: "Analytics", to: "/admin/analytics" },
+      { label: "Settings", to: "/admin/settings" },
       { label: "Logout", action: handleAdminSignOut },
     ],
   };

@@ -35,6 +35,9 @@ const TestResultPage         = lazy(() => import("./pages/TestResultPage"));
 const TestInstructionsPage   = lazy(() => import("./pages/TestInstructionsPage"));
 const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
 
+const AdminLayout            = lazy(() => import("./components/admin/AdminLayout"));
+const AdminComingSoon        = lazy(() => import("./pages/admin/AdminComingSoon"));
+
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   const location = useLocation();
@@ -81,10 +84,34 @@ const App = () => {
             <Route path="/resources/interview-experiences" element={<ProtectedRoute><WorkInProgress /></ProtectedRoute>} />
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin/dashboard" element={<WorkInProgress />} />
-            <Route path="/admin/users" element={<WorkInProgress />} />
-            <Route path="/admin/questions" element={<WorkInProgress />} />
-            <Route path="/admin/tests" element={<WorkInProgress />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route path="dashboard" element={<AdminComingSoon title="Dashboard" />} />
+
+              {/* User Management */}
+              <Route path="users" element={<AdminComingSoon title="All Users" />} />
+              <Route path="users/results" element={<AdminComingSoon title="User Results" />} />
+              <Route path="users/banned" element={<AdminComingSoon title="Banned Users" />} />
+              <Route path="users/:userId" element={<AdminComingSoon title="User Details" />} />
+
+              {/* Question Management */}
+              <Route path="questions" element={<AdminComingSoon title="Question Bank" />} />
+              <Route path="questions/add" element={<AdminComingSoon title="Add Question" />} />
+              <Route path="questions/categories" element={<AdminComingSoon title="Categories & Topics" />} />
+              <Route path="questions/edit/:id" element={<AdminComingSoon title="Edit Question" />} />
+
+              {/* Test Management */}
+              <Route path="tests" element={<AdminComingSoon title="All Tests" />} />
+              <Route path="tests/create" element={<AdminComingSoon title="Create Mock Test" />} />
+              <Route path="tests/results" element={<AdminComingSoon title="Test Results" />} />
+
+              {/* Analytics */}
+              <Route path="analytics" element={<AdminComingSoon title="Platform Overview" />} />
+              <Route path="analytics/users" element={<AdminComingSoon title="User Reports" />} />
+              <Route path="analytics/weaknesses" element={<AdminComingSoon title="Weakness Analysis" />} />
+
+              {/* Settings */}
+              <Route path="settings" element={<AdminComingSoon title="Admin Settings" />} />
+            </Route>
             <Route path="/about/us" element={<AboutUsPage />} />
             <Route path="/about/team" element={<OurTeamPage />} />
             <Route path="/about/contact" element={<ContactPage />} />
