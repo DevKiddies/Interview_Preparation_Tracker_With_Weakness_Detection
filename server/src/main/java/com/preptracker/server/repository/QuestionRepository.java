@@ -11,6 +11,7 @@ import java.util.List;
 
 public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findByTopic(String topic);
+    List<Question> findByTopicIn(List<String> topics);
     List<Question> findByCategory(String category);
     List<Question> findByCategoryIn(List<String> categories);
 }
