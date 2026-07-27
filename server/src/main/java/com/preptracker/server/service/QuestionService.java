@@ -21,14 +21,16 @@ public class QuestionService {
 
     private final QuestionRepository questionRepository;
 
-    public List<QuestionDTO> getQuestions(String topic, List<String> categories, int limit) {
+    public List<QuestionDTO> getQuestions(List<String> topics, List<String> categories, int limit) {
         List<Question> questions;
         if (categories != null && !categories.isEmpty()) {
             questions = categories.size() == 1
                 ? questionRepository.findByCategory(categories.get(0))
                 : questionRepository.findByCategoryIn(categories);
-        } else if (topic != null && !topic.isBlank()) {
-            questions = questionRepository.findByTopic(topic);
+        } else if (topics != null && !topics.isEmpty()) {
+            questions = topics.size() == 1
+                ? questionRepository.findByTopic(topics.get(0))
+                : questionRepository.findByTopicIn(topics);
         } else {
             questions = questionRepository.findAll();
         }

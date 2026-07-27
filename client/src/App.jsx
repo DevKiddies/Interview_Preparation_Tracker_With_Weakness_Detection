@@ -39,6 +39,28 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminComingSoon = lazy(() => import("./pages/admin/AdminComingSoon"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminBannedUsers = lazy(() => import("./pages/admin/AdminBannedUsers"));
+const AdminAllUsers = lazy(() => import("./pages/admin/AdminAllUsers"));
+const AdminUserResults = lazy(() => import("./pages/admin/AdminUserResults"));
+const AdminQuestionBank = lazy(() => import("./pages/admin/AdminQuestionBank"));
+const AdminAddQuestion = lazy(() => import("./pages/admin/AdminAddQuestion"));
+const AdminCategoriesTopics = lazy(
+  () => import("./pages/admin/AdminCategoriesTopics"),
+);
+const AdminAllTests = lazy(() => import("./pages/admin/AdminAllTests"));
+const AdminCreateMockTest = lazy(
+  () => import("./pages/admin/AdminCreateMockTest"),
+);
+const AdminTestResults = lazy(() => import("./pages/admin/AdminTestResults"));
+const AdminPlatformOverview = lazy(
+  () => import("./pages/admin/AdminPlatformOverview"),
+);
+const AdminUserReports = lazy(() => import("./pages/admin/AdminUserReports"));
+const AdminWeaknessAnalysis = lazy(
+  () => import("./pages/admin/AdminWeaknessAnalysis"),
+);
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -133,41 +155,23 @@ const App = () => {
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin" element={<AdminLayout />}>
-              <Route
-                path="dashboard"
-                element={<AdminComingSoon title="Dashboard" />}
-              />
+              <Route path="dashboard" element={<AdminDashboard />} />
 
               {/* User Management */}
-              <Route
-                path="users"
-                element={<AdminComingSoon title="All Users" />}
-              />
-              <Route
-                path="users/results"
-                element={<AdminComingSoon title="User Results" />}
-              />
-              <Route
-                path="users/banned"
-                element={<AdminComingSoon title="Banned Users" />}
-              />
+              <Route path="users" element={<AdminAllUsers />} />
+              <Route path="users/results" element={<AdminUserResults />} />
+              <Route path="users/banned" element={<AdminBannedUsers />} />
               <Route
                 path="users/:userId"
                 element={<AdminComingSoon title="User Details" />}
               />
 
               {/* Question Management */}
-              <Route
-                path="questions"
-                element={<AdminComingSoon title="Question Bank" />}
-              />
-              <Route
-                path="questions/add"
-                element={<AdminComingSoon title="Add Question" />}
-              />
+              <Route path="questions" element={<AdminQuestionBank />} />
+              <Route path="questions/add" element={<AdminAddQuestion />} />
               <Route
                 path="questions/categories"
-                element={<AdminComingSoon title="Categories & Topics" />}
+                element={<AdminCategoriesTopics />}
               />
               <Route
                 path="questions/edit/:id"
@@ -175,38 +179,20 @@ const App = () => {
               />
 
               {/* Test Management */}
-              <Route
-                path="tests"
-                element={<AdminComingSoon title="All Tests" />}
-              />
-              <Route
-                path="tests/create"
-                element={<AdminComingSoon title="Create Mock Test" />}
-              />
-              <Route
-                path="tests/results"
-                element={<AdminComingSoon title="Test Results" />}
-              />
+              <Route path="tests" element={<AdminAllTests />} />
+              <Route path="tests/create" element={<AdminCreateMockTest />} />
+              <Route path="tests/results" element={<AdminTestResults />} />
 
               {/* Analytics */}
-              <Route
-                path="analytics"
-                element={<AdminComingSoon title="Platform Overview" />}
-              />
-              <Route
-                path="analytics/users"
-                element={<AdminComingSoon title="User Reports" />}
-              />
+              <Route path="analytics" element={<AdminPlatformOverview />} />
+              <Route path="analytics/users" element={<AdminUserReports />} />
               <Route
                 path="analytics/weaknesses"
-                element={<AdminComingSoon title="Weakness Analysis" />}
+                element={<AdminWeaknessAnalysis />}
               />
 
               {/* Settings */}
-              <Route
-                path="settings"
-                element={<AdminComingSoon title="Admin Settings" />}
-              />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
             <Route path="/about/us" element={<AboutUsPage />} />
             <Route path="/about/team" element={<OurTeamPage />} />

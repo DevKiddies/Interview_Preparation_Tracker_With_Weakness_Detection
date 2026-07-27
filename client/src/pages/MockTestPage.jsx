@@ -62,7 +62,7 @@ export default function MockTestPage() {
     const qs    = new URLSearchParams({ limit: questionLimit });
     if (category) {
       const cats = Array.isArray(category) ? category : [category];
-      cats.forEach((c) => qs.append("category", c));
+      cats.forEach((c) => qs.append("topic", c));
     } else {
       qs.set("topic", "DSA");
     }

@@ -22,10 +22,11 @@ public class QuestionController {
 
     @GetMapping
     public ResponseEntity<List<QuestionDTO>> getQuestions(
-            @RequestParam(defaultValue = "DSA") String topic,
+            @RequestParam(required = false) List<String> topic,
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        return ResponseEntity.ok(questionService.getQuestions(topic, category, limit));
+        List<String> topics = (topic == null || topic.isEmpty()) ? List.of("DSA") : topic;
+        return ResponseEntity.ok(questionService.getQuestions(topics, category, limit));
     }
 }
