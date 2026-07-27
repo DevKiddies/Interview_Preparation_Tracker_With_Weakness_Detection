@@ -5,26 +5,19 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/dashboard/Sidebar";
-import WelcomeHeader from "../components/dashboard/WelcomeHeader";
 import StatCard from "../components/dashboard/StatCard";
-import DangerZoneAlert from "../components/dashboard/DangerZoneAlert";
-import WeaknessRadarChart from "../components/dashboard/WeaknessRadarChart";
-import ConfidenceAccuracyChart from "../components/dashboard/ConfidenceAccuracyChart";
 import ActivityHeatmap from "../components/dashboard/ActivityHeatmap";
 import QuickActions from "../components/dashboard/QuickActions";
-import RecommendedForYou from "../components/dashboard/RecommendedForYou";
-import ProgressByTopic from "../components/dashboard/ProgressByTopic";
+import PreparationCard from "../components/dashboard/PreparationCard";
 import API_BASE from "../utils/api.js";
-
-import {
-  dashboardStats,
-  dangerZone,
-  weaknessRadar,
-  confidenceAccuracy,
-  quickActions,
-  recommendations,
-  topicProgress,
-} from "../data/dashboardData";
+import ConfidenceByTopic from "../components/dashboard/ConfidenceByTopic";
+import { topicConfidence } from "../data/dashboardData";
+import { confidenceTrend } from "../data/dashboardData";
+import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
+import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
+import { blindSpotData } from "../data/dashboardData";
+import AccuracyHeatmap from "../components/dashboard/AccuracyHeatmap";
+import { accuracyHeatmap } from "../data/dashboardData";
 
 const TARGET_LABELS = {
   faang: "FAANG / Big Tech",
@@ -81,7 +74,6 @@ export default function DashboardPage() {
 
   const targetLabel = TARGET_LABELS[profile?.targetCompany] ?? null;
   const experienceLabel = EXPERIENCE_LABELS[profile?.experienceLevel] ?? null;
-  const focusTopics = profile?.focusTopics ?? [];
 
   return (
     <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
@@ -94,86 +86,82 @@ export default function DashboardPage() {
         />
 
         <div className="min-w-0 flex-1 space-y-6">
-          <WelcomeHeader
-            firstName={username}
-            daysLeft={daysLeft}
-            targetLabel={targetLabel}
-            experienceLabel={experienceLabel}
-            onStartTest={() =>
-              navigate("/practice/instructions", {
-                state: {
-                  nextUrl:     "/practice/mock-tests/dsa",
-                  nextState:   null,
-                  testTitle:   "DSA Fundamentals",
-                  questions:   20,
-                  timeMins:    90,
-                  difficulty:  "Mixed",
-                  description: "Arrays, HashMaps, Trees, Graphs, Sorting & Dynamic Programming",
-                },
-              })
-            }
+          <PreparationCard
+              targetLabel={targetLabel}
+              experienceLabel={experienceLabel}
+              interviewDate={profile?.interviewDate}
+              daysLeft={daysLeft}
+              onStartTest={() =>
+                  navigate("/practice/instructions", {
+                    state: {
+                      nextUrl: "/practice/mock-tests/dsa",
+                      nextState: null,
+                      testTitle: "DSA Fundamentals",
+                      questions: 20,
+                      timeMins: 90,
+                      difficulty: "Mixed",
+                      description:
+                          "Arrays, HashMaps, Trees, Graphs, Sorting & Dynamic Programming",
+                    },
+                  })
+              }
           />
-
-          {focusTopics.length > 0 && (
-            <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Your Focus Topics
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {focusTopics.map((topic) => (
-                  <span
-                    key={topic}
-                    className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
-                  >
-                    {topic}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Stats row */}
+          {/* Stats Row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {dashboardStats.map((stat) => (
-              <StatCard key={stat.id} {...stat} />
-            ))}
+            <StatCard
+                title="Overall Confidence"
+                value="78%"
+                icon="brain"
+                color="blue"
+                change="+3%"
+                trend="up"
+                description="vs last week"
+            />
+
+            <StatCard
+                title="Overall Accuracy"
+                value="82%"
+                icon="target"
+                color="green"
+                change="+2%"
+                trend="up"
+                description="vs last week"
+            />
+
+            <StatCard
+                title="Questions Solved"
+                value="1,247"
+                icon="book"
+                color="purple"
+                change="+56"
+                trend="up"
+                description="this week"
+            />
+
+            <StatCard
+                title="Study Streak"
+                value="18 Days"
+                icon="flame"
+                color="orange"
+                change="+2"
+                trend="up"
+                description="current streak"
+            />
           </div>
 
-          <DangerZoneAlert topic={dangerZone.topic} message={dangerZone.message} />
 
           {/* Charts */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <WeaknessRadarChart data={weaknessRadar} />
-            <ConfidenceAccuracyChart dataByRange={confidenceAccuracy} />
+            <ConfidenceByTopic topics={topicConfidence} />
+            <ConfidenceTrend data={confidenceTrend} />
           </div>
 
-          {/* Activity + Recommendations */}
+          {/* Charts Row 2 — Side by Side Grid */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ActivityHeatmap
-              footer={<QuickActions actions={quickActions} />}
-            />
-            <RecommendedForYou
-              items={recommendations}
-              onStart={(item) => {
-                if (item.badge === "Mock Test") {
-                  navigate("/practice/instructions", {
-                    state: {
-                      nextUrl:     "/practice/mock-tests/dsa",
-                      nextState:   null,
-                      testTitle:   item.title,
-                      questions:   20,
-                      timeMins:    90,
-                      difficulty:  "Mixed",
-                      description: item.description,
-                    },
-                  });
-                } else {
-                  navigate("/practice/mock-tests");
-                }
-              }}
-              footer={<ProgressByTopic topics={topicProgress} />}
-            />
+            <BlindSpotAnalysis data={blindSpotData} />
+            <AccuracyHeatmap data={accuracyHeatmap} />
           </div>
+
         </div>
       </div>
     </div>
