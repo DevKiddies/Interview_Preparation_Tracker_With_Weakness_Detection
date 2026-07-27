@@ -1,15 +1,53 @@
-import { Menu, X, ChevronDown, Moon, Sun } from "lucide-react";
-import { useState } from "react";
+// Navbar.jsx — sticky top navigation bar with three separate nav structures:
+// guest (not logged in), student (logged-in user), and admin.
+// Avatar and username stay in sync with the profile settings page via a custom DOM event.
+
+import { Menu, X, ChevronDown, Moon, Sun, Bell } from "lucide-react";
+import { useState, useEffect } from "react";
 import Logo from "./ui/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import API_BASE from "../utils/api.js";
+
+// Three separate nav configs because admins, logged-in students, and guests
+// have completely different sections. We pick the right one at render time.
 
 // ---- Admin Nav Structure ----
 const adminNavItems = [
   { label: "Dashboard", to: "/admin/dashboard" },
-  { label: "User Management", to: "/admin/users" },
-  { label: "Question Management", to: "/admin/questions" },
-  { label: "Test Management", to: "/admin/tests" },
+  {
+    label: "Users",
+    items: [
+      { label: "All Users", to: "/admin/users" },
+      { label: "User Results", to: "/admin/users/results" },
+      { label: "Banned Users", to: "/admin/users/banned" },
+    ],
+  },
+  {
+    label: "Questions",
+    items: [
+      { label: "Question Bank", to: "/admin/questions" },
+      { label: "Add Question", to: "/admin/questions/add" },
+      { label: "Categories & Topics", to: "/admin/questions/categories" },
+    ],
+  },
+  {
+    label: "Tests",
+    items: [
+      { label: "All Tests", to: "/admin/tests" },
+      { label: "Create Mock Test", to: "/admin/tests/create" },
+      { label: "Test Results", to: "/admin/tests/results" },
+    ],
+  },
+  {
+    label: "Analytics",
+    items: [
+      { label: "Platform Overview", to: "/admin/analytics" },
+      { label: "User Reports", to: "/admin/analytics/users" },
+      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses" },
+    ],
+  },
+  { label: "Settings", to: "/admin/settings" },
 ];
 
 // ---- Guest (Public) Nav Structure ----
@@ -19,7 +57,7 @@ const guestNavItems = [
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude", to: "/practice/aptitude" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
     ],
   },
   {
@@ -51,18 +89,11 @@ const guestNavItems = [
 // ---- Logged-in Student Nav Structure ----
 const studentNavItems = [
   {
-    label: "Dashboard",
-    items: [
-      { label: "My Progress", to: "/dashboard/progress" },
-      { label: "Bookmarks", to: "/dashboard/bookmarks" },
-      { label: "History", to: "/dashboard/history" },
-    ],
-  },
-  {
     label: "Practice",
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
     ],
   },
   {
@@ -70,7 +101,7 @@ const studentNavItems = [
     items: [
       { label: "Notes", to: "/resources/notes" },
       { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
-      { label: "Saved Notes", to: "/resources/saved-notes" },
+      { label: "Interview Experiences", to: "/resources/interview-experiences" },
     ],
   },
   {
@@ -165,7 +196,7 @@ function NavDropdown({
 }
 
 // ---- Mobile accordion section ----
-function MobileNavSection({ label, to, items, openSection, setOpenSection, onNavigate }) {
+function MobileNavSection({ label, sectionKey, to, items, openSection, setOpenSection, onNavigate }) {
   if (!items) {
     return (
       <Link
@@ -178,13 +209,15 @@ function MobileNavSection({ label, to, items, openSection, setOpenSection, onNav
     );
   }
 
-  const isOpen = openSection === label;
+  // Use sectionKey for comparison so JSX-element labels work reliably
+  const key = sectionKey ?? label;
+  const isOpen = openSection === key;
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setOpenSection(isOpen ? null : label)}
+        onClick={() => setOpenSection(isOpen ? null : key)}
         className="w-full flex items-center justify-between text-slate-700 dark:text-slate-200 font-medium py-2"
       >
         {label}
@@ -242,14 +275,40 @@ function ThemeToggle({ className = "" }) {
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openMobileSection, setOpenMobileSection] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
+  const [username, setUsername] = useState(() => localStorage.getItem("username") || "");
+  const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const adminToken = localStorage.getItem("adminToken");
-  const avatarUrl = localStorage.getItem("avatarUrl");
-  const username = localStorage.getItem("username");
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
 
-  const handleSignOut = () => {
+  useEffect(() => {
+    // Listen for the custom event dispatched by DashboardPage and ProfilePage
+    // after a successful profile save, so the avatar/username refreshes here
+    // without requiring a full page reload.
+    const sync = () => {
+      setAvatarUrl(localStorage.getItem("avatarUrl") || "");
+      setUsername(localStorage.getItem("username") || "");
+      setImgError(false);
+    };
+    window.addEventListener("user-profile-updated", sync);
+    return () => window.removeEventListener("user-profile-updated", sync);
+  }, []);
+
+  const handleSignOut = async () => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        // Tell the server to invalidate the token (best-effort — we log out locally regardless).
+        await fetch(`${API_BASE}/api/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // proceed with local logout even if server call fails
+      }
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("avatarUrl");
     localStorage.removeItem("username");
@@ -272,12 +331,24 @@ export default function Navbar() {
 
   const avatarLabel = (
     <div className="flex items-center gap-2">
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="Profile" className="w-7 h-7 rounded-full object-cover ring-2 ring-blue-100 dark:ring-slate-700" />
+      {avatarUrl && !imgError ? (
+        <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-blue-100 dark:ring-slate-700 shrink-0">
+          <img
+            src={avatarUrl}
+            alt="Profile"
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        </div>
       ) : (
-        <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
+        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
           {initials}
         </div>
+      )}
+      {username && (
+        <span className="hidden lg:inline text-sm font-semibold text-slate-700 dark:text-slate-200 max-w-30 truncate">
+          {username}
+        </span>
       )}
     </div>
   );
@@ -285,6 +356,7 @@ export default function Navbar() {
   const profileItem = {
     label: avatarLabel,
     items: [
+      { label: "Dashboard", to: "/dashboard" },
       { label: "Settings", to: "/profile/settings" },
       { label: "Logout", action: handleSignOut },
     ],
@@ -294,12 +366,17 @@ export default function Navbar() {
     label: "Admin",
     items: [
       { label: "Dashboard", to: "/admin/dashboard" },
+      { label: "All Users", to: "/admin/users" },
+      { label: "Question Bank", to: "/admin/questions" },
+      { label: "All Tests", to: "/admin/tests" },
+      { label: "Analytics", to: "/admin/analytics" },
+      { label: "Settings", to: "/admin/settings" },
       { label: "Logout", action: handleAdminSignOut },
     ],
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md px-6 py-4 shadow-sm transition-colors duration-200">
+    <nav className="sticky top-0 z-50 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md px-6 py-2.5 shadow-sm transition-colors duration-200">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo and Brand */}
         <Link to="/" className="flex items-center gap-2 group transition-transform duration-200 active:scale-95">
@@ -319,6 +396,16 @@ export default function Navbar() {
 
         {/* Desktop Action Area */}
         <div className="hidden md:flex items-center gap-3 text-sm font-semibold">
+          {token && (
+            <button
+              type="button"
+              aria-label="Notifications"
+              className="relative w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200"
+            >
+              <Bell size={16} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-800" />
+            </button>
+          )}
           <ThemeToggle />
           {adminToken ? (
             <NavDropdown {...adminItem} align="right" />
@@ -380,6 +467,7 @@ export default function Navbar() {
           ) : token ? (
             <MobileNavSection
               {...profileItem}
+              sectionKey="profile"
               openSection={openMobileSection}
               setOpenSection={setOpenMobileSection}
               onNavigate={() => setIsMenuOpen(false)}

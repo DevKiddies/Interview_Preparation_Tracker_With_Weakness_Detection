@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+// OnBoardingPage.jsx — 5-step wizard that collects the user's target company,
+// interview date, experience level, focus topics, and profile (username + avatar).
+// Data is saved via /api/users/onboarding and the user is then sent to the dashboard.
+// The "Next" button stays disabled until the current step has a valid selection.
+
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import FormStepper from "../components/ui/FormStepper.jsx";
 import API_BASE from "../utils/api.js";
@@ -9,6 +14,7 @@ function OnBoardingPage() {
     "Select Interview Date",
     "Select Experience Level",
     "Select Focus Topics",
+    "Set Up Your Profile",
   ];
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -20,6 +26,8 @@ function OnBoardingPage() {
     interviewDate: "",
     experienceLevel: "",
     focusTopics: [],
+    username: localStorage.getItem("username") || "",
+    avatarUrl: localStorage.getItem("avatarUrl") || "",
   });
 
   const handleNext = () => {
@@ -54,23 +62,33 @@ function OnBoardingPage() {
           interviewDate: formData.interviewDate,
           experienceLevel: formData.experienceLevel,
           focusTopics: formData.focusTopics,
+          username: formData.username.trim(),
+          avatarUrl: formData.avatarUrl,
         }),
       });
       if (response.ok) {
+        if (formData.username.trim()) localStorage.setItem("username", formData.username.trim());
+        if (formData.avatarUrl) localStorage.setItem("avatarUrl", formData.avatarUrl);
+        window.dispatchEvent(new CustomEvent("user-profile-updated"));
         navigate("/dashboard");
       } else {
-        setError("Failed to save onboarding data. Please try again.");
+        const msg = await response.text();
+        setError(msg || "Failed to save onboarding data. Please try again.");
       }
     } catch {
       setError("Something went wrong. Please check your connection.");
     }
   };
 
+  const _t = new Date();
+  const todayStr = `${_t.getFullYear()}-${String(_t.getMonth() + 1).padStart(2, "0")}-${String(_t.getDate()).padStart(2, "0")}`;
+
   const isNextDisabled = () => {
     if (currentStep === 0) return !formData.targetCompany;
-    if (currentStep === 1) return !formData.interviewDate;
+    if (currentStep === 1) return !formData.interviewDate || formData.interviewDate < todayStr;
     if (currentStep === 2) return !formData.experienceLevel;
     if (currentStep === 3) return formData.focusTopics.length === 0;
+    if (currentStep === 4) return !formData.username.trim();
     return false;
   };
 
@@ -94,12 +112,17 @@ function OnBoardingPage() {
       <div className="flex-1 flex items-stretch justify-center px-4 pb-6 min-h-0">
         <div className="w-full max-w-2xl flex flex-col border border-gray-200 dark:border-slate-700 rounded-2xl shadow-lg bg-white dark:bg-slate-800 overflow-hidden">
 
-          {/* Step content — scrollable only if it overflows */}
-          <div className="flex-1 overflow-y-auto px-6 pt-5 pb-2 text-left onboarding-scroll">
+          {/* Step content */}
+          <div className={`flex-1 min-h-0 px-6 text-left ${
+            currentStep === 4
+              ? "flex items-center overflow-hidden py-6"
+              : "overflow-y-auto pt-5 pb-2 onboarding-scroll"
+          }`}>
             {currentStep === 0 && <TargetStep formData={formData} setFormData={setFormData} />}
             {currentStep === 1 && <DateStep formData={formData} setFormData={setFormData} />}
             {currentStep === 2 && <ExperienceStep formData={formData} setFormData={setFormData} />}
             {currentStep === 3 && <TopicsStep formData={formData} setFormData={setFormData} />}
+            {currentStep === 4 && <ProfileStep formData={formData} setFormData={setFormData} />}
           </div>
 
           {/* Navigation — always pinned to bottom of card */}
@@ -171,16 +194,26 @@ function TargetStep({ formData, setFormData }) {
 }
 
 function DateStep({ formData, setFormData }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
   const calculateDaysRemaining = (targetDate) => {
     if (!targetDate) return null;
     const target = new Date(targetDate);
-    const today = new Date();
     target.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
     const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    return diff >= 0 ? diff : 0;
+    return diff >= 0 ? diff : -1;
   };
   const daysRemaining = calculateDaysRemaining(formData.interviewDate);
+  const isPast = daysRemaining !== null && daysRemaining < 0;
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    if (val && val < todayStr) return;
+    setFormData({ ...formData, interviewDate: val });
+  };
+
   return (
     <>
       <h2 className="text-lg font-bold mb-1 text-slate-900 dark:text-white">When is your interview?</h2>
@@ -189,10 +222,18 @@ function DateStep({ formData, setFormData }) {
         <input
           type="date"
           value={formData.interviewDate}
-          onChange={(e) => setFormData({ ...formData, interviewDate: e.target.value })}
-          className="border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-base font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 shadow-sm w-full max-w-xs transition-all"
+          min={todayStr}
+          onChange={handleDateChange}
+          className={`border rounded-lg px-4 py-3 text-base font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 shadow-sm w-full max-w-xs transition-all ${
+            isPast
+              ? "border-rose-400 focus:ring-rose-400"
+              : "border-gray-300 dark:border-slate-600"
+          }`}
         />
-        {formData.interviewDate && (
+        {isPast && (
+          <p className="text-xs font-medium text-rose-500">Please choose a future date.</p>
+        )}
+        {formData.interviewDate && !isPast && (
           <div className="bg-amber-500 text-white font-semibold text-sm px-5 py-1.5 rounded-full shadow-sm">
             ~ {daysRemaining} days remaining
           </div>
@@ -242,50 +283,209 @@ function ExperienceStep({ formData, setFormData }) {
   );
 }
 
-function TopicsStep({ formData, setFormData }) {
-  const [search, setSearch] = React.useState("");
-  const topics = [
-    // Languages
-    "C", "C++", "Java", "Python", "JavaScript", "TypeScript", "Go", "Rust", "Kotlin", "Swift",
-    // DSA
-    "Arrays", "Linked Lists", "Stacks & Queues", "Trees", "Graphs", "Heaps", "Tries",
-    "Hashing", "Sorting & Searching", "Recursion", "Dynamic Programming",
-    "Greedy Algorithms", "Backtracking", "Bit Manipulation",
-    "Sliding Window", "Two Pointers", "Binary Search", "Divide & Conquer",
-    // OOP & Design
-    "OOP Concepts", "OOP in Java", "Design Patterns", "SOLID Principles",
-    // System Design
-    "System Design", "Low Level Design", "Microservices", "REST APIs",
-    "Message Queues", "Caching", "Load Balancing", "Rate Limiting",
-    // Databases
-    "SQL", "Database Design", "Indexing & Query Optimization", "Transactions & ACID",
-    "NoSQL", "MongoDB", "Redis",
-    // Web & Frameworks
-    "Web Programming", "React", "Node.js", "SpringBoot", "Django", "FastAPI",
-    // CS Fundamentals
-    "Operating Systems", "Process & Threads", "Memory Management",
-    "Computer Networks", "TCP/IP", "HTTP & HTTPS",
-    "DBMS", "Compiler Design", "Computer Architecture",
-    // Tools & Practices
-    "Git & Version Control", "Docker", "Kubernetes", "CI/CD",
-    "Time & Space Complexity", "Problem Solving",
-  ];
-  const toggleTopic = (topic) => {
-    const active = [...formData.focusTopics];
-    if (active.includes(topic)) {
-      setFormData({ ...formData, focusTopics: active.filter((t) => t !== topic) });
-    } else {
-      setFormData({ ...formData, focusTopics: [...active, topic] });
-    }
+function ProfileStep({ formData, setFormData }) {
+  const fileInputRef = useRef(null);
+  const [imgError, setImgError] = React.useState(false);
+  const [compressing, setCompressing] = React.useState(false);
+
+  const initials = formData.username
+    ? formData.username.slice(0, 2).toUpperCase()
+    : "U";
+
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const MAX = 256;
+          let { width, height } = img;
+          if (width > height) {
+            if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
+          } else {
+            if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.75));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB."); return; }
+    setCompressing(true);
+    try {
+      const dataUrl = await compressImage(file);
+      setFormData({ ...formData, avatarUrl: dataUrl });
+      setImgError(false);
+    } catch { /* ignore */ }
+    setCompressing(false);
   };
 
-  const filtered = topics.filter((t) =>
-    t.toLowerCase().includes(search.toLowerCase())
+  return (
+    <div className="w-full flex items-center gap-8">
+
+      {/* Left — Avatar */}
+      <div className="flex flex-col items-center gap-3 shrink-0">
+        <div className="relative">
+          {formData.avatarUrl && !imgError ? (
+            <img
+              src={formData.avatarUrl}
+              alt="avatar"
+              onError={() => setImgError(true)}
+              className="h-32 w-32 rounded-full object-cover ring-4 ring-indigo-500/30 shadow-xl"
+            />
+          ) : (
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-violet-600 text-5xl font-bold text-white shadow-xl ring-4 ring-indigo-500/30">
+              {initials}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={compressing}
+            title="Upload photo"
+            className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg ring-2 ring-white dark:ring-slate-800 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-60"
+          >
+            {compressing ? (
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            )}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        </div>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Upload photo</p>
+      </div>
+
+      {/* Vertical divider */}
+      <div className="w-px self-stretch bg-slate-200 dark:bg-slate-700 shrink-0" />
+
+      {/* Right — Form */}
+      <div className="flex-1 flex flex-col gap-5">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Set up your profile</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            You can always update these from your profile settings.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Display Name <span className="text-rose-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.username}
+            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+            placeholder="Enter your display name"
+            maxLength={30}
+            className="w-full rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-3 text-sm text-slate-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+          />
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            This is how others will see you on the platform.
+          </p>
+        </div>
+      </div>
+
+    </div>
   );
+}
+
+const TOPIC_CATEGORIES = [
+  {
+    label: "LANGUAGES",
+    unselected: "bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400",
+    selected:   "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20",
+    topics: ["C", "C++", "Java", "Python", "JavaScript", "TypeScript", "Go", "Rust", "Kotlin", "Swift"],
+  },
+  {
+    label: "DATA STRUCTURES & ALGORITHMS",
+    unselected: "bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 hover:border-violet-400",
+    selected:   "bg-violet-600 border-violet-500 text-white shadow-md shadow-violet-500/20",
+    topics: [
+      "Arrays", "Linked Lists", "Stacks & Queues", "Trees", "Graphs", "Heaps", "Tries",
+      "Hashing", "Sorting & Searching", "Recursion", "Dynamic Programming",
+      "Greedy Algorithms", "Backtracking", "Bit Manipulation",
+      "Sliding Window", "Two Pointers", "Binary Search", "Divide & Conquer",
+    ],
+  },
+  {
+    label: "OOP & DESIGN",
+    unselected: "bg-teal-500/10 border-teal-500/30 text-teal-300 hover:bg-teal-500/20 hover:border-teal-400",
+    selected:   "bg-teal-600 border-teal-500 text-white shadow-md shadow-teal-500/20",
+    topics: ["OOP Concepts", "OOP in Java", "Design Patterns", "SOLID Principles"],
+  },
+  {
+    label: "SYSTEM DESIGN",
+    unselected: "bg-cyan-500/10 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400",
+    selected:   "bg-cyan-600 border-cyan-500 text-white shadow-md shadow-cyan-500/20",
+    topics: ["System Design", "Low Level Design", "Microservices", "REST APIs", "Message Queues", "Caching", "Load Balancing", "Rate Limiting"],
+  },
+  {
+    label: "DATABASES",
+    unselected: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-400",
+    selected:   "bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-500/20",
+    topics: ["SQL", "Database Design", "Indexing & Query Optimization", "Transactions & ACID", "NoSQL", "MongoDB", "Redis"],
+  },
+  {
+    label: "WEB & FRAMEWORKS",
+    unselected: "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400",
+    selected:   "bg-amber-500 border-amber-400 text-white shadow-md shadow-amber-500/20",
+    topics: ["Web Programming", "React", "Node.js", "SpringBoot", "Django", "FastAPI"],
+  },
+  {
+    label: "CS FUNDAMENTALS",
+    unselected: "bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:border-rose-400",
+    selected:   "bg-rose-600 border-rose-500 text-white shadow-md shadow-rose-500/20",
+    topics: ["Operating Systems", "Process & Threads", "Memory Management", "Computer Networks", "TCP/IP", "HTTP & HTTPS", "DBMS", "Compiler Design", "Computer Architecture"],
+  },
+  {
+    label: "TOOLS & PRACTICES",
+    unselected: "bg-slate-500/10 border-slate-500/30 text-slate-300 hover:bg-slate-500/20 hover:border-slate-400",
+    selected:   "bg-slate-500 border-slate-400 text-white shadow-md shadow-slate-500/20",
+    topics: ["Git & Version Control", "Docker", "Kubernetes", "CI/CD", "Time & Space Complexity", "Problem Solving"],
+  },
+];
+
+function TopicsStep({ formData, setFormData }) {
+  const [search, setSearch] = React.useState("");
+
+  const toggleTopic = (topic) => {
+    const active = [...formData.focusTopics];
+    setFormData({
+      ...formData,
+      focusTopics: active.includes(topic)
+        ? active.filter((t) => t !== topic)
+        : [...active, topic],
+    });
+  };
+
+  const q = search.toLowerCase();
+  const visibleCategories = TOPIC_CATEGORIES.map((cat) => ({
+    ...cat,
+    topics: q ? cat.topics.filter((t) => t.toLowerCase().includes(q)) : cat.topics,
+  })).filter((cat) => cat.topics.length > 0);
 
   return (
     <>
-      <div className="flex items-start justify-between gap-4 mb-1">
+      <div className="flex items-start justify-between gap-4 mb-4">
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Topics you know well</h2>
           <p className="text-gray-500 dark:text-slate-400 text-sm mt-0.5">Select topics you're already comfortable with.</p>
@@ -303,26 +503,35 @@ function TopicsStep({ formData, setFormData }) {
           />
         </div>
       </div>
-      <div className="flex flex-wrap gap-2.5 mt-4">
-        {filtered.length === 0 && (
-          <p className="text-sm text-gray-400 dark:text-slate-500">No topics match your search.</p>
-        )}
-        {filtered.map((topic) => {
-          const isSelected = formData.focusTopics.includes(topic);
-          return (
-            <button
-              key={topic}
-              onClick={() => toggleTopic(topic)}
-              className={`px-4 py-2 rounded-full text-sm font-medium border cursor-pointer transition-all ${
-                isSelected
-                  ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                  : "bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-gray-400 dark:hover:border-slate-400"
-              }`}
-            >
-              {topic}
-            </button>
-          );
-        })}
+
+      {visibleCategories.length === 0 && (
+        <p className="text-sm text-gray-400 dark:text-slate-500">No topics match your search.</p>
+      )}
+
+      <div className="flex flex-col gap-5">
+        {visibleCategories.map((cat) => (
+          <div key={cat.label}>
+            <p className="mb-2 text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500">
+              {cat.label}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cat.topics.map((topic) => {
+                const isSelected = formData.focusTopics.includes(topic);
+                return (
+                  <button
+                    key={topic}
+                    onClick={() => toggleTopic(topic)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                      isSelected ? cat.selected : cat.unselected
+                    }`}
+                  >
+                    {topic}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );

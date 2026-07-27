@@ -1,3 +1,7 @@
+// QuickActions.jsx — a small set of shortcut buttons shown at the bottom of the
+// Activity Heatmap card. Lets users jump directly to common tasks without
+// navigating through the full menu.
+
 import { Link } from "react-router-dom";
 import { BookOpen, Zap, Star, ArrowRight } from "lucide-react";
 

@@ -1,3 +1,7 @@
+// StatCard.jsx — reusable summary tile used in the dashboard stats row.
+// Icon and colour are driven by the 'icon' and 'tone' props so each card
+// looks distinct without needing separate components for each metric.
+
 import { Flame, CheckCircle2, Star, TrendingUp } from "lucide-react";
 
 const ICONS = {
@@ -25,7 +29,7 @@ export default function StatCard({ label, value, sublabel, sublabelTone = "muted
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4 flex items-center gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${ICON_TONES[tone]}`}>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-full ${ICON_TONES[tone]}`}>
           <Icon size={20} />
         </span>
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">

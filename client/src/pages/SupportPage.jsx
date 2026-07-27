@@ -1,3 +1,6 @@
+// SupportPage.jsx — help and support page where users can report issues or
+// browse quick support options. Includes a ticket-submission form and contact channels.
+
 import { useState } from "react";
 import { Mail, MessageCircle, Clock, CheckCircle2, Send, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";

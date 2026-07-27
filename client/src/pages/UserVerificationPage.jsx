@@ -1,22 +1,34 @@
-import React, { useState, useRef } from 'react';
-import {useNavigate} from "react-router-dom";
+// UserVerificationPage.jsx — 6-digit OTP verification step shown after registration.
+// Splits the code into individual character inputs for a better UX on both
+// desktop and mobile, with auto-advance on entry and backtrack on delete.
+
+import { useState, useRef } from 'react';
+import { useNavigate, useLocation } from "react-router-dom";
 import API_BASE from "../utils/api.js";
 
 const UserVerificationPage = () => {
     const length = 6;
     const [otp, setOtp] = useState(new Array(length).fill(""));
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [resendMessage, setResendMessage] = useState("");
     const inputRefs = useRef([]);
     const navigate = useNavigate();
+    const location = useLocation();
+    // Email is passed via router state from the SignUp page; empty string means the user
+    // navigated here directly — resend will catch and show a helpful error in that case.
+    const email = location.state?.email || "";
 
     const handleChange = (element, index) => {
         const value = element.value;
-        if (isNaN(value)) return;
+        if (isNaN(value)) return; // only allow digits
 
         const newOtp = [...otp];
+        // Take just the last character in case the browser auto-fills multiple digits.
         newOtp[index] = value.substring(value.length - 1);
         setOtp(newOtp);
 
+        // Auto-advance to the next box so the user doesn't have to click each one.
         if (value && index < length - 1) {
             inputRefs.current[index + 1].focus();
         }
@@ -32,6 +44,7 @@ const UserVerificationPage = () => {
         e.preventDefault();
         const pastedData = e.clipboardData.getData("text").trim();
 
+        // Only accept a paste if it's exactly 6 numeric digits — reject partial or non-numeric pastes.
         if (isNaN(pastedData) || pastedData.length !== length) return;
 
         setOtp(pastedData.split(""));
@@ -43,17 +56,18 @@ const UserVerificationPage = () => {
         const finalOtp = otp.join("");
 
         if (finalOtp.length !== length) {
-            alert("Please enter a valid 6-digit code.");
+            setError("Please enter a valid 6-digit code.");
             return;
         }
 
+        setError("");
         setLoading(true);
 
         try {
             const response = await fetch(`${API_BASE}/api/auth/verify-otp`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ otp: finalOtp }),
+                body: JSON.stringify({ otp: finalOtp, email }),
             });
 
             if (response.ok) {
@@ -62,19 +76,39 @@ const UserVerificationPage = () => {
                 navigate("/onboarding");
             } else {
                 const message = await response.text();
-                alert(message || "Invalid OTP. Please try again.");
+                setError(message || "Invalid OTP. Please try again.");
             }
         } catch {
-            alert("Something went wrong. Please try again.");
+            setError("Something went wrong. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleResend = () => {
-        alert("A new 6-digit verification code has been sent!");
+    const handleResend = async () => {
+        if (!email) {
+            setResendMessage("Unable to resend — please go back and register again.");
+            return;
+        }
+        setError("");
+        setResendMessage("");
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/resend-otp`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (res.ok) {
+                setResendMessage("A new verification code has been sent to your email.");
+            } else {
+                const msg = await res.text();
+                setResendMessage(msg || "Failed to resend code. Please try again.");
+            }
+        } catch {
+            setResendMessage("Something went wrong. Please try again.");
+        }
         setOtp(new Array(length).fill(""));
-        inputRefs.current[0].focus();
+        inputRefs.current[0]?.focus();
     };
 
     return (
@@ -94,6 +128,12 @@ const UserVerificationPage = () => {
                     <p className="mt-2 text-sm text-gray-500 dark:text-slate-400 mb-8">
                         We sent a 6-digit confirmation code to your device. Please enter it below.
                     </p>
+
+                    {error && (
+                        <div className="mb-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 text-left">
+                            {error}
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit}>
                         <div className="flex gap-2 sm:gap-3 justify-center items-center">
@@ -146,6 +186,11 @@ const UserVerificationPage = () => {
                             Resend code
                         </button>
                     </p>
+                    {resendMessage && (
+                        <p className="mt-2 text-xs text-center text-green-600 dark:text-green-400">
+                            {resendMessage}
+                        </p>
+                    )}
 
                 </div>
             </div>

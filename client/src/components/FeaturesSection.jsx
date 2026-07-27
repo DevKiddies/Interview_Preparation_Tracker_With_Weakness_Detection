@@ -1,3 +1,7 @@
+// FeaturesSection.jsx — landing page section highlighting the platform's key features.
+// Each feature card is driven by the features array so adding a new capability only
+// requires adding an entry there — no JSX changes needed.
+
 import { Code2, Clock, BarChart3, Users, Sparkles, Flame, ArrowRight } from 'lucide-react'
 
 const features = [

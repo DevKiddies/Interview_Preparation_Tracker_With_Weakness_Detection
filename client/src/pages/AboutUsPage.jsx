@@ -1,3 +1,5 @@
+// AboutUsPage.jsx — static page describing PrepEdge's mission, values, and story.
+
 import { Target, Lightbulb, Users, TrendingUp, Award, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 

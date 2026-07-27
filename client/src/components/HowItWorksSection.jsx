@@ -1,3 +1,6 @@
+// HowItWorksSection.jsx — numbered steps section on the landing page explaining
+// the user journey from profile creation to landing an offer.
+
 const steps = [
   {
     number: '01',

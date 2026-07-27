@@ -1,3 +1,7 @@
+// ConfidenceAccuracyChart.jsx — line chart comparing the user's self-reported
+// confidence against their actual accuracy over time. A widening gap between
+// the two lines is a signal that the user is overconfident in a weak area.
+
 import { useState } from "react";
 import {
   LineChart,

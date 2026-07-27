@@ -1,4 +1,9 @@
-import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
+// SignUpPage.jsx — new user registration form.
+// Validates all fields client-side first (via validateSignupForm), then POSTs
+// to /api/auth/register. On success it redirects to /verify so the user can
+// confirm their email with a 6-digit OTP.
+
+import { User, Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate} from "react-router-dom";
 
@@ -9,7 +14,6 @@ import API_BASE from "../utils/api.js";
 
 function SignUpPage() {
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -31,7 +35,6 @@ function SignUpPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
 
     const validationError = validateSignupForm(formData);
     if (validationError) {
@@ -52,7 +55,7 @@ function SignUpPage() {
       });
 
       if (response.ok) {
-        navigate("/verify");
+        navigate("/verify", { state: { email: formData.email.trim() } });
       } else {
         const message = await response.text();
         setError(message);
@@ -63,9 +66,17 @@ function SignUpPage() {
   };
 
   return (
-      <>
-
-        <div className="text-2xl text-center mx-auto border border-gray-300 dark:border-slate-700 rounded-xl shadow-lg w-[92%] max-w-sm mt-10 mb-10 p-6 sm:p-8 bg-white dark:bg-slate-900 transition-colors duration-200">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-140px)] bg-[#f8fafc] dark:bg-slate-950 w-full px-4 py-8 sm:p-6 transition-colors duration-200">
+        <div className="w-full max-w-sm mb-2">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
+            <ArrowLeft size={15} />
+            Back to Home
+          </Link>
+        </div>
+        <div className="text-center mx-auto border border-gray-300 dark:border-slate-700 rounded-xl shadow-lg w-full max-w-sm p-6 sm:p-8 bg-white dark:bg-slate-900 transition-colors duration-200">
           <form className="flex flex-col items-stretch justify-center gap-0.5 w-full" onSubmit={handleSubmit}>
 
             <div className="my-1 text-center justify-center">
@@ -76,12 +87,6 @@ function SignUpPage() {
             </div>
 
             {error && <ErrorAlert message={error} />}
-
-            {success && (
-                <div className="bg-green-100 text-green-700 border border-green-300 rounded-lg px-4 py-2 text-xs w-full mb-2">
-                  {success}
-                </div>
-            )}
 
             <InputField
                 label="Username"
@@ -152,8 +157,8 @@ function SignUpPage() {
             </p>
 
           </form>
-        </div>
-      </>
+      </div>
+    </div>
   );
 }
 

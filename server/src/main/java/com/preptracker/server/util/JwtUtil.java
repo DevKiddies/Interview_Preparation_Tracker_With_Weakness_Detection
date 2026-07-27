@@ -1,5 +1,11 @@
 package com.preptracker.server.util;
 
+// Utility for creating and parsing JWTs using the HMAC-SHA256 algorithm.
+// Regular user tokens have the user's UUID as the subject and no role claim.
+// Admin tokens additionally carry a "role: ADMIN" claim, which JwtFilter reads
+// to populate Spring Security authorities for route-level access control.
+// The signing key and expiry are loaded from application.properties at startup.
+
 import com.preptracker.server.model.Admin;
 import com.preptracker.server.model.User;
 import io.jsonwebtoken.Claims;
@@ -29,6 +35,7 @@ public class JwtUtil {
         signingKey = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
+    // UUID is used as subject (not email) so tokens remain valid after an email change
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getId().toString())

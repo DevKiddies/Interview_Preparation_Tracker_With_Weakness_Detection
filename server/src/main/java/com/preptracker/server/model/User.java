@@ -1,5 +1,12 @@
 package com.preptracker.server.model;
 
+// Represents a user account in the system. Supports three login methods:
+//   LOCAL  — registered with email + password (verified via OTP)
+//   GOOGLE — signed in via Google OAuth
+//   GITHUB — signed in via GitHub OAuth
+// A user can link multiple providers to one account (authProvider stores them
+// comma-separated, e.g. "LOCAL,GOOGLE"). OAuth users have password = null.
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,9 +22,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID) // Hibernate internally generates UUID generation, no need to use
-                                                    // GenericGenerator
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false)
     private UUID id;
 
@@ -27,7 +34,8 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = true)
+    // null for OAuth-only accounts (Google/GitHub) — they don't have a local password
+    @Column
     private String password;
 
     @Column(name = "is_verified", nullable = false)
@@ -41,17 +49,19 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(name = "google_id", nullable = true)
+    @Column(name = "google_id")
     private String googleId;
 
-    @Column(name = "github_id", nullable = true)
-private String githubId;
+    @Column(name = "github_id")
+    private String githubId;
 
+    // comma-separated when the account is linked to multiple providers, e.g. "LOCAL,GOOGLE"
     @Column(name = "auth_provider", nullable = false)
     private String authProvider = "LOCAL";
 
     @Column(name = "is_onboarded", nullable = false)
     private Boolean isOnboarded = false;
 
-
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    private String avatarUrl;
 }

@@ -1,3 +1,7 @@
+// ContactPage.jsx — contact form page where users can reach out to the PrepEdge team.
+// Form submission is handled client-side with a success state — wire up a real
+// email/backend endpoint when ready to send messages.
+
 import { useState } from "react";
 import { Mail, MapPin, Clock, Send, CheckCircle2 } from "lucide-react";
 

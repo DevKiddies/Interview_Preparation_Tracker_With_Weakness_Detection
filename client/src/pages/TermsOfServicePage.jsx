@@ -1,3 +1,6 @@
+// TermsOfServicePage.jsx — static legal page covering the terms users agree to
+// when using PrepEdge. Update this whenever terms change or a lawyer reviews it.
+
 import { Link } from "react-router-dom";
 import { FileText } from "lucide-react";
 

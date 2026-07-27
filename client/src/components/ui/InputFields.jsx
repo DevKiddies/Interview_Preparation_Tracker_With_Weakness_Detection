@@ -1,4 +1,6 @@
-import React from "react";
+// InputField.jsx — shared form input used across Login, Signup, Admin Login,
+// and Forgot Password pages. Accepts an optional leading Icon and a children
+// slot used to drop in the password-visibility toggle button.
 
 function InputField({ label, id, name, type = "text", placeholder, value, onChange, Icon, children }) {
   return (

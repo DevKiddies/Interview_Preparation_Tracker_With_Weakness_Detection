@@ -1,0 +1,521 @@
+// AdminQuestionBank.jsx — Admin page for browsing, previewing, editing, and deleting
+// all questions in the question bank. Supports live search, multi-filter (topic /
+// category / difficulty), sortable table with pagination, a full-detail preview
+// modal, an inline edit modal, and a delete confirmation modal.
+// Data is mocked in adminQuestionsData.js — wire to API when ready.
+
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import {
+  Database, Search, X, ChevronDown, ChevronUp,
+  Eye, Pencil, Trash2, PlusCircle, CheckCircle,
+  AlertTriangle, Download, Filter, ChevronLeft, ChevronRight,
+} from "lucide-react";
+import {
+  questionsData, topicsConfig, difficultyLevels,
+} from "../../data/adminQuestionsData";
+
+// ─── constants ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
+
+const DIFF_STYLE = {
+  Easy:   "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+  Medium: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  Hard:   "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400",
+};
+const CORRECT_STYLE = "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+
+const TOPIC_COLOR = Object.fromEntries(
+  topicsConfig.map(({ topic, color }) => [topic, color])
+);
+const TOPIC_BADGE = {
+  blue:    "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  indigo:  "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400",
+  teal:    "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400",
+  amber:   "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+  purple:  "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+  emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
+};
+
+function topicBadge(topic) {
+  return TOPIC_BADGE[TOPIC_COLOR[topic]] ?? "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+function optionLetter(q, letter) {
+  return q[`option${letter}`];
+}
+
+function SortIcon({ field, sortField, sortDir }) {
+  if (sortField !== field) return <ChevronDown size={11} className="text-slate-300 dark:text-slate-600" />;
+  return sortDir === "asc" ? <ChevronUp size={11} className="text-blue-500" /> : <ChevronDown size={11} className="text-blue-500" />;
+}
+
+// ─── Stat Card ───────────────────────────────────────────────────────────────
+function StatCard({ label, value, color }) {
+  const C = {
+    blue:    "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/40 text-blue-700 dark:text-blue-400",
+    emerald: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400",
+    amber:   "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800/40 text-amber-700 dark:text-amber-400",
+    rose:    "bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/40 text-rose-700 dark:text-rose-400",
+    slate:   "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300",
+  }[color];
+  return (
+    <div className={`border rounded-xl px-4 py-3 flex flex-col gap-0.5 ${C}`}>
+      <p className="text-xl font-extrabold leading-none">{value}</p>
+      <p className="text-[11px] font-medium opacity-80">{label}</p>
+    </div>
+  );
+}
+
+// ─── Question Preview Modal ───────────────────────────────────────────────────
+function PreviewModal({ q, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+
+        {/* badges */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{q.category}</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500">ID #{q.id}</span>
+        </div>
+
+        {/* question */}
+        <p className="text-[15px] font-semibold text-slate-900 dark:text-white leading-relaxed mb-5">{q.text}</p>
+
+        {/* options */}
+        <div className="flex flex-col gap-2.5">
+          {["A", "B", "C", "D"].map((letter) => {
+            const isCorrect = q.correctAnswer === letter;
+            return (
+              <div
+                key={letter}
+                className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                  isCorrect
+                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700"
+                }`}
+              >
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                  isCorrect
+                    ? "bg-emerald-500 text-white"
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                }`}>{letter}</span>
+                <span className={`text-sm leading-relaxed ${isCorrect ? "font-semibold text-emerald-800 dark:text-emerald-300" : "text-slate-700 dark:text-slate-300"}`}>
+                  {optionLetter(q, letter)}
+                </span>
+                {isCorrect && <CheckCircle size={15} className="text-emerald-500 shrink-0 ml-auto mt-0.5" />}
+              </div>
+            );
+          })}
+        </div>
+
+        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+function EditModal({ q, onSave, onClose }) {
+  const [form, setForm] = useState({ ...q });
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const cats = topicsConfig.find((t) => t.topic === form.topic)?.categories ?? [];
+
+  const inputCls = "w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors";
+  const labelCls = "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
+        <p className="text-base font-bold text-slate-900 dark:text-white mb-5 flex items-center gap-2"><Pencil size={16} className="text-blue-500" /> Edit Question #{q.id}</p>
+
+        <div className="space-y-4">
+          <div>
+            <label className={labelCls}>Question Text</label>
+            <textarea rows={3} value={form.text} onChange={set("text")} className={inputCls + " resize-none"} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {["A", "B", "C", "D"].map((l) => (
+              <div key={l}>
+                <label className={labelCls}>Option {l}</label>
+                <input value={form[`option${l}`]} onChange={set(`option${l}`)} className={inputCls} />
+              </div>
+            ))}
+          </div>
+
+          {/* Correct Answer */}
+          <div>
+            <label className={labelCls}>Correct Answer</label>
+            <div className="flex gap-2">
+              {["A", "B", "C", "D"].map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setForm((p) => ({ ...p, correctAnswer: l }))}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors ${
+                    form.correctAnswer === l
+                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600"
+                  }`}
+                >{l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>Topic</label>
+              <select value={form.topic} onChange={(e) => setForm((p) => ({ ...p, topic: e.target.value, category: "" }))} className={inputCls}>
+                {topicsConfig.map((t) => <option key={t.topic} value={t.topic}>{t.topic}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Category</label>
+              <select value={form.category} onChange={set("category")} className={inputCls}>
+                {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Difficulty</label>
+              <select value={form.difficulty} onChange={set("difficulty")} className={inputCls}>
+                {difficultyLevels.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+          <button onClick={() => onSave(form)} className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+function DeleteModal({ q, onConfirm, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="p-4 rounded-full bg-rose-50 dark:bg-rose-900/20 w-fit mx-auto mb-4">
+          <Trash2 size={24} className="text-rose-600 dark:text-rose-400" />
+        </div>
+        <p className="text-base font-bold text-slate-900 dark:text-white mb-2">Delete Question #{q.id}?</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">"{q.text}"</p>
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg mb-5 text-left">
+          <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-400">This action cannot be undone. The question will be permanently removed.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+          <button onClick={() => onConfirm(q.id)} className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── main component ───────────────────────────────────────────────────────────
+export default function AdminQuestionBank() {
+  const [questions, setQuestions] = useState(questionsData);
+  const [search, setSearch]       = useState("");
+  const [topicFilter, setTopicFilter]   = useState("All");
+  const [catFilter, setCatFilter]       = useState("All");
+  const [diffFilter, setDiffFilter]     = useState("All");
+  const [sortField, setSortField]       = useState("id");
+  const [sortDir, setSortDir]           = useState("asc");
+  const [page, setPage]                 = useState(1);
+  const [topicDropOpen, setTopicDropOpen] = useState(false);
+  const [catDropOpen, setCatDropOpen]     = useState(false);
+  const [preview, setPreview]   = useState(null);
+  const [editQ, setEditQ]       = useState(null);
+  const [deleteQ, setDeleteQ]   = useState(null);
+  const [toast, setToast]       = useState(null);
+
+  // ── stats ──────────────────────────────────────────────────────────────────
+  const total  = questions.length;
+  const easy   = questions.filter((q) => q.difficulty === "Easy").length;
+  const medium = questions.filter((q) => q.difficulty === "Medium").length;
+  const hard   = questions.filter((q) => q.difficulty === "Hard").length;
+
+  // ── categories for current topic filter ────────────────────────────────────
+  const availCats = useMemo(() => {
+    if (topicFilter === "All") return [];
+    return topicsConfig.find((t) => t.topic === topicFilter)?.categories ?? [];
+  }, [topicFilter]);
+
+  // ── filtering + sorting ────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let r = [...questions];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter((x) => x.text.toLowerCase().includes(q) || String(x.id) === q.trim());
+    }
+    if (topicFilter !== "All") r = r.filter((x) => x.topic === topicFilter);
+    if (catFilter !== "All")   r = r.filter((x) => x.category === catFilter);
+    if (diffFilter !== "All")  r = r.filter((x) => x.difficulty === diffFilter);
+    r.sort((a, b) => {
+      const av = a[sortField], bv = b[sortField];
+      return (av < bv ? -1 : av > bv ? 1 : 0) * (sortDir === "asc" ? 1 : -1);
+    });
+    return r;
+  }, [questions, search, topicFilter, catFilter, diffFilter, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const pageItems  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function handleSort(field) {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("asc"); }
+    setPage(1);
+  }
+
+  function handleDelete(id) {
+    setQuestions((prev) => prev.filter((q) => q.id !== id));
+    setDeleteQ(null);
+    showToast("Question deleted.");
+  }
+
+  function handleSave(updated) {
+    setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    setEditQ(null);
+    showToast("Question updated successfully.");
+  }
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  const TH = "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap select-none";
+  const THs = TH + " cursor-pointer hover:text-slate-700 dark:hover:text-slate-200";
+
+  return (
+    <div className="space-y-5 pb-6">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-[22px] font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            <Database size={22} className="text-teal-500" /> Question Bank
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Browse, edit and delete all questions in the database</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm">
+            <Download size={14} /> Export
+          </button>
+          <Link to="/admin/questions/add" className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm">
+            <PlusCircle size={14} /> Add Question
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Stats ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <StatCard label="Total Questions" value={total}  color="blue"    />
+        <StatCard label="Easy"            value={easy}   color="emerald" />
+        <StatCard label="Medium"          value={medium} color="amber"   />
+        <StatCard label="Hard"            value={hard}   color="rose"    />
+        <StatCard label="Topics"          value={topicsConfig.length} color="slate" />
+      </div>
+
+      {/* ── Filters ────────────────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input type="text" placeholder="Search question text or ID…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors" />
+            {search && <button onClick={() => { setSearch(""); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={14} /></button>}
+          </div>
+
+          {/* Topic dropdown */}
+          <div className="relative shrink-0">
+            <button onClick={() => { setTopicDropOpen((v) => !v); setCatDropOpen(false); }}
+              className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-[130px]">
+              <Filter size={14} className="text-slate-400" />
+              <span className="flex-1 text-left">{topicFilter === "All" ? "All Topics" : topicFilter}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${topicDropOpen ? "rotate-180" : ""}`} />
+            </button>
+            {topicDropOpen && (
+              <div className="absolute left-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-20 py-1">
+                {["All", ...topicsConfig.map((t) => t.topic)].map((t) => (
+                  <button key={t} onClick={() => { setTopicFilter(t); setCatFilter("All"); setTopicDropOpen(false); setPage(1); }}
+                    className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${topicFilter === t ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+                    {t === "All" ? "All Topics" : t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Category dropdown (only when topic selected) */}
+          {topicFilter !== "All" && (
+            <div className="relative shrink-0">
+              <button onClick={() => { setCatDropOpen((v) => !v); setTopicDropOpen(false); }}
+                className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-[150px]">
+                <span className="flex-1 text-left">{catFilter === "All" ? "All Categories" : catFilter}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${catDropOpen ? "rotate-180" : ""}`} />
+              </button>
+              {catDropOpen && (
+                <div className="absolute left-0 mt-1.5 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-20 py-1 max-h-52 overflow-y-auto">
+                  {["All", ...availCats].map((c) => (
+                    <button key={c} onClick={() => { setCatFilter(c); setCatDropOpen(false); setPage(1); }}
+                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${catFilter === c ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+                      {c === "All" ? "All Categories" : c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Difficulty pills */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 shrink-0">
+            {["All", ...difficultyLevels].map((d) => (
+              <button key={d} onClick={() => { setDiffFilter(d); setPage(1); }}
+                className={`px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${diffFilter === d ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Active chips */}
+        {(search || topicFilter !== "All" || catFilter !== "All" || diffFilter !== "All") && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[11px] text-slate-400">Filters:</span>
+            {search && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">"{search}" <button onClick={() => { setSearch(""); setPage(1); }}><X size={9} /></button></span>}
+            {topicFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicFilter} <button onClick={() => { setTopicFilter("All"); setCatFilter("All"); setPage(1); }}><X size={9} /></button></span>}
+            {catFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{catFilter} <button onClick={() => { setCatFilter("All"); setPage(1); }}><X size={9} /></button></span>}
+            {diffFilter !== "All" && <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${DIFF_STYLE[diffFilter]}`}>{diffFilter} <button onClick={() => { setDiffFilter("All"); setPage(1); }}><X size={9} /></button></span>}
+            <button onClick={() => { setSearch(""); setTopicFilter("All"); setCatFilter("All"); setDiffFilter("All"); setPage(1); }} className="text-[11px] text-slate-400 hover:text-slate-600 underline ml-1">Clear all</button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between -mt-1">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Showing <span className="font-semibold text-slate-700 dark:text-slate-300">{filtered.length}</span> of {total} questions
+        </p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Page {safePage} of {totalPages}</p>
+      </div>
+
+      {/* ── Table (desktop) ────────────────────────────────────────────── */}
+      {filtered.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-16 text-center shadow-sm">
+          <Database size={36} className="text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+          <p className="font-bold text-slate-800 dark:text-slate-200">No questions found</p>
+          <p className="text-sm text-slate-500 mt-1">Try adjusting your filters.</p>
+        </div>
+      ) : (
+        <>
+          <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th className={THs} onClick={() => handleSort("id")}><span className="flex items-center gap-1"># <SortIcon field="id" sortField={sortField} sortDir={sortDir} /></span></th>
+                  <th className={TH}>Question</th>
+                  <th className={THs} onClick={() => handleSort("topic")}><span className="flex items-center gap-1">Topic <SortIcon field="topic" sortField={sortField} sortDir={sortDir} /></span></th>
+                  <th className={TH}>Category</th>
+                  <th className={THs} onClick={() => handleSort("difficulty")}><span className="flex items-center gap-1">Difficulty <SortIcon field="difficulty" sortField={sortField} sortDir={sortDir} /></span></th>
+                  <th className={TH}>Correct Ans</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                {pageItems.map((q) => (
+                  <tr key={q.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
+                    <td className="px-4 py-3.5 text-[12px] font-mono text-slate-400 dark:text-slate-500">#{q.id}</td>
+                    <td className="px-4 py-3.5 max-w-[320px]">
+                      <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">{q.text}</p>
+                    </td>
+                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span></td>
+                    <td className="px-4 py-3.5 text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{q.category}</td>
+                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span></td>
+                    <td className="px-4 py-3.5"><span className={`px-2.5 py-0.5 rounded-full text-[12px] font-bold ${CORRECT_STYLE}`}>{q.correctAnswer}</span></td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setPreview(q)} title="Preview" className="p-1.5 rounded-lg text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><Eye size={14} /></button>
+                        <button onClick={() => setEditQ(q)} title="Edit" className="p-1.5 rounded-lg text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><Pencil size={14} /></button>
+                        <button onClick={() => setDeleteQ(q)} title="Delete" className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Mobile Cards ──────────────────────────────────────────── */}
+          <div className="lg:hidden flex flex-col gap-3">
+            {pageItems.map((q) => (
+              <div key={q.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${CORRECT_STYLE}`}>Ans: {q.correctAnswer}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-mono shrink-0">#{q.id}</span>
+                </div>
+                <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug mb-3">{q.text}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setPreview(q)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><Eye size={13} /> View</button>
+                  <button onClick={() => setEditQ(q)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold border border-indigo-200 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"><Pencil size={13} /> Edit</button>
+                  <button onClick={() => setDeleteQ(q)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors"><Trash2 size={13} /> Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Pagination ────────────────────────────────────────────── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
+                className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                <button key={n} onClick={() => setPage(n)}
+                  className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${n === safePage ? "bg-blue-600 text-white" : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  {n}
+                </button>
+              ))}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+                className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Modals ─────────────────────────────────────────────────────── */}
+      {preview  && <PreviewModal q={preview}  onClose={() => setPreview(null)} />}
+      {editQ    && <EditModal    q={editQ}    onSave={handleSave} onClose={() => setEditQ(null)} />}
+      {deleteQ  && <DeleteModal  q={deleteQ}  onConfirm={handleDelete} onClose={() => setDeleteQ(null)} />}
+
+      {/* ── Toast ──────────────────────────────────────────────────────── */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium">
+          <CheckCircle size={15} className="text-emerald-400 dark:text-emerald-600 shrink-0" />{toast}
+        </div>
+      )}
+    </div>
+  );
+}

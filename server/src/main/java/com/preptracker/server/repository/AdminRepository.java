@@ -1,5 +1,8 @@
 package com.preptracker.server.repository;
 
+// Database access layer for the Admin entity.
+// Supports lookup by email or username so admins can log in with either.
+
 import com.preptracker.server.model.Admin;
 import org.springframework.data.jpa.repository.JpaRepository;
 
