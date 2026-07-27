@@ -28,34 +28,48 @@ const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 
-const MockTestPage           = lazy(() => import("./pages/MockTestPage"));
-const MockTestSelectionPage  = lazy(() => import("./pages/MockTestSelectionPage"));
-const TopicTestConfigPage    = lazy(() => import("./pages/TopicTestConfigPage"));
-const TestResultPage         = lazy(() => import("./pages/TestResultPage"));
-const TestInstructionsPage   = lazy(() => import("./pages/TestInstructionsPage"));
-const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
+const MockTestPage = lazy(() => import("./pages/MockTestPage"));
+const MockTestSelectionPage = lazy(
+  () => import("./pages/MockTestSelectionPage"),
+);
+const TopicTestConfigPage = lazy(() => import("./pages/TopicTestConfigPage"));
+const TestResultPage = lazy(() => import("./pages/TestResultPage"));
+const TestInstructionsPage = lazy(() => import("./pages/TestInstructionsPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 
-const AdminLayout            = lazy(() => import("./components/admin/AdminLayout"));
-const AdminComingSoon        = lazy(() => import("./pages/admin/AdminComingSoon"));
-const AdminDashboard         = lazy(() => import("./pages/admin/AdminDashboard"));
-const AdminBannedUsers       = lazy(() => import("./pages/admin/AdminBannedUsers"));
-const AdminAllUsers          = lazy(() => import("./pages/admin/AdminAllUsers"));
-const AdminUserResults       = lazy(() => import("./pages/admin/AdminUserResults"));
-const AdminQuestionBank      = lazy(() => import("./pages/admin/AdminQuestionBank"));
-const AdminAddQuestion       = lazy(() => import("./pages/admin/AdminAddQuestion"));
-const AdminCategoriesTopics  = lazy(() => import("./pages/admin/AdminCategoriesTopics"));
-const AdminAllTests          = lazy(() => import("./pages/admin/AdminAllTests"));
-const AdminCreateMockTest    = lazy(() => import("./pages/admin/AdminCreateMockTest"));
-const AdminTestResults       = lazy(() => import("./pages/admin/AdminTestResults"));
-const AdminPlatformOverview  = lazy(() => import("./pages/admin/AdminPlatformOverview"));
-const AdminUserReports       = lazy(() => import("./pages/admin/AdminUserReports"));
-const AdminWeaknessAnalysis  = lazy(() => import("./pages/admin/AdminWeaknessAnalysis"));
-const AdminSettings          = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
+const AdminComingSoon = lazy(() => import("./pages/admin/AdminComingSoon"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminBannedUsers = lazy(() => import("./pages/admin/AdminBannedUsers"));
+const AdminAllUsers = lazy(() => import("./pages/admin/AdminAllUsers"));
+const AdminUserResults = lazy(() => import("./pages/admin/AdminUserResults"));
+const AdminQuestionBank = lazy(() => import("./pages/admin/AdminQuestionBank"));
+const AdminAddQuestion = lazy(() => import("./pages/admin/AdminAddQuestion"));
+const AdminCategoriesTopics = lazy(
+  () => import("./pages/admin/AdminCategoriesTopics"),
+);
+const AdminAllTests = lazy(() => import("./pages/admin/AdminAllTests"));
+const AdminCreateMockTest = lazy(
+  () => import("./pages/admin/AdminCreateMockTest"),
+);
+const AdminTestResults = lazy(() => import("./pages/admin/AdminTestResults"));
+const AdminPlatformOverview = lazy(
+  () => import("./pages/admin/AdminPlatformOverview"),
+);
+const AdminUserReports = lazy(() => import("./pages/admin/AdminUserReports"));
+const AdminWeaknessAnalysis = lazy(
+  () => import("./pages/admin/AdminWeaknessAnalysis"),
+);
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   const location = useLocation();
-  return token ? children : <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  return token ? (
+    children
+  ) : (
+    <Navigate to="/login" state={{ from: location.pathname }} replace />
+  );
 }
 
 const App = () => {
@@ -89,13 +103,55 @@ const App = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile/settings" element={<ProfilePage />} />
 
-            <Route path="/practice/mock-tests" element={<ProtectedRoute><MockTestSelectionPage /></ProtectedRoute>} />
-            <Route path="/practice/mock-tests/:testId" element={<ProtectedRoute><MockTestPage /></ProtectedRoute>} />
-            <Route path="/practice/topic-test" element={<ProtectedRoute><TopicTestConfigPage /></ProtectedRoute>} />
-            <Route path="/practice/instructions" element={<ProtectedRoute><TestInstructionsPage /></ProtectedRoute>} />
-            <Route path="/practice/results" element={<ProtectedRoute><TestResultPage /></ProtectedRoute>} />
+            <Route
+              path="/practice/mock-tests"
+              element={
+                <ProtectedRoute>
+                  <MockTestSelectionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice/mock-tests/:testId"
+              element={
+                <ProtectedRoute>
+                  <MockTestPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice/topic-test"
+              element={
+                <ProtectedRoute>
+                  <TopicTestConfigPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice/instructions"
+              element={
+                <ProtectedRoute>
+                  <TestInstructionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practice/results"
+              element={
+                <ProtectedRoute>
+                  <TestResultPage />
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/resources/interview-experiences" element={<ProtectedRoute><WorkInProgress /></ProtectedRoute>} />
+            <Route
+              path="/resources/interview-experiences"
+              element={
+                <ProtectedRoute>
+                  <WorkInProgress />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin" element={<AdminLayout />}>
@@ -105,13 +161,22 @@ const App = () => {
               <Route path="users" element={<AdminAllUsers />} />
               <Route path="users/results" element={<AdminUserResults />} />
               <Route path="users/banned" element={<AdminBannedUsers />} />
-              <Route path="users/:userId" element={<AdminComingSoon title="User Details" />} />
+              <Route
+                path="users/:userId"
+                element={<AdminComingSoon title="User Details" />}
+              />
 
               {/* Question Management */}
               <Route path="questions" element={<AdminQuestionBank />} />
               <Route path="questions/add" element={<AdminAddQuestion />} />
-              <Route path="questions/categories" element={<AdminCategoriesTopics />} />
-              <Route path="questions/edit/:id" element={<AdminComingSoon title="Edit Question" />} />
+              <Route
+                path="questions/categories"
+                element={<AdminCategoriesTopics />}
+              />
+              <Route
+                path="questions/edit/:id"
+                element={<AdminComingSoon title="Edit Question" />}
+              />
 
               {/* Test Management */}
               <Route path="tests" element={<AdminAllTests />} />
@@ -121,7 +186,10 @@ const App = () => {
               {/* Analytics */}
               <Route path="analytics" element={<AdminPlatformOverview />} />
               <Route path="analytics/users" element={<AdminUserReports />} />
-              <Route path="analytics/weaknesses" element={<AdminWeaknessAnalysis />} />
+              <Route
+                path="analytics/weaknesses"
+                element={<AdminWeaknessAnalysis />}
+              />
 
               {/* Settings */}
               <Route path="settings" element={<AdminSettings />} />
