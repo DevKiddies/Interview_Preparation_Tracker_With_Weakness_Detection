@@ -1,11 +1,33 @@
-// MockTestSelectionPage.jsx — test catalogue where users pick either a full
-// preset assessment (DSA, OS, DBMS, Networks) or configure a custom topic test.
-// Tests marked available: false show a "Coming Soon" badge and are non-clickable.
-// Clicking an available test always goes through TestInstructionsPage first so
-// the user reads the rules before the timer starts.
+// MockTestSelectionPage.jsx — test catalogue with persistent left navigation sidebar.
 
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { PlayCircle, Clock, Code2, Database, Server, Globe, Lock, ChevronRight, SlidersHorizontal } from "lucide-react";
+import {
+  PlayCircle,
+  Clock,
+  Code2,
+  Database,
+  Server,
+  Globe,
+  Lock,
+  ChevronRight,
+  SlidersHorizontal,
+} from "lucide-react";
+import Sidebar from "../components/dashboard/Sidebar";
+import API_BASE from "../utils/api.js";
+
+const TARGET_LABELS = {
+  faang: "FAANG / Big Tech",
+  product: "Product Companies",
+  service: "Service Companies",
+  competitive: "Competitive Exams",
+};
+
+const EXPERIENCE_LABELS = {
+  fresher: "Student / Fresher",
+  mid: "Mid-level",
+  senior: "Senior",
+};
 
 const FULL_TESTS = [
   {
@@ -72,140 +94,191 @@ const FULL_TESTS = [
 
 export default function MockTestSelectionPage() {
   const navigate = useNavigate();
+  const [username, setUsername] = useState(localStorage.getItem("username") || "");
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.username) {
+            setUsername(data.username);
+            localStorage.setItem("username", data.username);
+          }
+          if (data.avatarUrl) {
+            localStorage.setItem("avatarUrl", data.avatarUrl);
+          }
+          setProfile(data);
+        })
+        .catch(() => {});
+  }, []);
+
+  const daysLeft = useMemo(() => {
+    if (!profile?.interviewDate) return null;
+    const target = new Date(profile.interviewDate);
+    const today = new Date();
+    target.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
+    return diff >= 0 ? diff : 0;
+  }, [profile?.interviewDate]);
+
+  const targetLabel = TARGET_LABELS[profile?.targetCompany] ?? null;
+  const experienceLabel = EXPERIENCE_LABELS[profile?.experienceLevel] ?? null;
 
   return (
-    <div className="min-h-screen bg-indigo-50 dark:bg-slate-950 transition-colors duration-200">
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
+        <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6">
+          {/* Persistent Sidebar */}
+          <Sidebar
+              username={username}
+              targetLabel={targetLabel}
+              experienceLabel={experienceLabel}
+              daysLeft={daysLeft}
+          />
 
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
-            Practice Mock Tests
-          </h1>
-          <p className="mt-1.5 text-slate-500 dark:text-slate-400">
-            Choose a full assessment or practice a specific topic with custom settings.
-          </p>
-        </div>
-
-        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-linear-to-r from-indigo-600 to-violet-600 p-6 shadow-sm sm:flex-row sm:items-center">
-          <div className="flex-1 min-w-0">
-            <div className="mb-1 flex items-center gap-2">
-              <SlidersHorizontal size={16} className="text-indigo-200 shrink-0" />
-              <span className="text-xs font-bold uppercase tracking-widest text-indigo-200">Topic Practice</span>
+          {/* Main Content Area */}
+          <div className="min-w-0 flex-1 space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+                Practice Mock Tests
+              </h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Choose a full assessment or practice a specific topic with custom settings.
+              </p>
             </div>
-            <h2 className="text-lg font-bold text-white">Practice a Specific Topic</h2>
-            <p className="mt-0.5 text-sm text-indigo-200">
-              Choose any topic from 70+ options — Arrays, Java, SQL, System Design and more.
-              Set your own question count and time limit.
+
+            {/* Topic Practice Banner */}
+            <div className="flex flex-col gap-4 rounded-2xl border border-indigo-200 bg-linear-to-r from-indigo-600 to-violet-600 p-6 shadow-sm dark:border-indigo-500/30 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <SlidersHorizontal size={16} className="shrink-0 text-indigo-200" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-200">
+                  Topic Practice
+                </span>
+                </div>
+                <h2 className="text-lg font-bold text-white">Practice a Specific Topic</h2>
+                <p className="mt-0.5 text-sm text-indigo-200">
+                  Choose any topic from 70+ options — Arrays, Java, SQL, System Design and more.
+                  Set your own question count and time limit.
+                </p>
+              </div>
+              <button
+                  onClick={() => navigate("/practice/topic-test")}
+                  className="flex shrink-0 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 shadow-sm transition-all duration-150 hover:bg-indigo-50 active:scale-[0.98]"
+              >
+                <SlidersHorizontal size={15} />
+                Configure Test
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            {/* Section Header */}
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Full Assessments
+              </h2>
+            </div>
+
+            {/* Test Cards Grid */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {FULL_TESTS.map((test) => {
+                const Icon = test.icon;
+                return (
+                    <div
+                        key={test.id}
+                        className={`relative flex flex-col justify-between rounded-2xl border bg-white p-6 shadow-sm transition-all duration-200 dark:bg-slate-900 ${
+                            test.available
+                                ? "cursor-pointer border-slate-200 hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:hover:border-slate-700"
+                                : "cursor-not-allowed border-slate-100 opacity-60 dark:border-slate-800/60"
+                        }`}
+                        onClick={() =>
+                            test.available &&
+                            navigate("/practice/instructions", {
+                              state: {
+                                nextUrl: `/practice/mock-tests/${test.id}`,
+                                nextState: null,
+                                testTitle: test.title,
+                                questions: test.questions,
+                                timeMins: test.timeMins,
+                                difficulty: test.difficulty,
+                                description: test.description,
+                              },
+                            })
+                        }
+                    >
+                      {!test.available && (
+                          <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <Lock size={9} />
+                      Coming Soon
+                    </span>
+                      )}
+
+                      <div>
+                        <div className="flex items-start gap-4">
+                      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${test.iconBg}`}>
+                        <Icon size={22} className={test.iconColor} />
+                      </span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-slate-900 dark:text-white">{test.title}</h3>
+                            <p className="mt-0.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                              {test.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {test.questions} Questions
+                      </span>
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                        <Clock size={11} />
+                            {test.time}
+                      </span>
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${test.difficultyColor}`}>
+                        {test.difficulty}
+                      </span>
+                        </div>
+                      </div>
+
+                      {test.available && (
+                          <button
+                              className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 active:scale-[0.98] ${test.accent}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate("/practice/instructions", {
+                                  state: {
+                                    nextUrl: `/practice/mock-tests/${test.id}`,
+                                    nextState: null,
+                                    testTitle: test.title,
+                                    questions: test.questions,
+                                    timeMins: test.timeMins,
+                                    difficulty: test.difficulty,
+                                    description: test.description,
+                                  },
+                                });
+                              }}
+                          >
+                            <PlayCircle size={16} />
+                            Start Test
+                            <ChevronRight size={14} />
+                          </button>
+                      )}
+                    </div>
+                );
+              })}
+            </div>
+
+            <p className="pt-2 text-center text-xs text-slate-400 dark:text-slate-600">
+              All tests are auto-graded with detailed results and category breakdown shown immediately.
             </p>
           </div>
-          <button
-            onClick={() => navigate("/practice/topic-test")}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 shadow-sm transition-all duration-150 hover:bg-indigo-50 active:scale-[0.98]"
-          >
-            <SlidersHorizontal size={15} />
-            Configure Test
-            <ChevronRight size={14} />
-          </button>
         </div>
-
-        <div className="mb-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Full Assessments
-          </h2>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {FULL_TESTS.map((test) => {
-            const Icon = test.icon;
-            return (
-              <div
-                key={test.id}
-                className={`relative flex flex-col rounded-2xl border bg-white dark:bg-slate-900 p-6 shadow-sm transition-all duration-200 ${
-                  test.available
-                    ? "border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-indigo-200 dark:hover:border-slate-600 cursor-pointer"
-                    : "border-slate-100 dark:border-slate-800 opacity-55 cursor-not-allowed"
-                }`}
-                // All tests go through the instructions page first, which receives
-                // the test config via router state and then navigates to MockTestPage.
-                onClick={() =>
-                  test.available &&
-                  navigate("/practice/instructions", {
-                    state: {
-                      nextUrl:     `/practice/mock-tests/${test.id}`,
-                      nextState:   null,
-                      testTitle:   test.title,
-                      questions:   test.questions,
-                      timeMins:    test.timeMins,
-                      difficulty:  test.difficulty,
-                      description: test.description,
-                    },
-                  })
-                }
-              >
-                {!test.available && (
-                  <span className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                    <Lock size={9} />
-                    Coming Soon
-                  </span>
-                )}
-
-                <div className="flex items-start gap-4">
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${test.iconBg}`}>
-                    <Icon size={22} className={test.iconColor} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 dark:text-white">{test.title}</h3>
-                    <p className="mt-0.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                      {test.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    {test.questions} Questions
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                    <Clock size={11} />
-                    {test.time}
-                  </span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${test.difficultyColor}`}>
-                    {test.difficulty}
-                  </span>
-                </div>
-
-                {test.available && (
-                  <button
-                    className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 active:scale-[0.98] ${test.accent}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate("/practice/instructions", {
-                        state: {
-                          nextUrl:     `/practice/mock-tests/${test.id}`,
-                          nextState:   null,
-                          testTitle:   test.title,
-                          questions:   test.questions,
-                          timeMins:    test.timeMins,
-                          difficulty:  test.difficulty,
-                          description: test.description,
-                        },
-                      });
-                    }}
-                  >
-                    <PlayCircle size={16} />
-                    Start Test
-                    <ChevronRight size={14} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-600">
-          All tests are auto-graded with detailed results and category breakdown shown immediately.
-        </p>
       </div>
-    </div>
   );
 }
