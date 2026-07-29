@@ -1,22 +1,18 @@
-// AdminUserResults.jsx — Admin page showing all user test results platform-wide.
-// Features: stat cards, score distribution chart, topic performance chart,
-// live search, topic/score/pass-fail filters, sortable results table,
+// AdminUserResults.jsx — Admin page showing a searchable log of every individual
+// test attempt across every user (each row = one user's one test attempt).
+// Features: live search, topic/score/pass-fail filters, sortable results table,
 // result detail modal, and responsive mobile card layout.
-// Data is mocked in adminUserResultsData.js — swap for API calls when ready.
+// Fetches live data from GET /api/admin/results. There's no persisted named-test
+// concept server-side (users take ad-hoc question sets, not named tests), so
+// unlike the old mock there is no per-row test title — only the dominant topic.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
-} from "recharts";
-import {
-  BarChart2, CheckCircle, XCircle, TrendingUp, Clock,
-  Search, X, ChevronDown, ChevronUp, Eye, Download, Filter,
+  BarChart2, CheckCircle, XCircle, Loader2, AlertTriangle,
+  Search, X, ChevronDown, ChevronUp, Eye, RefreshCw, Filter,
 } from "lucide-react";
-import { useTheme } from "../../context/ThemeContext";
-import {
-  userResultsData, topicOptions, scoreRangeOptions,
-} from "../../data/adminUserResultsData";
+import { scoreRangeOptions } from "../../data/adminUserResultsData";
+import API_BASE from "../../utils/api";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,7 +29,14 @@ const GRADIENTS = [
   "from-rose-400 to-pink-500",   "from-amber-400 to-orange-500",
   "from-purple-400 to-violet-500","from-cyan-400 to-sky-500",
 ];
-function avatarColor(id) { return GRADIENTS[id % GRADIENTS.length]; }
+// id is a UUID string (not a small int), so hash it into a deterministic index
+// instead of using % directly — "uuid" % n is NaN.
+function avatarColor(id) {
+  const str = String(id);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return GRADIENTS[hash % GRADIENTS.length];
+}
 
 function scoreColor(s) {
   if (s >= 80) return "text-emerald-600 dark:text-emerald-400";
@@ -47,37 +50,6 @@ function scoreBg(s) {
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
-
-function StatCard({ label, value, icon: Icon, color, sub }) {
-  const C = {
-    blue:    { bg: "bg-blue-50 dark:bg-blue-900/20",    icon: "text-blue-600 dark:text-blue-400",    border: "border-blue-100 dark:border-blue-800/40"    },
-    emerald: { bg: "bg-emerald-50 dark:bg-emerald-900/20", icon: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-100 dark:border-emerald-800/40" },
-    amber:   { bg: "bg-amber-50 dark:bg-amber-900/20",   icon: "text-amber-600 dark:text-amber-400",   border: "border-amber-100 dark:border-amber-800/40"   },
-    indigo:  { bg: "bg-indigo-50 dark:bg-indigo-900/20", icon: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-100 dark:border-indigo-800/40" },
-  }[color];
-  return (
-    <div className={`bg-white dark:bg-slate-900 border ${C.border} rounded-xl p-4 flex items-center gap-4 shadow-sm`}>
-      <div className={`p-3 rounded-xl ${C.bg} shrink-0`}><Icon size={20} className={C.icon} /></div>
-      <div>
-        <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">{value}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{label}</p>
-        {sub && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shadow-lg text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }} className="font-medium">{p.name}: <span className="font-bold">{p.value}</span></p>
-      ))}
-    </div>
-  );
-}
 
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return <ChevronDown size={11} className="text-slate-300 dark:text-slate-600" />;
@@ -105,10 +77,9 @@ function ResultDetailModal({ result, onClose }) {
           </div>
         </div>
 
-        {/* Test name + topic */}
+        {/* Topic */}
         <div className="mb-5">
-          <p className="text-[15px] font-bold text-slate-900 dark:text-white">{result.testName}</p>
-          <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+          <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
             {result.topic}
           </span>
         </div>
@@ -156,7 +127,10 @@ function ResultDetailModal({ result, onClose }) {
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminUserResults() {
-  const { isDark } = useTheme();
+  const [results, setResults]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch]       = useState("");
   const [topic, setTopic]         = useState("All Topics");
   const [scoreRange, setScoreRange] = useState("all");
@@ -166,52 +140,57 @@ export default function AdminUserResults() {
   const [viewResult, setViewResult] = useState(null);
   const [topicDropOpen, setTopicDropOpen] = useState(false);
 
-  const axisColor = isDark ? "#64748b" : "#94a3b8";
-  const gridColor = isDark ? "#1e293b" : "#f1f5f9";
+  async function fetchResults() {
+    const res = await fetch(`${API_BASE}/api/admin/results`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+    });
+    if (!res.ok) throw new Error("Failed to load results");
+    return res.json();
+  }
+
+  useEffect(() => {
+    async function loadResults() {
+      setLoading(true);
+      setError(null);
+      try {
+        setResults(await fetchResults());
+      } catch (err) {
+        setError(err.message || "Failed to load results");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadResults();
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      setResults(await fetchResults());
+    } catch (err) {
+      setError(err.message || "Failed to load results");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // ── derived stats ──────────────────────────────────────────────────────────
-  const totalTests  = userResultsData.length;
-  const avgScore    = Math.round(userResultsData.reduce((s, r) => s + r.score, 0) / totalTests);
-  const passCount   = userResultsData.filter((r) => r.status === "pass").length;
-  const passRate    = Math.round((passCount / totalTests) * 100);
-  const todayTests  = userResultsData.filter((r) => r.date === new Date().toISOString().slice(0, 10)).length;
+  const totalTests  = results.length;
 
-  // ── score distribution chart data ─────────────────────────────────────────
-  const scoreDistribution = useMemo(() => {
-    const buckets = [
-      { range: "0–20%",  min: 0,  max: 20,  count: 0 },
-      { range: "21–40%", min: 21, max: 40,  count: 0 },
-      { range: "41–60%", min: 41, max: 60,  count: 0 },
-      { range: "61–80%", min: 61, max: 80,  count: 0 },
-      { range: "81–100%",min: 81, max: 100, count: 0 },
-    ];
-    userResultsData.forEach((r) => {
-      const b = buckets.find((b) => r.score >= b.min && r.score <= b.max);
-      if (b) b.count++;
-    });
-    return buckets;
-  }, []);
-
-  // ── topic avg score chart data ────────────────────────────────────────────
-  const topicPerformance = useMemo(() => {
-    const map = {};
-    userResultsData.forEach((r) => {
-      if (!map[r.topic]) map[r.topic] = { total: 0, count: 0 };
-      map[r.topic].total += r.score;
-      map[r.topic].count++;
-    });
-    return Object.entries(map).map(([topic, { total, count }]) => ({
-      topic: topic.replace("Data Structures", "DSA"),
-      avgScore: Math.round(total / count),
-    })).sort((a, b) => b.avgScore - a.avgScore);
-  }, []);
+  // Options are derived from real data rather than hardcoded, since the actual
+  // category names come from the DB and shouldn't drift out of sync with it.
+  const topicOptions = useMemo(() => {
+    const unique = Array.from(new Set(results.map((r) => r.topic).filter(Boolean)));
+    return ["All Topics", ...unique];
+  }, [results]);
 
   // ── filtering + sorting ────────────────────────────────────────────────────
   const displayed = useMemo(() => {
-    let r = [...userResultsData];
+    let r = [...results];
     if (search.trim()) {
       const q = search.toLowerCase();
-      r = r.filter((u) => u.userName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.testName.toLowerCase().includes(q));
+      r = r.filter((u) => u.userName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
     }
     if (topic !== "All Topics") r = r.filter((u) => u.topic === topic);
     if (passFilter !== "all")   r = r.filter((u) => u.status === passFilter);
@@ -227,7 +206,7 @@ export default function AdminUserResults() {
       return 0;
     });
     return r;
-  }, [search, topic, passFilter, scoreRange, sortField, sortDir]);
+  }, [results, search, topic, passFilter, scoreRange, sortField, sortDir]);
 
   function handleSort(field) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -237,8 +216,22 @@ export default function AdminUserResults() {
   const TH = "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap select-none";
   const THSort = TH + " cursor-pointer hover:text-slate-700 dark:hover:text-slate-200";
 
-  // bucket colors for score distribution
-  const bucketColors = ["#f43f5e", "#f97316", "#f59e0b", "#10b981", "#3b82f6"];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading results…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-6">
@@ -252,53 +245,13 @@ export default function AdminUserResults() {
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">All test results across every user on the platform</p>
         </div>
-        <button className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0">
-          <Download size={14} /> Export CSV
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
         </button>
-      </div>
-
-      {/* ── Stat Cards ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Tests Taken"  value={totalTests}   icon={BarChart2}  color="blue"    />
-        <StatCard label="Platform Avg Score" value={`${avgScore}%`} icon={TrendingUp} color="emerald" />
-        <StatCard label="Pass Rate"          value={`${passRate}%`} icon={CheckCircle} color="indigo" sub={`${passCount} of ${totalTests} passed`} />
-        <StatCard label="Tests Today"        value={todayTests}   icon={Clock}      color="amber"   />
-      </div>
-
-      {/* ── Charts Row ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-        {/* Score Distribution */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-          <p className="text-[15px] font-bold text-slate-900 dark:text-white mb-1">Score Distribution</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">How many users fall in each score bracket</p>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={scoreDistribution} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis dataKey="range" tick={{ fill: axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="count" name="Tests" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                {scoreDistribution.map((_, i) => <Cell key={i} fill={bucketColors[i]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Topic Avg Performance */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-          <p className="text-[15px] font-bold text-slate-900 dark:text-white mb-1">Avg Score by Topic</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Mean score across all tests per subject</p>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={topicPerformance} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fill: axisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="topic" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="avgScore" name="Avg Score %" fill="#6366f1" radius={[0, 4, 4, 0]} maxBarSize={18} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────────────── */}
@@ -309,7 +262,7 @@ export default function AdminUserResults() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search user, email or test name…"
+              placeholder="Search user or email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors"
@@ -433,7 +386,7 @@ export default function AdminUserResults() {
                     <th className={THSort} onClick={() => handleSort("userName")}>
                       <span className="flex items-center gap-1">User <SortIcon field="userName" sortField={sortField} sortDir={sortDir} /></span>
                     </th>
-                    <th className={TH}>Test / Topic</th>
+                    <th className={TH}>Topic</th>
                     <th className={THSort} onClick={() => handleSort("score")}>
                       <span className="flex items-center gap-1">Score <SortIcon field="score" sortField={sortField} sortDir={sortDir} /></span>
                     </th>
@@ -463,8 +416,7 @@ export default function AdminUserResults() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
-                        <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate max-w-[160px]">{res.testName}</p>
-                        <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
                           {res.topic}
                         </span>
                       </td>
@@ -512,7 +464,7 @@ export default function AdminUserResults() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-[13px] text-slate-800 dark:text-slate-200 truncate">{res.userName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{res.testName}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{res.email}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">

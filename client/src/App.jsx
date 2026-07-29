@@ -58,11 +58,15 @@ function ProtectedRoute({ children }) {
   return token ? children : <Navigate to="/login" state={{ from: location.pathname }} replace />;
 }
 
+function AdminProtectedRoute({ children }) {
+  const adminToken = localStorage.getItem("adminToken");
+  const location = useLocation();
+  return adminToken ? children : <Navigate to="/admin/login" state={{ from: location.pathname }} replace />;
+}
+
 const App = () => {
   const location = useLocation();
-  const isAdminRoute =
-    location.pathname.startsWith("/admin") &&
-    location.pathname !== "/admin/login";
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   // Navbar and Footer are hidden inside the test flow and on admin pages,
   // but not on the test-selection page so users can still navigate away.
@@ -98,7 +102,7 @@ const App = () => {
             <Route path="/resources/interview-experiences" element={<ProtectedRoute><WorkInProgress /></ProtectedRoute>} />
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin" element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminProtectedRoute><AdminLayout /></AdminProtectedRoute>}>
               <Route path="dashboard" element={<AdminDashboard />} />
 
               {/* User Management */}

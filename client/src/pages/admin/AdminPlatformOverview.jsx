@@ -77,6 +77,8 @@ export default function AdminPlatformOverview() {
     setTimeout(() => setToast(false), 2500);
   };
 
+  const sortedTopicsByAccuracy = [...topicPerformanceData].sort((a, b) => a.avgAccuracy - b.avgAccuracy);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -172,7 +174,7 @@ export default function AdminPlatformOverview() {
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white mb-1">Avg Accuracy by Topic</h3>
           <p className="text-xs text-slate-400 mb-4">Sorted weakest to strongest</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={[...topicPerformanceData].sort((a, b) => a.avgAccuracy - b.avgAccuracy)} layout="vertical" barSize={18}>
+            <BarChart data={sortedTopicsByAccuracy} layout="vertical" barSize={18}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
               <XAxis type="number" domain={[0, 100]} tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
               <YAxis type="category" dataKey="topic" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
@@ -181,7 +183,7 @@ export default function AdminPlatformOverview() {
                 formatter={(v) => [`${v}%`, "Avg Accuracy"]}
               />
               <Bar dataKey="avgAccuracy" radius={[0, 6, 6, 0]}>
-                {[...topicPerformanceData].sort((a, b) => a.avgAccuracy - b.avgAccuracy).map((d, i) => (
+                {sortedTopicsByAccuracy.map((d, i) => (
                   <Cell key={i} fill={d.color} />
                 ))}
               </Bar>
@@ -193,28 +195,26 @@ export default function AdminPlatformOverview() {
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white mb-1">Test Attempts by Topic</h3>
           <p className="text-xs text-slate-400 mb-2">Distribution across all {topicPerformanceData.reduce((s, t) => s + t.attempts, 0).toLocaleString()} attempts</p>
-          <div className="flex items-center gap-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={topicPerformanceData}
-                  dataKey="attempts"
-                  nameKey="topic"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                >
-                  {topicPerformanceData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: isDark ? "#1e293b" : "#fff", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }}
-                  formatter={(v, n) => [v.toLocaleString() + " attempts", n]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={topicPerformanceData}
+                dataKey="attempts"
+                nameKey="topic"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                paddingAngle={3}
+              >
+                {topicPerformanceData.map((d, i) => <Cell key={i} fill={d.color} />)}
+              </Pie>
+              <Tooltip
+                contentStyle={{ background: isDark ? "#1e293b" : "#fff", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }}
+                formatter={(v, n) => [v.toLocaleString() + " attempts", n]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2">
             {topicPerformanceData.map(d => (
               <div key={d.topic} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">

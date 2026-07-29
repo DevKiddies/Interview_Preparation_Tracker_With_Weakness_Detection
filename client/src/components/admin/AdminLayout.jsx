@@ -47,13 +47,13 @@ const navSections = [
     items: [
       { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp },
       { label: "User Reports", to: "/admin/analytics/users", icon: BarChart },
-      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain },
+      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain, disabled: true },
     ],
   },
   {
     title: "Settings",
     items: [
-      { label: "Admin Settings", to: "/admin/settings", icon: Settings },
+      { label: "Admin Settings", to: "/admin/settings", icon: Settings, disabled: true },
     ],
   },
 ];
@@ -131,7 +131,22 @@ export default function AdminLayout() {
 
                 {!isCollapsed && (
                   <div className="flex flex-col gap-0.5">
-                    {section.items.map(({ label, to, icon: Icon }) => {
+                    {section.items.map(({ label, to, icon: Icon, disabled }) => {
+                      if (disabled) {
+                        return (
+                          <div
+                            key={to}
+                            title="Coming soon"
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+                          >
+                            <Icon size={16} className="shrink-0" />
+                            <span className="flex-1 min-w-0 truncate whitespace-nowrap">{label}</span>
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                              Soon
+                            </span>
+                          </div>
+                        );
+                      }
                       const isActive = location.pathname === to;
                       return (
                         <Link

@@ -2,18 +2,19 @@
 // Features: stat cards, live search, status/verified filters, sortable table,
 // user detail modal with full profile, ban user modal with reason + duration,
 // unban action, toast notifications, and responsive mobile card layout.
-// Data is mocked in adminAllUsersData.js — swap for API calls when ready.
+// Fetches live data from GET /api/admin/users; ban/unban call the real endpoints.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Users, UserCheck, UserPlus, ShieldCheck,
-  Search, Filter, ChevronDown, ChevronUp, X,
+  Search, ChevronDown, ChevronUp, X,
   Eye, ShieldOff, Shield, CheckCircle, AlertTriangle,
   Mail, Calendar, BarChart2, Flame, Building, Briefcase,
-  Download, RotateCcw,
+  RotateCcw, Loader2, RefreshCw,
 } from "lucide-react";
-import { allUsersData, banDurations, banReasonOptions } from "../../data/adminAllUsersData";
+import { banDurations, banReasonOptions } from "../../data/adminAllUsersData";
+import API_BASE from "../../utils/api";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,14 @@ const AVATAR_GRADIENTS = [
   "from-rose-400 to-pink-500",   "from-amber-400 to-orange-500",
   "from-purple-400 to-violet-500","from-cyan-400 to-sky-500",
 ];
-function avatarColor(id) { return AVATAR_GRADIENTS[id % AVATAR_GRADIENTS.length]; }
+// id is a UUID string (not a small int), so hash it into a deterministic index
+// instead of using % directly — "uuid" % n is NaN.
+function avatarColor(id) {
+  const str = String(id);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
 
 // ─── Status badge ────────────────────────────────────────────────────────────
 
@@ -84,7 +92,7 @@ function StatCard({ label, value, icon: Icon, color }) {
 
 // ─── User Detail Modal ────────────────────────────────────────────────────────
 
-function UserDetailModal({ user, onClose, onBan }) {
+function UserDetailModal({ user, onClose, onBan, onUnban }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -162,7 +170,7 @@ function UserDetailModal({ user, onClose, onBan }) {
           )}
           {user.status === "banned" && (
             <button
-              onClick={onClose}
+              onClick={() => { onClose(); onUnban(user); }}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm"
             >
               <RotateCcw size={14} /> Unban User
@@ -179,18 +187,17 @@ function UserDetailModal({ user, onClose, onBan }) {
 function BanModal({ user, onConfirm, onClose }) {
   const [reason, setReason]     = useState("");
   const [duration, setDuration] = useState("permanent");
-  const [note, setNote]         = useState("");
   const [error, setError]       = useState("");
 
   function handleSubmit() {
     if (!reason) { setError("Please select a ban reason."); return; }
-    onConfirm({ userId: user.id, reason, duration, note });
+    onConfirm({ userId: user.id, reason, duration });
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <div className="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
 
         {/* Header */}
@@ -247,26 +254,6 @@ function BanModal({ user, onConfirm, onClose }) {
           </div>
         </div>
 
-        {/* Note */}
-        <div className="mb-5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Internal Note (optional)</label>
-          <textarea
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Add context for other admins…"
-            className="w-full px-3 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400/40 focus:border-rose-400 resize-none transition-colors"
-          />
-        </div>
-
-        {/* Warning */}
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 mb-5">
-          <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            This user will immediately lose access to the platform and receive a ban notification.
-          </p>
-        </div>
-
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
             Cancel
@@ -283,7 +270,9 @@ function BanModal({ user, onConfirm, onClose }) {
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminAllUsers() {
-  const [users, setUsers]             = useState(allUsersData);
+  const [users, setUsers]             = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
   const [search, setSearch]           = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [verifiedFilter, setVerifiedFilter] = useState("all"); // "all" | "verified" | "unverified"
@@ -292,6 +281,43 @@ export default function AdminAllUsers() {
   const [viewUser, setViewUser]       = useState(null);
   const [banUser, setBanUser]         = useState(null);
   const [toast, setToast]             = useState(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    async function loadUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+        });
+        if (!res.ok) throw new Error("Failed to load users");
+        setUsers(await res.json());
+      } catch (err) {
+        setError(err.message || "Failed to load users");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUsers();
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to load users");
+      setUsers(await res.json());
+    } catch (err) {
+      setError(err.message || "Failed to load users");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // ── derived stats ──────────────────────────────────────────────────────────
   const totalUsers    = users.length;
@@ -325,10 +351,37 @@ export default function AdminAllUsers() {
     else { setSortField(field); setSortDir("asc"); }
   }
 
-  function handleBanConfirm({ userId }) {
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "banned" } : u));
-    setBanUser(null);
-    showToast("User has been banned successfully.");
+  async function handleBanConfirm({ userId, reason, duration }) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}/ban`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify({ reason, duration }),
+      });
+      if (!res.ok) throw new Error("Failed to ban user");
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "banned" } : u));
+      setBanUser(null);
+      showToast("User has been banned successfully.");
+    } catch (err) {
+      showToast(err.message || "Failed to ban user", "error");
+    }
+  }
+
+  async function handleUnbanConfirm(user) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${user.id}/unban`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to unban user");
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, status: "active" } : u));
+      showToast("User has been unbanned successfully.");
+    } catch (err) {
+      showToast(err.message || "Failed to unban user", "error");
+    }
   }
 
   function showToast(message, type = "success") {
@@ -338,6 +391,23 @@ export default function AdminAllUsers() {
 
   const TH = "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap select-none";
   const THSort = TH + " cursor-pointer hover:text-slate-700 dark:hover:text-slate-200";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading users…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-6">
@@ -351,8 +421,12 @@ export default function AdminAllUsers() {
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">View and manage every registered user on the platform</p>
         </div>
-        <button className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0">
-          <Download size={14} /> Export CSV
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
 
@@ -538,7 +612,13 @@ export default function AdminAllUsers() {
                               <Shield size={12} /> Ban
                             </button>
                           ) : (
-                            <span className="px-2.5 py-1.5 text-[12px] font-semibold text-slate-400 dark:text-slate-500">Banned</span>
+                            <button
+                              onClick={() => handleUnbanConfirm(user)}
+                              title="Unban user"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                            >
+                              <RotateCcw size={12} /> Unban
+                            </button>
                           )}
                         </div>
                       </td>
@@ -581,9 +661,13 @@ export default function AdminAllUsers() {
                   <button onClick={() => setViewUser(user)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                     <Eye size={13} /> View
                   </button>
-                  {user.status !== "banned" && (
+                  {user.status !== "banned" ? (
                     <button onClick={() => setBanUser(user)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors">
                       <Shield size={13} /> Ban
+                    </button>
+                  ) : (
+                    <button onClick={() => handleUnbanConfirm(user)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors">
+                      <RotateCcw size={13} /> Unban
                     </button>
                   )}
                 </div>
@@ -594,7 +678,14 @@ export default function AdminAllUsers() {
       )}
 
       {/* ── Modals ───────────────────────────────────────────────────────── */}
-      {viewUser && <UserDetailModal user={viewUser} onClose={() => setViewUser(null)} onBan={(u) => { setViewUser(null); setBanUser(u); }} />}
+      {viewUser && (
+        <UserDetailModal
+          user={viewUser}
+          onClose={() => setViewUser(null)}
+          onBan={(u) => { setViewUser(null); setBanUser(u); }}
+          onUnban={handleUnbanConfirm}
+        />
+      )}
       {banUser  && <BanModal user={banUser} onConfirm={handleBanConfirm} onClose={() => setBanUser(null)} />}
 
       {/* ── Toast ────────────────────────────────────────────────────────── */}

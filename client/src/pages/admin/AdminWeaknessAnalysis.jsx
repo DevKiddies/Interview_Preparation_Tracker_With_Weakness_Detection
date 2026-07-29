@@ -10,27 +10,40 @@ import {
 } from "recharts";
 import {
   AlertTriangle, ChevronUp, ChevronDown, Info, TrendingUp,
-  BookOpen, Target, Zap, HelpCircle,
+  Target, Zap, HelpCircle,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import {
   categoryWeaknessData, mostMissedQuestions, accuracyTrendData,
 } from "../../data/adminAnalyticsData";
-import { topicsConfig } from "../../data/adminQuestionsData";
+import { categoriesData } from "../../data/adminQuestionsData";
 import { TOPIC_COLORS } from "../../data/adminTestsData";
 
-// Accuracy → color mapping used by the heatmap and table
+// Accuracy → color mapping used by both the heatmap/table cells and the legend
+const ACC_LEVELS = [
+  { max: 45,       bg: "bg-rose-600",  hex: "#dc2626", label: "Critical" },
+  { max: 55,       bg: "bg-rose-400",  hex: "#f87171", label: "Weak"     },
+  { max: 65,       bg: "bg-amber-400", hex: "#fbbf24", label: "Fair"     },
+  { max: 75,       bg: "bg-blue-400",  hex: "#60a5fa", label: "Good"     },
+  { max: Infinity, bg: "bg-green-500", hex: "#22c55e", label: "Strong"   },
+];
+
 function accColor(acc) {
-  if (acc < 45) return { bg: "bg-rose-600",   text: "text-white",                  hex: "#dc2626", label: "Critical" };
-  if (acc < 55) return { bg: "bg-rose-400",   text: "text-white",                  hex: "#f87171", label: "Weak"     };
-  if (acc < 65) return { bg: "bg-amber-400",  text: "text-white",                  hex: "#fbbf24", label: "Fair"     };
-  if (acc < 75) return { bg: "bg-blue-400",   text: "text-white",                  hex: "#60a5fa", label: "Good"     };
-  return               { bg: "bg-green-500",  text: "text-white",                  hex: "#22c55e", label: "Strong"   };
+  const level = ACC_LEVELS.find(l => acc < l.max);
+  return { bg: level.bg, text: "text-white", hex: level.hex, label: level.label };
 }
 
 function SortIcon({ active, dir }) {
   if (!active) return <ChevronUp size={13} className="text-slate-300 dark:text-slate-600" />;
   return dir === "asc" ? <ChevronUp size={13} className="text-blue-500" /> : <ChevronDown size={13} className="text-blue-500" />;
+}
+
+function TH({ label, sk, sortKey, sortDir, onSort }) {
+  return (
+    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap" onClick={() => onSort(sk)}>
+      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
+    </th>
+  );
 }
 
 const DIFF_COLORS = {
@@ -56,10 +69,10 @@ export default function AdminWeaknessAnalysis() {
 
   // Topic-level avg accuracy (for the bar chart)
   const topicWeaknessData = useMemo(() => {
-    return topicsConfig.map(tc => {
-      const cats = categoryWeaknessData.filter(c => c.topic === tc.topic);
+    return categoriesData.map(cat => {
+      const cats = categoryWeaknessData.filter(c => c.topic === cat.name);
       const avg = cats.length ? (cats.reduce((s, c) => s + c.avgAccuracy, 0) / cats.length).toFixed(1) : 0;
-      return { topic: tc.topic, avgAccuracy: Number(avg), color: TOPIC_COLORS[tc.topic]?.chart || "#64748b" };
+      return { topic: cat.name, avgAccuracy: Number(avg), color: TOPIC_COLORS[cat.name]?.chart || "#64748b" };
     }).sort((a, b) => a.avgAccuracy - b.avgAccuracy); // weakest first
   }, []);
 
@@ -70,10 +83,10 @@ export default function AdminWeaknessAnalysis() {
 
   // Heatmap: grouped by topic, sorted by avgAccuracy within each group
   const heatmapData = useMemo(() => {
-    return topicsConfig.map(tc => ({
-      topic: tc.topic,
+    return categoriesData.map(cat => ({
+      topic: cat.name,
       categories: categoryWeaknessData
-        .filter(c => c.topic === tc.topic)
+        .filter(c => c.topic === cat.name)
         .sort((a, b) => a.avgAccuracy - b.avgAccuracy),
     }));
   }, []);
@@ -89,12 +102,6 @@ export default function AdminWeaknessAnalysis() {
     });
     return arr;
   }, [topicFilter, sortKey, sortDir]);
-
-  const TH = ({ label, sk }) => (
-    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap" onClick={() => handleSort(sk)}>
-      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
-    </th>
-  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -147,15 +154,9 @@ export default function AdminWeaknessAnalysis() {
           </div>
           {/* Legend */}
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {[
-              { label: "Critical",  color: "#dc2626" },
-              { label: "Weak",      color: "#f87171" },
-              { label: "Fair",      color: "#fbbf24" },
-              { label: "Good",      color: "#60a5fa" },
-              { label: "Strong",    color: "#22c55e" },
-            ].map(({ label, color }) => (
+            {ACC_LEVELS.map(({ label, hex }) => (
               <span key={label} className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                <span className="w-3 h-3 rounded" style={{ background: color }} />{label}
+                <span className="w-3 h-3 rounded" style={{ background: hex }} />{label}
               </span>
             ))}
           </div>
@@ -292,7 +293,7 @@ export default function AdminWeaknessAnalysis() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-700">
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white">Category Breakdown</h3>
           <div className="flex gap-1 flex-wrap">
-            {["All", ...topicsConfig.map(tc => tc.topic)].map(t => (
+            {["All", ...categoriesData.map(cat => cat.name)].map(t => (
               <button
                 key={t}
                 onClick={() => setTopicFilter(t)}
@@ -307,11 +308,11 @@ export default function AdminWeaknessAnalysis() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                <TH label="Category"   sk="category"    />
-                <TH label="Topic"      sk="topic"       />
-                <TH label="Accuracy"   sk="avgAccuracy" />
-                <TH label="Attempts"   sk="attempts"    />
-                <TH label="Difficulty" sk="difficulty"  />
+                <TH label="Category"   sk="category"    sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Topic"      sk="topic"       sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Accuracy"   sk="avgAccuracy" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Attempts"   sk="attempts"    sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Difficulty" sk="difficulty"  sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
               </tr>
             </thead>

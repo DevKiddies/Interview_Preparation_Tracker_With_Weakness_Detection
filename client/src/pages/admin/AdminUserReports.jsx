@@ -59,6 +59,11 @@ export default function AdminUserReports() {
 
   const maxCompany = Math.max(...targetCompanyData.map(d => d.count));
 
+  const engagementTiersWithPct = engagementTiers.map(t => ({
+    ...t,
+    pct: ((t.count / totalEngagementCount) * 100).toFixed(1),
+  }));
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -198,26 +203,20 @@ export default function AdminUserReports() {
         <p className="text-xs text-slate-400 mb-4">Segmented by number of tests completed</p>
         {/* Stacked bar */}
         <div className="flex rounded-xl overflow-hidden h-5 mb-4">
-          {engagementTiers.map(t => {
-            const pct = ((t.count / totalEngagementCount) * 100).toFixed(1);
-            return (
-              <div key={t.tier} style={{ width: `${pct}%`, background: t.color }} title={`${t.tier}: ${t.count} users (${pct}%)`} />
-            );
-          })}
+          {engagementTiersWithPct.map(t => (
+            <div key={t.tier} style={{ width: `${t.pct}%`, background: t.color }} title={`${t.tier}: ${t.count} users (${t.pct}%)`} />
+          ))}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {engagementTiers.map(t => {
-            const pct = ((t.count / totalEngagementCount) * 100).toFixed(1);
-            return (
-              <div key={t.tier} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center">
-                <div className="w-2.5 h-2.5 rounded-full mx-auto mb-2" style={{ background: t.color }} />
-                <p className="text-sm font-bold text-slate-900 dark:text-white">{t.count}</p>
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{t.tier}</p>
-                <p className="text-xs text-slate-400">{t.desc}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{pct}%</p>
-              </div>
-            );
-          })}
+          {engagementTiersWithPct.map(t => (
+            <div key={t.tier} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center">
+              <div className="w-2.5 h-2.5 rounded-full mx-auto mb-2" style={{ background: t.color }} />
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{t.count}</p>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{t.tier}</p>
+              <p className="text-xs text-slate-400">{t.desc}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t.pct}%</p>
+            </div>
+          ))}
         </div>
       </div>
 

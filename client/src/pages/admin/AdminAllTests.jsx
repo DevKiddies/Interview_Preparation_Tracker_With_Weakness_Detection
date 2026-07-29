@@ -7,11 +7,15 @@ import { useNavigate } from "react-router-dom";
 import {
   ClipboardList, Plus, Search, ChevronUp, ChevronDown, Eye, Edit2, Trash2,
   X, Clock, Target, Users, CheckCircle, AlertCircle, BookOpen, Shuffle,
-  BarChart2, FileText,
+  BarChart2,
 } from "lucide-react";
-import { useTheme } from "../../context/ThemeContext";
 import { testConfigs as initialConfigs, TOPIC_COLORS, difficultyOptions } from "../../data/adminTestsData";
-import { topicsConfig } from "../../data/adminQuestionsData";
+import { categoriesData, topicsData } from "../../data/adminQuestionsData";
+
+// NOTE: this page's "topic"/"categories" fields mean the same thing as in
+// AdminCreateMockTest.jsx — "topic" = top-level grouping (DB `categories`),
+// "categories" = nested grouping (DB `topics`). Kept as-is; only the
+// adminQuestionsData.js lookups below were updated.
 
 const DIFF_COLORS = {
   Easy:   { bg: "bg-green-100 dark:bg-green-900/30",  text: "text-green-700 dark:text-green-300"  },
@@ -43,6 +47,14 @@ function SortIcon({ active, dir }) {
   return dir === "asc" ? <ChevronUp size={13} className="text-blue-500" /> : <ChevronDown size={13} className="text-blue-500" />;
 }
 
+function TH({ label, sk, sortKey, sortDir, onSort }) {
+  return (
+    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap" onClick={() => onSort(sk)}>
+      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
+    </th>
+  );
+}
+
 const EMPTY_FORM = {
   name: "", description: "", topic: "", categories: [],
   questionCount: 20, timeLimitMinutes: 30,
@@ -52,7 +64,6 @@ const EMPTY_FORM = {
 
 export default function AdminAllTests() {
   const navigate = useNavigate();
-  const { isDark } = useTheme();
 
   const [tests, setTests] = useState(initialConfigs);
   const [search, setSearch] = useState("");
@@ -109,7 +120,8 @@ export default function AdminAllTests() {
   };
 
   // Edit modal helpers
-  const topicCategories = topicsConfig.find(tc => tc.topic === editForm.topic)?.categories || [];
+  const editCategoryMeta = categoriesData.find(c => c.name === editForm.topic);
+  const topicCategories = editCategoryMeta ? topicsData.filter(t => t.categoryId === editCategoryMeta.id).map(t => t.name) : [];
   const toggleCategory = (cat) => {
     setEditForm(f => ({
       ...f,
@@ -145,12 +157,6 @@ export default function AdminAllTests() {
     showToast("Test deleted", "error");
     closeModal();
   };
-
-  const TH = ({ label, sk }) => (
-    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap" onClick={() => handleSort(sk)}>
-      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
-    </th>
-  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -208,7 +214,7 @@ export default function AdminAllTests() {
             className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">All Topics</option>
-            {topicsConfig.map(tc => <option key={tc.topic} value={tc.topic}>{tc.topic}</option>)}
+            {categoriesData.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
           </select>
           <div className="flex gap-2">
             {["All", "Active", "Draft"].map(s => (
@@ -232,16 +238,16 @@ export default function AdminAllTests() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <TH label="#" sk="id" />
-                <TH label="Test Name" sk="name" />
-                <TH label="Topic" sk="topic" />
+                <TH label="#" sk="id" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Test Name" sk="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Topic" sk="topic" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Categories</th>
-                <TH label="Questions" sk="questionCount" />
-                <TH label="Time" sk="timeLimitMinutes" />
-                <TH label="Difficulty" sk="difficulty" />
-                <TH label="Status" sk="status" />
-                <TH label="Attempts" sk="attemptCount" />
-                <TH label="Avg Score" sk="avgScore" />
+                <TH label="Questions" sk="questionCount" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Time" sk="timeLimitMinutes" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Difficulty" sk="difficulty" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Status" sk="status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Attempts" sk="attemptCount" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Avg Score" sk="avgScore" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -441,7 +447,7 @@ export default function AdminAllTests() {
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Topic *</label>
                 <select value={editForm.topic} onChange={e => handleTopicChange(e.target.value)} className={`w-full px-3 py-2 text-sm rounded-lg border ${editErrors.topic ? "border-rose-400" : "border-slate-200 dark:border-slate-600"} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}>
                   <option value="">Select topic…</option>
-                  {topicsConfig.map(tc => <option key={tc.topic} value={tc.topic}>{tc.label}</option>)}
+                  {categoriesData.map(cat => <option key={cat.id} value={cat.name}>{cat.label}</option>)}
                 </select>
                 {editErrors.topic && <p className="text-xs text-rose-500 mt-1">{editErrors.topic}</p>}
               </div>

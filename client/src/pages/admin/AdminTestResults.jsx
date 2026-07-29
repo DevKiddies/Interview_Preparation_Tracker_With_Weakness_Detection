@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { useTheme } from "../../context/ThemeContext";
 import { testAttempts, TOPIC_COLORS } from "../../data/adminTestsData";
-import { topicsConfig } from "../../data/adminQuestionsData";
+import { categoriesData } from "../../data/adminQuestionsData";
 
 const PAGE_SIZE = 10;
 
@@ -30,6 +30,14 @@ const SCORE_BUCKETS = [
 function SortIcon({ active, dir }) {
   if (!active) return <ChevronUp size={13} className="text-slate-300 dark:text-slate-600" />;
   return dir === "asc" ? <ChevronUp size={13} className="text-blue-500" /> : <ChevronDown size={13} className="text-blue-500" />;
+}
+
+function TH({ label, sk, className = "", sortKey, sortDir, onSort }) {
+  return (
+    <th className={`px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap ${className}`} onClick={() => onSort(sk)}>
+      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
+    </th>
+  );
 }
 
 function PassBadge({ passed }) {
@@ -126,18 +134,12 @@ export default function AdminTestResults() {
 
   // Topic avg accuracy chart data
   const topicAvgData = useMemo(() => {
-    return topicsConfig.map(tc => {
-      const group = testAttempts.filter(a => a.topic === tc.topic);
+    return categoriesData.map(cat => {
+      const group = testAttempts.filter(a => a.topic === cat.name);
       const avg = group.length ? (group.reduce((s, a) => s + a.accuracy, 0) / group.length).toFixed(1) : 0;
-      return { topic: tc.topic, avg: Number(avg), color: TOPIC_COLORS[tc.topic]?.chart || "#64748b", attempts: group.length };
+      return { topic: cat.name, avg: Number(avg), color: TOPIC_COLORS[cat.name]?.chart || "#64748b", attempts: group.length };
     }).filter(d => d.attempts > 0).sort((a, b) => b.avg - a.avg);
   }, []);
-
-  const TH = ({ label, sk, className = "" }) => (
-    <th className={`px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none whitespace-nowrap ${className}`} onClick={() => handleSort(sk)}>
-      <div className="flex items-center gap-1">{label}<SortIcon active={sortKey === sk} dir={sortDir} /></div>
-    </th>
-  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -231,7 +233,7 @@ export default function AdminTestResults() {
             className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">All Topics</option>
-            {topicsConfig.map(tc => <option key={tc.topic} value={tc.topic}>{tc.topic}</option>)}
+            {categoriesData.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
           </select>
         </div>
 
@@ -257,14 +259,14 @@ export default function AdminTestResults() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <TH label="#" sk="id" />
-                <TH label="User" sk="user" />
-                <TH label="Test" sk="testName" />
-                <TH label="Topic" sk="topic" />
-                <TH label="Score" sk="score" />
-                <TH label="Accuracy" sk="accuracy" />
-                <TH label="Time" sk="timeTaken" />
-                <TH label="Date" sk="submittedAt" />
+                <TH label="#" sk="id" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="User" sk="user" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Test" sk="testName" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Topic" sk="topic" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Score" sk="score" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Accuracy" sk="accuracy" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Time" sk="timeTaken" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <TH label="Date" sk="submittedAt" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Result</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Details</th>
               </tr>
