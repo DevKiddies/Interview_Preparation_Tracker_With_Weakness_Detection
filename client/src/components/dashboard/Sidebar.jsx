@@ -6,22 +6,20 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ClipboardList,
-  Trophy,
   User,
   HelpCircle,
   LogOut,
   Flame,
   Clock,
   Sparkles,
-  Target,
+  History,
 } from "lucide-react";
 import API_BASE from "../../utils/api.js";
 
 const NAV_ITEMS = [
   { label: "Dashboard",      icon: LayoutDashboard, to: "/dashboard",           exact: true  },
   { label: "Mock Tests",     icon: ClipboardList,   to: "/practice/mock-tests", exact: false },
-  { label: "Interview Goal", icon: Target,          to: "/interview-goal",      exact: false },
-  { label: "My Results",     icon: Trophy,          to: "/dashboard/history",   exact: false },
+  { label: "History", icon: History,       to: "/interview-history",   exact: false },
   { label: "Profile",        icon: User,            to: "/profile/settings",    exact: false },
   { label: "Help Center",    icon: HelpCircle,      to: "/help/faqs",           exact: false },
 ];
@@ -104,7 +102,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
 
               {/* Compact Preparation Widget (Now Clickable Shortcut) */}
               <button
-                  onClick={() => navigate("/interview-goal")}
+                  onClick={() => navigate("/interview-settings")}
                   className="w-full rounded-lg border border-indigo-100/80 bg-indigo-50/50 p-2 text-left transition hover:border-indigo-200 hover:bg-indigo-100/60 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"
               >
                 <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-950 dark:text-indigo-200">
