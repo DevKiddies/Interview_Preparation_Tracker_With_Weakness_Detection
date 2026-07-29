@@ -27,8 +27,11 @@ export default function MockTestPage() {
   const retakeUrl   = isTopicTest ? "/practice/mock-tests/topic" : `/practice/mock-tests/${testId}`;
   const retakeState = isTopicTest ? { category, limit: questionLimit, duration: initialTime } : null;
 
+  const CACHE_KEY = `quiz-${testId}`;
+
   const [sidebarOpen, setSidebarOpen]        = useState(false);
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [timedOut, setTimedOut]              = useState(false);
   const [submitting, setSubmitting]          = useState(false);
 
@@ -40,17 +43,45 @@ export default function MockTestPage() {
   const [selectedAnswers, setSelectedAnswers]  = useState({});
   const [statuses, setStatuses]               = useState([]);
   const [timeLeft, setTimeLeft]               = useState(initialTime);
+  const [tabSwitches, setTabSwitches]         = useState(0);
+  const [showTabWarning, setShowTabWarning]   = useState(false);
 
+  const initialTimeRef = useRef(initialTime);
+  const doSubmitRef = useRef(null);
   const stateRef = useRef({ questions, selectedAnswers, timeLeft });
   useEffect(() => {
     stateRef.current = { questions, selectedAnswers, timeLeft };
   }, [questions, selectedAnswers, timeLeft]);
 
+  const saveToCache = (state) => {
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch {}
+  };
+
   useEffect(() => {
+    // Topic tests: new navigation → clear stale cache so a fresh fetch happens
+    if (isTopicTest && category) {
+      sessionStorage.removeItem(CACHE_KEY);
+    }
+
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const state = JSON.parse(cached);
+        setQuestions(state.questions);
+        setSelectedAnswers(state.selectedAnswers);
+        setStatuses(state.statuses);
+        setCurrentIndex(state.currentIndex);
+        setTimeLeft(state.timeLeft);
+        setTabSwitches(state.tabSwitches ?? 0);
+        initialTimeRef.current = state.initialTime;
+        setLoading(false);
+        return;
+      } catch {}
+    }
+
     const token = localStorage.getItem("token");
     const qs    = new URLSearchParams({ limit: questionLimit });
 
-    // FIX: Only append category if it actually exists, preventing 400 Bad Request
     if (category) {
       const cats = Array.isArray(category) ? category : [category];
       cats.forEach((c) => qs.append("category", c));
@@ -60,9 +91,19 @@ export default function MockTestPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
         .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
-        .then((data) => { setQuestions(data); setLoading(false); })
+        .then((data) => {
+          setQuestions(data);
+          setLoading(false);
+          saveToCache({ questions: data, selectedAnswers: {}, statuses: [], currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, initialTime: initialTimeRef.current });
+        })
         .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
-  }, [testId, category, questionLimit]);
+  }, []);
+
+  // Persist progress on every meaningful change
+  useEffect(() => {
+    if (questions.length === 0) return;
+    saveToCache({ questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, initialTime: initialTimeRef.current });
+  }, [questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -73,6 +114,20 @@ export default function MockTestPage() {
     }, 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      if (document.hidden) return;
+      setTabSwitches((prev) => prev + 1);
+      setShowTabWarning(true);
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, []);
+
+  useEffect(() => {
+    if (tabSwitches >= 3) doSubmitRef.current?.();
+  }, [tabSwitches]);
 
   useEffect(() => {
     if (timeLeft === 0 && questions.length > 0) {
@@ -96,21 +151,23 @@ export default function MockTestPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          // FIX: Added 'topic' and explicitly mapped 'category' to match the updated Java DTO
           category: Array.isArray(category) ? category.join(", ") : (category ?? "Data Structures & Algorithms"),
           topic: null,
-          timeTaken: initialTime - tl,
+          tabSwitches,
+          timeTaken: initialTimeRef.current - tl,
           questionIds,
           answers,
         }),
       });
       if (!res.ok) throw new Error();
+      sessionStorage.removeItem(CACHE_KEY);
       const result = await res.json();
       navigate("/practice/results", { state: { result, testTitle, retakeUrl, retakeState } });
     } catch {
       navigate("/practice/mock-tests");
     }
   }, [submitting, navigate, category, initialTime, testTitle, retakeUrl, retakeState]);
+  doSubmitRef.current = doSubmit;
 
   const currentQuestion  = questions[currentIndex];
   const isCurrentFlagged = statuses[currentIndex] === "flagged";
@@ -135,6 +192,16 @@ export default function MockTestPage() {
         u[currentIndex] = u[currentIndex] === "flagged" ? "unvisited" : "flagged";
         return u;
       });
+
+  const handleNavigate = (idx) => {
+    setStatuses((prev) => {
+      if (prev[currentIndex] === "flagged") return prev;
+      const u = [...prev];
+      u[currentIndex] = selectedAnswers[currentIndex] ? "answered" : "skipped";
+      return u;
+    });
+    setCurrentIndex(idx);
+  };
 
   const handleClear = () =>
       setSelectedAnswers((prev) => { const u = { ...prev }; delete u[currentIndex]; return u; });
@@ -180,6 +247,9 @@ export default function MockTestPage() {
 
   return (
       <div className="flex h-screen flex-col bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-white transition-colors duration-200">
+        {showTabWarning && (
+            <TabSwitchBanner tabSwitches={tabSwitches} onDismiss={() => setShowTabWarning(false)} />
+        )}
         <QuizHeader
             timeLeft={timeLeft}
             total={questions.length}
@@ -215,7 +285,7 @@ export default function MockTestPage() {
               total={questions.length}
               currentIndex={currentIndex}
               statuses={statuses}
-              onNavigate={(idx) => setCurrentIndex(idx)}
+              onNavigate={handleNavigate}
               isOpen={sidebarOpen}
               onClose={() => setSidebarOpen(false)}
           />
@@ -275,7 +345,14 @@ export default function MockTestPage() {
                       </button>
                   )}
                   <button
-                      onClick={() => { setShowFinishModal(false); doSubmit(); }}
+                      onClick={() => {
+                        setShowFinishModal(false);
+                        if (answeredCount === questions.length) {
+                          doSubmit();
+                        } else {
+                          setShowConfirmModal(true);
+                        }
+                      }}
                       className="flex-1 rounded-xl bg-rose-500 hover:bg-rose-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/20 transition-colors"
                   >
                     Submit
@@ -284,6 +361,59 @@ export default function MockTestPage() {
               </div>
             </div>
         )}
+
+        {showConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+              <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                    <AlertTriangle size={20} className="text-slate-500 dark:text-slate-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white">Unanswered Questions</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {notAnsweredCount} question{notAnsweredCount !== 1 ? "s" : ""} not answered. Submit anyway?
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                      onClick={() => setShowConfirmModal(false)}
+                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    Review
+                  </button>
+                  <button
+                      onClick={() => { setShowConfirmModal(false); doSubmit(); }}
+                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                  >
+                    Submit Anyway
+                  </button>
+                </div>
+              </div>
+            </div>
+        )}
       </div>
   );
+}
+
+function TabSwitchBanner({ tabSwitches, onDismiss }) {
+    useEffect(() => {
+        const id = setTimeout(onDismiss, 4000);
+        return () => clearTimeout(id);
+    }, [onDismiss]);
+
+    return (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 shadow-lg dark:border-amber-500/30 dark:bg-amber-500/10">
+            <div className="flex items-center gap-3">
+                <AlertTriangle size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Tab switch detected ({tabSwitches}). Please stay on the test page.
+                </p>
+                <button onClick={onDismiss} className="ml-2 text-sm font-semibold text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    );
 }

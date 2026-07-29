@@ -5,6 +5,8 @@
 // exam paper rather than app chrome; options stay sans for clarity.
 
 import { Check } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const LABELS = ["A", "B", "C", "D"];
 
@@ -22,9 +24,9 @@ export default function QuizQuestionCard({ question, index, total, selectedOptio
             </div>
 
             {/* Question text */}
-            <h2 className="mb-7 text-lg sm:text-xl leading-relaxed text-zinc-900" style={{ fontFamily: "'Source Serif 4', Georgia, 'Times New Roman', serif" }}>
-                {question.text}
-            </h2>
+            <div className="mb-7 text-lg sm:text-xl leading-relaxed text-zinc-900 prose prose-sm prose-zinc max-w-none dark:prose-invert" style={{ fontFamily: "'Source Serif 4', Georgia, 'Times New Roman', serif" }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{question.text}</ReactMarkdown>
+            </div>
 
             {/* Options */}
             <div className="flex flex-col gap-2.5">
@@ -53,8 +55,8 @@ export default function QuizQuestionCard({ question, index, total, selectedOptio
 
                             {/* Option text */}
                             <span className={`flex-1 text-[14px] leading-snug ${isSelected ? "text-zinc-900 font-medium" : "text-zinc-700"}`}>
-                {option}
-              </span>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <>{children}</> }}>{option}</ReactMarkdown>
+                            </span>
 
                             {isSelected && (
                                 <Check size={16} className="shrink-0 text-zinc-900" strokeWidth={2.5} />
