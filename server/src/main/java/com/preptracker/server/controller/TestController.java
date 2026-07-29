@@ -51,15 +51,16 @@ public class TestController {
             boolean correct  = submitted != null && submitted.equals(correctText);
             if (correct) score++;
 
-            int[] counts = catMap.computeIfAbsent(q.getCategory(), k -> new int[]{0, 0});
+            String catName = q.getCategory().getName();
+            int[] counts = catMap.computeIfAbsent(catName, k -> new int[]{0, 0});
             counts[1]++;
             if (correct) counts[0]++;
 
             results.add(new TestResultResponse.QuestionResult(
-                    q.getId(), q.getText(),
+                    q.getId(), q.getQuestion(),
                     List.of(q.getOptionA(), q.getOptionB(), q.getOptionC(), q.getOptionD()),
                     submitted, correctText, correct,
-                    q.getCategory(), q.getDifficulty()
+                    catName, q.getDifficulty()
             ));
         }
 

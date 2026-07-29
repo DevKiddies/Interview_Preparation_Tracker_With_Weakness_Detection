@@ -26,7 +26,6 @@ public class QuestionController {
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        List<String> topics = (topic == null || topic.isEmpty()) ? List.of("DSA") : topic;
-        return ResponseEntity.ok(questionService.getQuestions(topics, category, limit));
+        return ResponseEntity.ok(questionService.getQuestions(topic, category, limit));
     }
 }
