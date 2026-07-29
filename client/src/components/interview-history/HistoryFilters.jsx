@@ -1,54 +1,108 @@
+import React from "react";
 import { Search } from "lucide-react";
 
 const STATUSES = ["All", "Active", "Completed", "Archived"];
 const TARGETS = ["All", "FAANG", "Product", "Service", "Competitive Exams"];
 const SORTS = ["Newest", "Oldest", "Most Questions", "Highest Accuracy"];
 
-function HistoryFilters({ search, onSearchChange, status, onStatusChange, target, onTargetChange, sort, onSortChange }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative flex-1 min-w-[180px]">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search Interview"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2 pl-9 pr-3 text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-        />
-      </div>
+function HistoryFilters({
+                            search,
+                            onSearchChange,
+                            status,
+                            onStatusChange,
+                            target,
+                            onTargetChange,
+                            sort,
+                            onSortChange,
+                        }) {
+    return (
+        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+            {/* Search Input - Expands to fill the space cleanly */}
+            <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <Search size={16} className="text-slate-400" />
+                </div>
+                <input
+                    type="search"
+                    placeholder="Search Interview"
+                    value={search}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-slate-200/80 bg-slate-50/50 dark:bg-slate-800/50 dark:border-slate-700/60 pl-9 pr-3 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                />
+            </div>
 
-      <select
-        value={status}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-      >
-        {STATUSES.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
+            {/* Filter Dropdowns - Fixed width next to each other */}
+            <div className="flex items-center gap-2 shrink-0">
+                <FilterSelect
+                    label="Status"
+                    value={status}
+                    options={STATUSES}
+                    onChange={onStatusChange}
+                />
 
-      <select
-        value={target}
-        onChange={(e) => onTargetChange(e.target.value)}
-        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-      >
-        {TARGETS.map((t) => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
+                <FilterSelect
+                    label="Target"
+                    value={target}
+                    options={TARGETS}
+                    onChange={onTargetChange}
+                />
 
-      <select
-        value={sort}
-        onChange={(e) => onSortChange(e.target.value)}
-        className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-      >
-        {SORTS.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
-    </div>
-  );
+                <FilterSelect
+                    label="Sort By"
+                    value={sort}
+                    options={SORTS}
+                    onChange={onSortChange}
+                    isSortSelect={true}
+                />
+            </div>
+        </div>
+    );
+}
+
+function FilterSelect({ label, value, options, onChange, isSortSelect = false }) {
+    // Check active status based on whether it's a sort field or filter field
+    const isSelected = isSortSelect ? value !== "Newest" : value !== "All";
+
+    return (
+        <div className="relative flex items-center shrink-0">
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className={`h-9 appearance-none rounded-lg border px-3 pr-8 text-xs font-medium cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-indigo-500/30 ${
+                    isSelected
+                        ? "border-indigo-500/40 bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+                        : "border-slate-200/80 bg-slate-50/50 text-slate-600 hover:bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-300"
+                }`}
+            >
+                <option value="" disabled hidden>
+                    {label}
+                </option>
+                {options.map((opt) => (
+                    <option
+                        key={opt}
+                        value={opt}
+                        className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
+                    >
+                        {/* Formats "All" options cleanly (e.g., "All Statuses", "All Targets") */}
+                        {opt === "All" ? `All ${label}s` : opt}
+                    </option>
+                ))}
+            </select>
+
+            {/* Custom Chevron Indicator */}
+            <svg
+                className={`pointer-events-none absolute right-2.5 h-3.5 w-3.5 ${
+                    isSelected ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+                stroke="currentColor"
+            >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+        </div>
+    );
 }
 
 export default HistoryFilters;

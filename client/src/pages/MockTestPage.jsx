@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { CheckCircle2, Flag, XCircle, AlertTriangle, Timer } from "lucide-react";
-import QuizHeader from "../components/ui/QuizHeader";
-import QuizQuestionCard from "../components/ui/QuizQuestionCard";
-import QuizSidebarNavigator from "../components/ui/QuizSidebarNavigator";
-import QuizFooterControls from "../components/ui/QuizFooterControls";
+import QuizHeader from "../components/mock-test/QuizHeader.jsx";
+import QuizQuestionCard from "../components/mock-test/QuizQuestionCard.jsx";
+import QuizSidebarNavigator from "../components/mock-test/QuizSidebarNavigator.jsx";
+import QuizFooterControls from "../components/mock-test/QuizFooterControls.jsx";
 import API_BASE from "../utils/api.js";
 
 export default function MockTestPage() {
