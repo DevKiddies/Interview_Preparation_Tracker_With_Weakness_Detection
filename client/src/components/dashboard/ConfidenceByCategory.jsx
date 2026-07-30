@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 
-export default function ConfidenceByTopic({ topics = [] }) {
+export default function ConfidenceByCategory({ topics = [] }) {
     const getColor = (confidence) => {
         if (confidence < 40) return "bg-rose-500 dark:bg-rose-600";
         if (confidence < 60) return "bg-amber-500";
@@ -19,7 +19,7 @@ export default function ConfidenceByTopic({ topics = [] }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="mb-4">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Confidence by Topic
+                    Confidence by Category
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                     Performance metrics breakdown across core concepts.

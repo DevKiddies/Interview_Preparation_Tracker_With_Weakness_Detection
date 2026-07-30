@@ -7,11 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { Play, Plus, Target } from "lucide-react";
 import Sidebar from "../components/dashboard/Sidebar";
 import StatCard from "../components/dashboard/StatCard";
-import ActivityHeatmap from "../components/dashboard/ActivityHeatmap";
+import ActivityHeatmap from "../components/profile/ActivityHeatmap";
 import QuickActions from "../components/dashboard/QuickActions";
 import PreparationCard from "../components/dashboard/PreparationCard";
 import API_BASE from "../utils/api.js";
-import ConfidenceByTopic from "../components/dashboard/ConfidenceByTopic";
+import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
 import { topicConfidence } from "../data/dashboardData";
 import { confidenceTrend } from "../data/dashboardData";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
@@ -185,7 +185,7 @@ export default function DashboardPage() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ConfidenceByTopic topics={topicConfidence} />
+              <ConfidenceByCategory topics={topicConfidence} />
               <ConfidenceTrend data={confidenceTrend} />
             </div>
 
