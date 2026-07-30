@@ -6,11 +6,13 @@ import {
   ClipboardList, FilePlus, FileBarChart,
   TrendingUp, BarChart, Brain,
   Settings, LogOut, Menu, X, ChevronDown,
-  Moon, Sun,
+  Moon, Sun, CheckCircle2,
 } from "lucide-react";
 import Logo from "../ui/Logo";
 import { useTheme } from "../../context/ThemeContext";
 
+// `connected: true` is a temporary marker for pages already wired to the real
+// backend (vs. still on mock data) — remove it once every page is wired.
 const navSections = [
   {
     title: "Overview",
@@ -21,39 +23,39 @@ const navSections = [
   {
     title: "User Management",
     items: [
-      { label: "All Users", to: "/admin/users", icon: Users },
-      { label: "User Results", to: "/admin/users/results", icon: BarChart2 },
-      { label: "Banned Users", to: "/admin/users/banned", icon: UserX },
+      { label: "All Users", to: "/admin/users", icon: Users, connected: true },
+      { label: "User Results", to: "/admin/users/results", icon: BarChart2, connected: true },
+      { label: "Banned Users", to: "/admin/users/banned", icon: UserX, connected: true },
     ],
   },
   {
     title: "Question Management",
     items: [
-      { label: "Question Bank", to: "/admin/questions", icon: Database },
-      { label: "Add Question", to: "/admin/questions/add", icon: PlusCircle },
-      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen },
+      { label: "Question Bank", to: "/admin/questions", icon: Database, connected: true },
+      { label: "Add Question", to: "/admin/questions/add", icon: PlusCircle, connected: true },
+      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen, connected: true },
     ],
   },
   {
     title: "Test Management",
     items: [
-      { label: "All Tests", to: "/admin/tests", icon: ClipboardList },
-      { label: "Create Mock Test", to: "/admin/tests/create", icon: FilePlus },
-      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart },
+      { label: "All Tests", to: "/admin/tests", icon: ClipboardList, connected: true },
+      { label: "Create Mock Test", to: "/admin/tests/create", icon: FilePlus, connected: true },
+      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart, connected: true },
     ],
   },
   {
     title: "Analytics & Reports",
     items: [
-      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp },
+      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp, connected: true },
       { label: "User Reports", to: "/admin/analytics/users", icon: BarChart },
-      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain },
+      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain, disabled: true },
     ],
   },
   {
     title: "Settings",
     items: [
-      { label: "Admin Settings", to: "/admin/settings", icon: Settings },
+      { label: "Admin Settings", to: "/admin/settings", icon: Settings, disabled: true },
     ],
   },
 ];
@@ -131,7 +133,22 @@ export default function AdminLayout() {
 
                 {!isCollapsed && (
                   <div className="flex flex-col gap-0.5">
-                    {section.items.map(({ label, to, icon: Icon }) => {
+                    {section.items.map(({ label, to, icon: Icon, disabled, connected }) => {
+                      if (disabled) {
+                        return (
+                          <div
+                            key={to}
+                            title="Coming soon"
+                            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+                          >
+                            <Icon size={16} className="shrink-0" />
+                            <span className="flex-1 min-w-0 truncate whitespace-nowrap">{label}</span>
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                              Soon
+                            </span>
+                          </div>
+                        );
+                      }
                       const isActive = location.pathname === to;
                       return (
                         <Link
@@ -145,7 +162,10 @@ export default function AdminLayout() {
                             }`}
                         >
                           <Icon size={16} className="shrink-0" />
-                          {label}
+                          <span className="flex-1 min-w-0 truncate whitespace-nowrap">{label}</span>
+                          {connected && (
+                            <CheckCircle2 size={13} className="shrink-0 text-green-500" title="Connected to backend" />
+                          )}
                         </Link>
                       );
                     })}

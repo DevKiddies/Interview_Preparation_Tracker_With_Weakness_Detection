@@ -38,7 +38,7 @@ function InterviewPreviewCard({ targetCompany, experienceLevel, interviewDate })
   if (!hasData) return null;
 
   return (
-    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-slate-900 p-5">
+    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-linear-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-slate-900 p-5">
       <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-4">
         Current Goal
       </p>

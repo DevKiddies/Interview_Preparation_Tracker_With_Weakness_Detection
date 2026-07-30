@@ -64,4 +64,33 @@ public class User {
 
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
+
+    // Updated on successful login — used by the admin panel to derive active/inactive status.
+    @Column(name = "last_active_at")
+    private LocalDateTime lastActiveAt;
+
+    @Column(name = "is_banned", nullable = false, columnDefinition = "boolean default false")
+    private Boolean isBanned = false;
+
+    @Column(name = "ban_reason")
+    private String banReason;
+
+    @Column(name = "ban_note", columnDefinition = "TEXT")
+    private String banNote;
+
+    @Column(name = "banned_at")
+    private LocalDateTime bannedAt;
+
+    // null means the ban is permanent (as long as isBanned is true)
+    @Column(name = "ban_expires_at")
+    private LocalDateTime banExpiresAt;
+
+    // Admin username who applied the current/most recent ban.
+    @Column(name = "banned_by")
+    private String bannedBy;
+
+    // Incremented every time this account is banned (never decremented), so
+    // "previous bans" can be shown as banCount - 1 without a full audit-log table.
+    @Column(name = "ban_count", nullable = false, columnDefinition = "integer default 0")
+    private Integer banCount = 0;
 }

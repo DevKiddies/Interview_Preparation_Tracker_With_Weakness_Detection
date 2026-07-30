@@ -127,5 +127,4 @@ export const platformHealthMetrics = [
   { label: "Avg Session Duration", value: "18 min", icon: "clock",  color: "indigo" },
   { label: "Question Pass Rate",   value: "63.4%",  icon: "check",  color: "emerald" },
   { label: "Test Completion Rate", value: "78.2%",  icon: "target", color: "blue"    },
-  { label: "Repeat Visitors",      value: "54%",    icon: "repeat", color: "amber"   },
 ];

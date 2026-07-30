@@ -6,7 +6,7 @@ function EditAction({ onClick, label }) {
         <button
             onClick={onClick}
             aria-label={label}
-            className="inline-flex shrink-0 items-center gap-1 rounded text-[11px] font-medium text-[#8A93A3] transition-colors hover:text-[#2647D6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2647D6] dark:text-[#6B7280] dark:hover:text-[#7C97FF]"
+            className="inline-flex shrink-0 items-center gap-1 rounded text-[11px] font-medium text-[#8A93A3] transition-colors hover:text-[#2647D6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2647D6] dark:text-[#6B7280] dark:hover:text-[#7C97FF]"
         >
             <Pencil size={10} />
             Edit
@@ -280,7 +280,7 @@ export default function ProfileOverviewCard({
                     <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#5B6472] dark:text-[#A7AFBD]">
                         <span className="inline-flex items-center gap-1" title={profile?.email}>
                             <Mail size={12} className="shrink-0 text-[#8A93A3]" />
-                            <span className="max-w-[200px] truncate">{profile?.email}</span>
+                            <span className="max-w-50 truncate">{profile?.email}</span>
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF7F1] px-1.5 py-0.5 text-[10px] font-medium text-[#157F5C] dark:bg-[#0E2A21] dark:text-[#3FBF8F]">
                             <ShieldCheck size={10} />

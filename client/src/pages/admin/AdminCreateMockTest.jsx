@@ -1,28 +1,47 @@
 // AdminCreateMockTest.jsx — Test Management > Create Mock Test page.
-// Multi-section form for creating a new mock test template (name, topic, categories,
+// Multi-section form for creating a new mock test template (name, category, topics,
 // question count, time limit, difficulty mix, randomize, status).
 // Live preview panel updates as the admin fills the form.
+// Category/topic reference data comes from GET /api/admin/categories and
+// /api/admin/topics (shared with the Question Bank page); submits via
+// POST /api/admin/tests.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FilePlus, BookOpen, Clock, Target, Shuffle, CheckCircle,
-  ChevronRight, ArrowLeft, AlertCircle, Info,
+  ArrowLeft, AlertCircle, Info, Loader2, AlertTriangle,
 } from "lucide-react";
-import { topicsConfig, questionsData } from "../../data/adminQuestionsData";
-import { difficultyOptions, TOPIC_COLORS } from "../../data/adminTestsData";
+import API_BASE from "../../utils/api";
 
+const difficultyOptions = ["Easy", "Medium", "Hard", "Mixed"];
 const DIFF_BAR = { Easy: "#22c55e", Medium: "#f59e0b", Hard: "#ef4444" };
+
+// Same deterministic-by-id palette used on the All Tests page (categories no
+// longer carry a `color` field like the old mock data did).
+const CATEGORY_PALETTE = ["blue", "indigo", "teal", "amber", "purple", "emerald"];
+const CATEGORY_STYLE = {
+  blue:    { bg: "bg-blue-100 dark:bg-blue-900/30",    text: "text-blue-700 dark:text-blue-300"    },
+  indigo:  { bg: "bg-indigo-100 dark:bg-indigo-900/30",text: "text-indigo-700 dark:text-indigo-300"},
+  teal:    { bg: "bg-teal-100 dark:bg-teal-900/30",    text: "text-teal-700 dark:text-teal-300"    },
+  amber:   { bg: "bg-amber-100 dark:bg-amber-900/30",  text: "text-amber-700 dark:text-amber-300"  },
+  purple:  { bg: "bg-purple-100 dark:bg-purple-900/30",text: "text-purple-700 dark:text-purple-300"},
+  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30",text:"text-emerald-700 dark:text-emerald-300"},
+};
+function categoryColor(categoryId) {
+  const key = CATEGORY_PALETTE[Number(categoryId) % CATEGORY_PALETTE.length];
+  return CATEGORY_STYLE[key] ?? { bg: "bg-slate-100 dark:bg-slate-700", text: "text-slate-600 dark:text-slate-300" };
+}
 
 const INIT_FORM = {
   name: "",
   description: "",
-  topic: "",
-  categories: [],
+  categoryId: "",
+  topicIds: [],
   questionCount: 20,
   timeLimitMinutes: 30,
   difficulty: "Mixed",
-  difficultyMix: { Easy: 7, Medium: 9, Hard: 4 },
+  difficultyEasy: 7, difficultyMedium: 9, difficultyHard: 4,
   randomize: true,
   status: "Active",
 };
@@ -55,38 +74,74 @@ export default function AdminCreateMockTest() {
   const [form, setForm] = useState(INIT_FORM);
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const [categories, setCategories] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [questionCounts, setQuestionCounts] = useState({}); // topicId -> question count
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+        const [catRes, topRes, qRes] = await Promise.all([
+          fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/questions`, { headers: authHeaders }),
+        ]);
+        if (![catRes, topRes, qRes].every(r => r.ok)) throw new Error("Failed to load categories/topics");
+        const [cat, top, questions] = await Promise.all([catRes.json(), topRes.json(), qRes.json()]);
+        setCategories(cat);
+        setTopics(top);
+        const counts = {};
+        for (const q of questions) counts[q.topicId] = (counts[q.topicId] || 0) + 1;
+        setQuestionCounts(counts);
+      } catch (err) {
+        setLoadError(err.message || "Failed to load categories/topics");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
-  const setMix = (d, val) => setForm(f => ({ ...f, difficultyMix: { ...f.difficultyMix, [d]: Number(val) } }));
+  const setMix = (key, val) => setForm(f => ({ ...f, [key]: Number(val) }));
 
-  const handleTopicChange = (t) => setForm(f => ({ ...f, topic: t, categories: [] }));
+  const handleCategoryChange = (id) => setForm(f => ({ ...f, categoryId: Number(id), topicIds: [] }));
 
-  const toggleCategory = (cat) => setForm(f => ({
+  const toggleTopic = (topicId) => setForm(f => ({
     ...f,
-    categories: f.categories.includes(cat)
-      ? f.categories.filter(c => c !== cat)
-      : [...f.categories, cat],
+    topicIds: f.topicIds.includes(topicId)
+      ? f.topicIds.filter(id => id !== topicId)
+      : [...f.topicIds, topicId],
   }));
 
-  const topicMeta = topicsConfig.find(tc => tc.topic === form.topic);
-  const topicCategories = topicMeta?.categories || [];
-  const topicColor = TOPIC_COLORS[form.topic];
+  const topicsInCategory = useMemo(
+    () => form.categoryId ? topics.filter(t => t.categoryId === Number(form.categoryId)) : [],
+    [topics, form.categoryId]
+  );
+  const selectedCategory = categories.find(c => c.id === Number(form.categoryId));
+  const categoryStyle = form.categoryId ? categoryColor(form.categoryId) : null;
 
   // Count available questions matching current filters
   const availableCount = useMemo(() => {
-    if (!form.topic) return 0;
-    let pool = questionsData.filter(q => q.topic === form.topic);
-    if (form.categories.length > 0) pool = pool.filter(q => form.categories.includes(q.category));
-    return pool.length;
-  }, [form.topic, form.categories]);
+    if (form.topicIds.length === 0) return 0;
+    return form.topicIds.reduce((sum, id) => sum + (questionCounts[id] || 0), 0);
+  }, [form.topicIds, questionCounts]);
 
-  const mixSum = (form.difficultyMix.Easy || 0) + (form.difficultyMix.Medium || 0) + (form.difficultyMix.Hard || 0);
+  const mixSum = (form.difficultyEasy || 0) + (form.difficultyMedium || 0) + (form.difficultyHard || 0);
 
   const validate = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = "Test name is required";
-    if (!form.topic) errs.topic = "Please select a topic";
-    if (form.categories.length === 0) errs.categories = "Select at least one category";
+    if (!form.categoryId) errs.categoryId = "Please select a category";
+    if (form.topicIds.length === 0) errs.topicIds = "Select at least one topic";
     if (!form.questionCount || form.questionCount < 5 || form.questionCount > 50) errs.questionCount = "Enter a value between 5 and 50";
     if (!form.timeLimitMinutes || form.timeLimitMinutes < 5 || form.timeLimitMinutes > 120) errs.timeLimit = "Enter a value between 5 and 120 minutes";
     if (form.difficulty === "Mixed" && mixSum !== Number(form.questionCount)) errs.mixSum = `Difficulty mix total (${mixSum}) must equal question count (${form.questionCount})`;
@@ -94,11 +149,47 @@ export default function AdminCreateMockTest() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    setSuccess(true);
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/tests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error("Failed to create test");
+      setSuccess(true);
+    } catch (err) {
+      setSubmitError(err.message || "Failed to create test");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading form data…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+          <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -114,17 +205,17 @@ export default function AdminCreateMockTest() {
             <span className="font-semibold text-slate-700 dark:text-slate-200">"{form.name}"</span> has been added to the test library.
           </p>
           <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 flex flex-col gap-2">
-            <div className="flex justify-between"><span>Topic</span><span className="font-medium text-slate-900 dark:text-white">{form.topic}</span></div>
-            <div className="flex justify-between"><span>Categories</span><span className="font-medium text-slate-900 dark:text-white">{form.categories.length} selected</span></div>
+            <div className="flex justify-between"><span>Category</span><span className="font-medium text-slate-900 dark:text-white">{selectedCategory?.name}</span></div>
+            <div className="flex justify-between"><span>Topics</span><span className="font-medium text-slate-900 dark:text-white">{form.topicIds.length} selected</span></div>
             <div className="flex justify-between"><span>Questions</span><span className="font-medium text-slate-900 dark:text-white">{form.questionCount}</span></div>
             <div className="flex justify-between"><span>Time Limit</span><span className="font-medium text-slate-900 dark:text-white">{form.timeLimitMinutes} min</span></div>
             <div className="flex justify-between"><span>Status</span><span className={`font-medium ${form.status === "Active" ? "text-green-600 dark:text-green-400" : "text-slate-500"}`}>{form.status}</span></div>
           </div>
           <div className="flex gap-3 mt-6 justify-center">
-            <button onClick={() => { setForm(INIT_FORM); setErrors({}); setSuccess(false); }} className="flex-1 max-w-[180px] py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors">
+            <button onClick={() => { setForm(INIT_FORM); setErrors({}); setSuccess(false); }} className="flex-1 max-w-45 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors">
               Create Another
             </button>
-            <button onClick={() => navigate("/admin/tests")} className="flex-1 max-w-[180px] py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors">
+            <button onClick={() => navigate("/admin/tests")} className="flex-1 max-w-45 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors">
               View All Tests
             </button>
           </div>
@@ -188,58 +279,58 @@ export default function AdminCreateMockTest() {
             {/* Test Configuration */}
             <SectionCard title="Test Configuration" icon={Target}>
               <div className="space-y-5">
-                {/* Topic */}
+                {/* Category */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                    Topic <span className="text-rose-500">*</span>
+                    Category <span className="text-rose-500">*</span>
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {topicsConfig.map(tc => {
-                      const c = TOPIC_COLORS[tc.topic];
-                      const active = form.topic === tc.topic;
+                    {categories.map(cat => {
+                      const c = categoryColor(cat.id);
+                      const active = Number(form.categoryId) === cat.id;
                       return (
                         <button
-                          key={tc.topic}
+                          key={cat.id}
                           type="button"
-                          onClick={() => handleTopicChange(tc.topic)}
+                          onClick={() => handleCategoryChange(cat.id)}
                           className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${active ? `${c.bg} ${c.text} border-current ring-2 ring-offset-1 ring-current dark:ring-offset-slate-900` : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500 bg-white dark:bg-slate-900"}`}
                         >
                           {active && <CheckCircle size={14} />}
-                          {tc.topic}
+                          {cat.name}
                         </button>
                       );
                     })}
                   </div>
-                  {errors.topic && <p className="text-xs text-rose-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{errors.topic}</p>}
+                  {errors.categoryId && <p className="text-xs text-rose-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{errors.categoryId}</p>}
                 </div>
 
-                {/* Categories */}
-                {form.topic && (
+                {/* Topics */}
+                {form.categoryId && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                        Categories <span className="text-rose-500">*</span>
+                        Topics <span className="text-rose-500">*</span>
                       </label>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => setForm(f => ({ ...f, categories: [...topicCategories] }))} className="text-xs text-blue-500 hover:underline">All</button>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, topicIds: topicsInCategory.map(t => t.id) }))} className="text-xs text-blue-500 hover:underline">All</button>
                         <span className="text-slate-300 dark:text-slate-600">·</span>
-                        <button type="button" onClick={() => setForm(f => ({ ...f, categories: [] }))} className="text-xs text-slate-400 hover:underline">None</button>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, topicIds: [] }))} className="text-xs text-slate-400 hover:underline">None</button>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {topicCategories.map(cat => {
-                        const active = form.categories.includes(cat);
+                      {topicsInCategory.map(t => {
+                        const active = form.topicIds.includes(t.id);
                         return (
-                          <label key={cat} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${active ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600"}`}>
-                            <input type="checkbox" className="accent-blue-600 shrink-0" checked={active} onChange={() => toggleCategory(cat)} />
-                            <span className="truncate">{cat}</span>
+                          <label key={t.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${active ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-600"}`}>
+                            <input type="checkbox" className="accent-blue-600 shrink-0" checked={active} onChange={() => toggleTopic(t.id)} />
+                            <span className="truncate">{t.name}</span>
                           </label>
                         );
                       })}
                     </div>
-                    {errors.categories && <p className="text-xs text-rose-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{errors.categories}</p>}
+                    {errors.topicIds && <p className="text-xs text-rose-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{errors.topicIds}</p>}
                     {availableCount > 0 && (
-                      <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Info size={11} />{availableCount} question{availableCount !== 1 ? "s" : ""} available in selected categories</p>
+                      <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Info size={11} />{availableCount} question{availableCount !== 1 ? "s" : ""} available in selected topics</p>
                     )}
                   </div>
                 )}
@@ -306,14 +397,14 @@ export default function AdminCreateMockTest() {
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-3 gap-3">
-                      {[["Easy", "green"], ["Medium", "amber"], ["Hard", "rose"]].map(([d, color]) => (
+                      {[["Easy", "green", "difficultyEasy"], ["Medium", "amber", "difficultyMedium"], ["Hard", "rose", "difficultyHard"]].map(([d, color, key]) => (
                         <div key={d}>
                           <label className={`block text-xs font-semibold text-${color}-600 dark:text-${color}-400 mb-1.5`}>{d}</label>
                           <input
                             type="number"
                             min={0}
-                            value={form.difficultyMix[d] || 0}
-                            onChange={e => setMix(d, e.target.value)}
+                            value={form[key] || 0}
+                            onChange={e => setMix(key, e.target.value)}
                             className="w-full px-3 py-2.5 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-center font-semibold"
                           />
                         </div>
@@ -323,18 +414,18 @@ export default function AdminCreateMockTest() {
                     {mixSum > 0 && (
                       <div>
                         <div className="flex rounded-lg overflow-hidden h-3 bg-slate-100 dark:bg-slate-700">
-                          {[["Easy","#22c55e"], ["Medium","#f59e0b"], ["Hard","#ef4444"]].map(([d, color]) => {
-                            const count = form.difficultyMix[d] || 0;
+                          {[["Easy","difficultyEasy"],["Medium","difficultyMedium"],["Hard","difficultyHard"]].map(([d, key]) => {
+                            const count = form[key] || 0;
                             const pct = mixSum > 0 ? (count / mixSum * 100).toFixed(1) : 0;
-                            return count > 0 ? <div key={d} style={{ width: `${pct}%`, background: color }} /> : null;
+                            return count > 0 ? <div key={d} style={{ width: `${pct}%`, background: DIFF_BAR[d] }} /> : null;
                           })}
                         </div>
                         <div className="flex justify-between items-center mt-2">
                           <div className="flex gap-3 text-xs text-slate-500 dark:text-slate-400">
-                            {[["Easy","#22c55e"],["Medium","#f59e0b"],["Hard","#ef4444"]].map(([d,c]) => (
+                            {[["Easy","difficultyEasy"],["Medium","difficultyMedium"],["Hard","difficultyHard"]].map(([d, key]) => (
                               <span key={d} className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: c }} />
-                                {d}: {form.difficultyMix[d]||0}
+                                <span className="w-2 h-2 rounded-full inline-block" style={{ background: DIFF_BAR[d] }} />
+                                {d}: {form[key]||0}
                               </span>
                             ))}
                           </div>
@@ -367,13 +458,20 @@ export default function AdminCreateMockTest() {
               </div>
             </SectionCard>
 
+            {submitError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40 text-sm text-rose-700 dark:text-rose-400">
+                <AlertTriangle size={14} /> {submitError}
+              </div>
+            )}
+
             {/* Submit */}
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                disabled={submitting}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <FilePlus size={16} /> Create Test
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <FilePlus size={16} />} Create Test
               </button>
               <button
                 type="button"
@@ -401,35 +499,27 @@ export default function AdminCreateMockTest() {
                     {form.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{form.description}</p>}
                   </div>
 
-                  {/* Topic badge */}
-                  {form.topic && topicColor && (
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${topicColor.bg} ${topicColor.text}`}>
-                      {topicMeta?.label || form.topic}
+                  {/* Category badge */}
+                  {selectedCategory && categoryStyle && (
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${categoryStyle.bg} ${categoryStyle.text}`}>
+                      {selectedCategory.name}
                     </span>
                   )}
 
                   {/* Stats grid */}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
-                      <BookOpen size={14} className="text-blue-500 mx-auto mb-1" />
-                      <p className="text-base font-bold text-slate-900 dark:text-white">{form.questionCount || 0}</p>
-                      <p className="text-xs text-slate-400">Questions</p>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
-                      <Clock size={14} className="text-indigo-500 mx-auto mb-1" />
-                      <p className="text-base font-bold text-slate-900 dark:text-white">{form.timeLimitMinutes || 0}</p>
-                      <p className="text-xs text-slate-400">Minutes</p>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
-                      <Target size={14} className="text-amber-500 mx-auto mb-1" />
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{form.difficulty}</p>
-                      <p className="text-xs text-slate-400">Difficulty</p>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
-                      <Shuffle size={14} className="text-teal-500 mx-auto mb-1" />
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{form.randomize ? "Yes" : "No"}</p>
-                      <p className="text-xs text-slate-400">Randomize</p>
-                    </div>
+                    {[
+                      { icon: BookOpen, color: "text-blue-500",   value: form.questionCount || 0,          label: "Questions",  size: "text-base" },
+                      { icon: Clock,    color: "text-indigo-500", value: form.timeLimitMinutes || 0,       label: "Minutes",    size: "text-base" },
+                      { icon: Target,   color: "text-amber-500",  value: form.difficulty,                  label: "Difficulty", size: "text-sm"   },
+                      { icon: Shuffle,  color: "text-teal-500",   value: form.randomize ? "Yes" : "No",    label: "Randomize",  size: "text-sm"   },
+                    ].map(({ icon: Icon, color, value, label, size }) => (
+                      <div key={label} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
+                        <Icon size={14} className={`${color} mx-auto mb-1`} />
+                        <p className={`${size} font-bold text-slate-900 dark:text-white`}>{value}</p>
+                        <p className="text-xs text-slate-400">{label}</p>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Difficulty mix bar */}
@@ -437,30 +527,30 @@ export default function AdminCreateMockTest() {
                     <div>
                       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Difficulty Mix</p>
                       <div className="flex rounded-lg overflow-hidden h-2.5 bg-slate-100 dark:bg-slate-700">
-                        {[["Easy","#22c55e"],["Medium","#f59e0b"],["Hard","#ef4444"]].map(([d,color]) => {
-                          const count = form.difficultyMix[d] || 0;
+                        {[["Easy","difficultyEasy"],["Medium","difficultyMedium"],["Hard","difficultyHard"]].map(([d, key]) => {
+                          const count = form[key] || 0;
                           const pct = mixSum > 0 ? (count / mixSum * 100) : 0;
-                          return count > 0 ? <div key={d} style={{ width: `${pct}%`, background: color }} /> : null;
+                          return count > 0 ? <div key={d} style={{ width: `${pct}%`, background: DIFF_BAR[d] }} /> : null;
                         })}
                       </div>
                       <div className="flex gap-3 mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                        {[["Easy","#22c55e"],["Medium","#f59e0b"],["Hard","#ef4444"]].map(([d,c]) => (
+                        {[["Easy","difficultyEasy"],["Medium","difficultyMedium"],["Hard","difficultyHard"]].map(([d, key]) => (
                           <span key={d} className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full inline-block" style={{ background: c }} />
-                            {form.difficultyMix[d]||0}
+                            <span className="w-2 h-2 rounded-full inline-block" style={{ background: DIFF_BAR[d] }} />
+                            {form[key]||0}
                           </span>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Categories */}
-                  {form.categories.length > 0 && (
+                  {/* Topics */}
+                  {form.topicIds.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Categories ({form.categories.length})</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Topics ({form.topicIds.length})</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {form.categories.map(c => (
-                          <span key={c} className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{c}</span>
+                        {form.topicIds.map(id => (
+                          <span key={id} className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topics.find(t => t.id === id)?.name}</span>
                         ))}
                       </div>
                     </div>
@@ -473,7 +563,7 @@ export default function AdminCreateMockTest() {
                   </div>
 
                   {/* Available count info */}
-                  {form.topic && form.categories.length > 0 && (
+                  {form.categoryId && form.topicIds.length > 0 && (
                     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${availableCount >= (form.questionCount || 0) ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"}`}>
                       <Info size={12} />
                       {availableCount} Qs in bank · need {form.questionCount || 0}

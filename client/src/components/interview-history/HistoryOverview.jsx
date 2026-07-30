@@ -51,7 +51,7 @@ function HistoryOverview() {
           return (
               <div
                   key={s.title}
-                  className={`flex items-center gap-3 rounded-xl bg-gradient-to-br ${s.bg} p-3 ${s.glow}`}
+                  className={`flex items-center gap-3 rounded-xl bg-linear-to-br ${s.bg} p-3 ${s.glow}`}
               >
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg backdrop-blur-sm ${s.iconBg}`}>
                   <Icon size={18} strokeWidth={2.5} />

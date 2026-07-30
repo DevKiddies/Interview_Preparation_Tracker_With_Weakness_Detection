@@ -1,12 +1,11 @@
 package com.preptracker.server.model;
 
+// A reusable technique tag that can be attached to a question, e.g. "Two Pointers", "Sliding Window".
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "techniques")
@@ -19,14 +18,6 @@ public class Technique {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true)
     private String name;
-
-    @ManyToMany
-    @JoinTable(
-            name = "technique_topics",
-            joinColumns = @JoinColumn(name = "technique_id"),
-            inverseJoinColumns = @JoinColumn(name = "topic_id")
-    )
-    private Set<Topic> topics = new HashSet<>();
 }

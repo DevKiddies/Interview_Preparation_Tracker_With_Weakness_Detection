@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   Settings, Monitor, ClipboardList, Users, Bell, Shield,
   AlertTriangle, CheckCircle, Save, Download, Trash2, RefreshCw,
-  Eye, EyeOff, X, Info,
+  Eye, EyeOff, Info,
 } from "lucide-react";
 
 // ── Reusable small components ─────────────────────────────────────────────────

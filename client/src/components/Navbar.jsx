@@ -71,7 +71,7 @@ const guestNavItems = [
       },
     ],
   },
-  { label: "AI Interview", to: "/ai-interview" },
+  { label: "AI Interview", to: "/ai-interview", disabled: true },
   {
     label: "About",
     items: [
@@ -112,6 +112,7 @@ const studentNavItems = [
   },
   {
     label: "AI Interview",
+    disabled: true,
     items: [
       { label: "Start Session", to: "/ai-interview/start" },
       { label: "Past Sessions", to: "/ai-interview/past-sessions" },
@@ -139,10 +140,25 @@ function NavDropdown({
   label,
   to,
   items,
+  disabled = false,
   align = "left",
   buttonClassName = "flex items-center gap-1 py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200",
 }) {
   const [open, setOpen] = useState(false);
+
+  if (disabled) {
+    return (
+      <div
+        title="Coming soon"
+        className="flex items-center gap-1.5 py-2 text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+      >
+        {label}
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+          Upcoming
+        </span>
+      </div>
+    );
+  }
 
   if (!items) {
     return (
@@ -210,10 +226,25 @@ function MobileNavSection({
   sectionKey,
   to,
   items,
+  disabled = false,
   openSection,
   setOpenSection,
   onNavigate,
 }) {
+  if (disabled) {
+    return (
+      <div
+        title="Coming soon"
+        className="flex items-center justify-between gap-2 text-slate-400 dark:text-slate-600 font-medium py-2 cursor-not-allowed select-none"
+      >
+        {label}
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+          Upcoming
+        </span>
+      </div>
+    );
+  }
+
   if (!items) {
     return (
       <Link

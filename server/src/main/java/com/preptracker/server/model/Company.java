@@ -1,5 +1,7 @@
 package com.preptracker.server.model;
 
+// An optional company tag on a question, e.g. "Google" (type "Product") or "TCS" (type "Service").
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,9 +18,9 @@ public class Company {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false)
     private String type;
 }

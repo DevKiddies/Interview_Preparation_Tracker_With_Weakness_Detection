@@ -29,7 +29,7 @@ function CustomTooltip({ active, payload, maxCount }) {
 
     return (
         <div className="rounded-xl border border-slate-100 bg-white/95 p-3 shadow-xl backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 min-w-40">
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[200px] mb-1.5">
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-50 mb-1.5">
                 {data.topic}
             </p>
             <div className="flex items-center justify-between gap-4 text-xs">
@@ -80,7 +80,7 @@ export default function BlindSpotAnalysis({ data = [] }) {
                     No blind spots detected yet — keep practicing to build this up.
                 </div>
             ) : (
-                <div className="mt-6 flex-1 h-full min-h-[260px] w-full">
+                <div className="mt-6 flex-1 h-full min-h-65 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             layout="vertical"

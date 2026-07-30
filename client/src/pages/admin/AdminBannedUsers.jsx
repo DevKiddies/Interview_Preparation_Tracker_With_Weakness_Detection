@@ -1,16 +1,19 @@
 // AdminBannedUsers.jsx — Admin page for viewing and managing banned user accounts.
 // Features: stat cards, search, filter by ban type / reason, sortable table,
 // user detail modal, unban confirmation dialog, and ban expiry indicators.
-// All data is mocked in adminBannedUsersData.js — wire to API when ready.
+// Fetches live data from GET /api/admin/users/banned; unban calls the real endpoint.
+// Note: reportCount is currently always 0 — there's no user-report/abuse-flagging
+// feature in the app yet.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   UserX, Search, Filter, ChevronDown, ChevronUp,
   Shield, ShieldOff, Clock, AlertTriangle, X,
-  CheckCircle, Eye, RotateCcw, Calendar, Mail,
-  ClipboardList, BarChart2, Flag, User,
+  CheckCircle, Eye, RotateCcw, Mail,
+  ClipboardList, BarChart2, Flag, Loader2, RefreshCw,
 } from "lucide-react";
-import { bannedUsersData, banReasons } from "../../data/adminBannedUsersData";
+import { banReasons } from "../../data/adminBannedUsersData";
+import API_BASE from "../../utils/api";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,7 +36,12 @@ function avatarColor(id) {
     "from-purple-400 to-violet-500",
     "from-cyan-400 to-sky-500",
   ];
-  return palettes[id % palettes.length];
+  // id is a UUID string (not a small int), so hash it into a deterministic index
+  // instead of using % directly — "uuid" % n is NaN.
+  const str = String(id);
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return palettes[hash % palettes.length];
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -262,7 +270,9 @@ function UserDetailModal({ user, onClose, onUnban }) {
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminBannedUsers() {
-  const [users, setUsers]               = useState(bannedUsersData);
+  const [users, setUsers]               = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(null);
   const [search, setSearch]             = useState("");
   const [filterType, setFilterType]     = useState("all");     // "all" | "permanent" | "temporary"
   const [filterReason, setFilterReason] = useState("All Reasons");
@@ -272,12 +282,47 @@ export default function AdminBannedUsers() {
   const [viewTarget, setViewTarget]     = useState(null);      // user to view
   const [toast, setToast]               = useState(null);      // { message, type }
   const [reasonOpen, setReasonOpen]     = useState(false);
+  const [refreshing, setRefreshing]     = useState(false);
+
+  useEffect(() => {
+    async function loadBannedUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/users/banned`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+        });
+        if (!res.ok) throw new Error("Failed to load banned users");
+        setUsers(await res.json());
+      } catch (err) {
+        setError(err.message || "Failed to load banned users");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadBannedUsers();
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/banned`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to load banned users");
+      setUsers(await res.json());
+    } catch (err) {
+      setError(err.message || "Failed to load banned users");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // ── derived stats ──────────────────────────────────────────────────────────
   const totalBanned    = users.length;
   const permanentCount = users.filter((u) => u.banType === "permanent").length;
   const temporaryCount = users.filter((u) => u.banType === "temporary").length;
-  const expiringSoon   = users.filter((u) => u.banType === "temporary" && u.daysRemaining > 0 && u.daysRemaining <= 7).length;
 
   // ── filtering + sorting ────────────────────────────────────────────────────
   const displayed = useMemo(() => {
@@ -309,10 +354,19 @@ export default function AdminBannedUsers() {
     else { setSortField(field); setSortDir("asc"); }
   }
 
-  function handleUnban(id) {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    setUnbanTarget(null);
-    showToast("User has been unbanned successfully.", "success");
+  async function handleUnban(id) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${id}/unban`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to unban user");
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      setUnbanTarget(null);
+      showToast("User has been unbanned successfully.", "success");
+    } catch (err) {
+      showToast(err.message || "Failed to unban user", "error");
+    }
   }
 
   function showToast(message, type = "success") {
@@ -321,6 +375,23 @@ export default function AdminBannedUsers() {
   }
 
   const thClass = "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 select-none";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading banned users…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-6">
@@ -336,14 +407,20 @@ export default function AdminBannedUsers() {
             Manage suspended accounts and review ban history
           </p>
         </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+        </button>
       </div>
 
       {/* ── Stat Cards ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Banned"    value={totalBanned}    icon={UserX}         color="rose"    />
-        <StatCard label="Permanent Bans"  value={permanentCount} icon={Shield}        color="rose"    />
-        <StatCard label="Temporary Bans"  value={temporaryCount} icon={Clock}         color="amber"   />
-        <StatCard label="Expiring in 7d"  value={expiringSoon}   icon={AlertTriangle} color="amber"   />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <StatCard label="Total Banned"    value={totalBanned}    icon={UserX}  color="rose"  />
+        <StatCard label="Permanent Bans"  value={permanentCount} icon={Shield} color="rose"  />
+        <StatCard label="Temporary Bans"  value={temporaryCount} icon={Clock}  color="amber" />
       </div>
 
       {/* ── Filters & Search ─────────────────────────────────────────────── */}

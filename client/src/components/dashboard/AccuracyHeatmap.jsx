@@ -22,7 +22,7 @@ function Cell({ topic, difficulty, accuracy }) {
 
             {/* Modern Tooltip */}
             <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 hidden -translate-x-1/2 rounded-lg border border-slate-100 bg-white/95 p-2 shadow-xl backdrop-blur-sm group-hover:block dark:border-slate-800 dark:bg-slate-950/95 min-w-32 text-left">
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px] mb-0.5">
+                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-35 mb-0.5">
                     {topic}
                 </p>
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">

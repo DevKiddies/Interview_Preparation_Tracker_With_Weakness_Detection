@@ -46,7 +46,7 @@ function InterviewSummaryCard({ targetCompany, experienceLevel, interviewDate, s
       : null;
 
   return (
-      <div className={`w-full rounded-xl bg-gradient-to-r ${theme.bg} p-3.5 ${theme.glow}`}>
+      <div className={`w-full rounded-xl bg-linear-to-r ${theme.bg} p-3.5 ${theme.glow}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 
           {/* Left/Top Content: Heading Stack */}
