@@ -1,33 +1,54 @@
 // AdminCategoriesTopics.jsx — Admin page for managing question categories and topics.
-// Shows a card per category with question counts, difficulty distribution bar, and
+// Shows a card per category with live question counts, difficulty distribution bar, and
 // topic chips (a topic belongs to exactly one category). Includes an "Add Topic"
 // modal, delete-topic action, and a horizontal bar chart of questions per category
 // using Recharts.
-// Data derived from adminQuestionsData.js — wire to API when ready.
+// Fetches live data from GET /api/admin/categories, /api/admin/topics and
+// /api/admin/questions, and writes through POST/DELETE /api/admin/topics.
+// Categories are plain {id, name} from the DB (no color/label fields like the
+// old mock data), so card colors are derived deterministically from the id.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
   FolderOpen, PlusCircle, Trash2, X, CheckCircle,
-  AlertTriangle, Database, Tag, BookOpen, ArrowRight,
+  AlertTriangle, Database, Tag, BookOpen, ArrowRight, Loader2,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import { questionsData, categoriesData, topicsData, difficultyLevels } from "../../data/adminQuestionsData";
-
-// ─── colour maps ─────────────────────────────────────────────────────────────
-const CATEGORY_COLORS = {
-  blue:    { bg: "bg-blue-50 dark:bg-blue-900/20",    border: "border-blue-200 dark:border-blue-800/50", badge: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400", icon: "text-blue-600 dark:text-blue-400", chart: "#3b82f6" },
-  indigo:  { bg: "bg-indigo-50 dark:bg-indigo-900/20",  border: "border-indigo-200 dark:border-indigo-800/50", badge: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400", icon: "text-indigo-600 dark:text-indigo-400", chart: "#6366f1" },
-  teal:    { bg: "bg-teal-50 dark:bg-teal-900/20",    border: "border-teal-200 dark:border-teal-800/50",   badge: "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400", icon: "text-teal-600 dark:text-teal-400", chart: "#14b8a6" },
-  amber:   { bg: "bg-amber-50 dark:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800/50",  badge: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400", icon: "text-amber-600 dark:text-amber-400", chart: "#f59e0b" },
-  purple:  { bg: "bg-purple-50 dark:bg-purple-900/20",  border: "border-purple-200 dark:border-purple-800/50", badge: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400", icon: "text-purple-600 dark:text-purple-400", chart: "#a855f7" },
-  emerald: { bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800/50", badge: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400", icon: "text-emerald-600 dark:text-emerald-400", chart: "#10b981" },
-};
+import { categoryStyle } from "../../utils/categoryColors";
+import API_BASE from "../../utils/api";
 
 const DIFF_COLORS = { Easy: "#10b981", Medium: "#f59e0b", Hard: "#f43f5e" };
+const difficultyLevels = ["Easy", "Medium", "Hard"];
+
+// The DB stores difficulty in whatever case it was inserted with — normalize
+// for grouping/display rather than assuming a specific stored case.
+function normalizeDifficulty(d) {
+  if (!d) return "";
+  return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
+}
+
+function authHeaders() {
+  return { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+}
+
+async function fetchPageData() {
+  const [catRes, topRes, qRes] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders() }),
+    fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders() }),
+    fetch(`${API_BASE}/api/admin/questions`, { headers: authHeaders() }),
+  ]);
+  if (![catRes, topRes, qRes].every((r) => r.ok)) {
+    throw new Error("Failed to load categories & topics data");
+  }
+  const [categories, topics, questions] = await Promise.all([
+    catRes.json(), topRes.json(), qRes.json(),
+  ]);
+  return { categories, topics, questions };
+}
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -43,11 +64,19 @@ function ChartTooltip({ active, payload, label }) {
 function AddTopicModal({ category, onAdd, onClose }) {
   const [name, setName] = useState("");
   const [err, setErr]   = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!name.trim()) { setErr("Topic name is required."); return; }
     if (name.trim().length < 2) { setErr("Name must be at least 2 characters."); return; }
-    onAdd(category.id, name.trim());
+    setSaving(true);
+    setErr("");
+    try {
+      await onAdd(category.id, name.trim());
+    } catch (e) {
+      setErr(e.message || "Failed to add topic.");
+      setSaving(false);
+    }
   }
 
   return (
@@ -71,7 +100,10 @@ function AddTopicModal({ category, onAdd, onClose }) {
         </div>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-          <button onClick={handleSubmit} className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm">Add Topic</button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {saving && <Loader2 size={14} className="animate-spin" />} Add Topic
+          </button>
         </div>
       </div>
     </div>
@@ -80,6 +112,18 @@ function AddTopicModal({ category, onAdd, onClose }) {
 
 // ─── Delete Topic Confirm ──────────────────────────────────────────────────
 function DeleteTopicModal({ category, topic, count, onConfirm, onClose }) {
+  const [deleting, setDeleting] = useState(false);
+  const blocked = count > 0;
+
+  async function handleConfirm() {
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } catch {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -87,15 +131,18 @@ function DeleteTopicModal({ category, topic, count, onConfirm, onClose }) {
         <div className="p-4 rounded-full bg-rose-50 dark:bg-rose-900/20 w-fit mx-auto mb-4"><Trash2 size={22} className="text-rose-600 dark:text-rose-400" /></div>
         <p className="font-bold text-slate-900 dark:text-white mb-1">Delete "{topic}"?</p>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">From category: {category}</p>
-        {count > 0 && (
+        {blocked && (
           <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg mb-4 text-left">
             <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 dark:text-amber-400">{count} question{count > 1 ? "s are" : " is"} tagged with this topic. They will become untagged.</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400">{count} question{count > 1 ? "s are" : " is"} tagged with this topic. Reassign or delete them first.</p>
           </div>
         )}
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors">Delete</button>
+          <button onClick={handleConfirm} disabled={blocked || deleting}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {deleting && <Loader2 size={14} className="animate-spin" />} {blocked ? "Cannot Delete" : "Delete"}
+          </button>
         </div>
       </div>
     </div>
@@ -104,13 +151,13 @@ function DeleteTopicModal({ category, topic, count, onConfirm, onClose }) {
 
 // ─── Category Card ───────────────────────────────────────────────────────────
 function CategoryCard({ cfg, questions, topics, onAddTopic, onDeleteTopic }) {
-  const c = CATEGORY_COLORS[cfg.color];
+  const c = categoryStyle(cfg.id);
   const categoryQs = questions.filter((q) => q.categoryId === cfg.id);
   const total      = categoryQs.length;
 
   const diffCounts = useMemo(() => {
     const map = {};
-    difficultyLevels.forEach((d) => { map[d] = categoryQs.filter((q) => q.difficulty === d).length; });
+    difficultyLevels.forEach((d) => { map[d] = categoryQs.filter((q) => normalizeDifficulty(q.difficulty) === d).length; });
     return map;
   }, [categoryQs]);
 
@@ -128,10 +175,7 @@ function CategoryCard({ cfg, questions, topics, onAddTopic, onDeleteTopic }) {
           <div className={`p-2.5 rounded-xl ${c.bg}`}>
             <BookOpen size={18} className={c.icon} />
           </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-white">{cfg.name}</p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">{cfg.label}</p>
-          </div>
+          <p className="font-bold text-slate-900 dark:text-white">{cfg.name}</p>
         </div>
         <span className={`text-lg font-extrabold ${c.icon} shrink-0`}>{total}</span>
       </div>
@@ -191,7 +235,7 @@ function CategoryCard({ cfg, questions, topics, onAddTopic, onDeleteTopic }) {
 
       {/* Footer link */}
       <Link
-        to={`/admin/questions?category=${encodeURIComponent(cfg.name)}`}
+        to={`/admin/questions?categoryId=${cfg.id}`}
         className={`flex items-center justify-between text-[12px] font-semibold ${c.icon} hover:opacity-80 transition-opacity pt-2 border-t ${c.border}`}
       >
         <span>View {total} question{total !== 1 ? "s" : ""} in bank</span>
@@ -201,14 +245,15 @@ function CategoryCard({ cfg, questions, topics, onAddTopic, onDeleteTopic }) {
   );
 }
 
-let _topicUid = -1;
-
 // ─── main component ───────────────────────────────────────────────────────────
 export default function AdminCategoriesTopics() {
   const { isDark } = useTheme();
-  const [topicsByCategory, setTopicsByCategory] = useState(
-    Object.fromEntries(categoriesData.map((c) => [c.id, topicsData.filter((t) => t.categoryId === c.id)]))
-  );
+  const [categories, setCategories] = useState([]);
+  const [topics, setTopics]         = useState([]);
+  const [questions, setQuestions]   = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+
   const [addModal, setAddModal]       = useState(null);  // category object
   const [delModal, setDelModal]       = useState(null);  // { category, topic, count }
   const [toast, setToast]             = useState(null);
@@ -216,37 +261,92 @@ export default function AdminCategoriesTopics() {
   const axisColor = isDark ? "#64748b" : "#94a3b8";
   const gridColor = isDark ? "#1e293b" : "#f1f5f9";
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchPageData();
+      setCategories(data.categories);
+      setTopics(data.topics);
+      setQuestions(data.questions);
+    } catch (err) {
+      setError(err.message || "Failed to load categories & topics data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
   // ── derived stats ──────────────────────────────────────────────────────────
-  const totalQuestions = questionsData.length;
-  const totalCategories = categoriesData.length;
-  const totalTopics = Object.values(topicsByCategory).reduce((s, ts) => s + ts.length, 0);
+  const totalQuestions = questions.length;
+  const totalCategories = categories.length;
+  const totalTopics = topics.length;
 
   // ── chart data ─────────────────────────────────────────────────────────────
   const chartData = useMemo(() =>
-    categoriesData.map((c) => ({
+    categories.map((c) => ({
       category: c.name,
-      count: questionsData.filter((q) => q.categoryId === c.id).length,
-      color: CATEGORY_COLORS[c.color].chart,
+      count: questions.filter((q) => q.categoryId === c.id).length,
+      color: categoryStyle(c.id).chart,
     }))
-  , []);
+  , [categories, questions]);
+
+  const topicsByCategory = useCallback(
+    (categoryId) => topics.filter((t) => t.categoryId === categoryId),
+    [topics],
+  );
 
   // ── handlers ───────────────────────────────────────────────────────────────
-  function handleAddTopic(categoryId, name) {
-    const newTopic = { id: _topicUid--, name, categoryId };
-    setTopicsByCategory((prev) => ({ ...prev, [categoryId]: [...(prev[categoryId] ?? []), newTopic] }));
+  async function handleAddTopic(categoryId, name) {
+    const res = await fetch(`${API_BASE}/api/admin/topics`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ name, categoryId }),
+    });
+    if (!res.ok) throw new Error(await res.text() || "Failed to add topic");
+    const newTopic = await res.json();
+    setTopics((prev) => [...prev, newTopic]);
     setAddModal(null);
     showToast(`Topic "${name}" added.`);
   }
 
-  function handleDeleteTopic(categoryId, topicId, topicName) {
-    setTopicsByCategory((prev) => ({ ...prev, [categoryId]: prev[categoryId].filter((t) => t.id !== topicId) }));
-    setDelModal(null);
-    showToast(`Topic "${topicName}" removed.`);
+  async function handleDeleteTopic(categoryId, topicId, topicName) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/topics/${topicId}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(await res.text() || "Failed to delete topic");
+      setTopics((prev) => prev.filter((t) => t.id !== topicId));
+      setDelModal(null);
+      showToast(`Topic "${topicName}" removed.`);
+    } catch (err) {
+      showToast(err.message || "Failed to delete topic.");
+      throw err;
+    }
   }
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading categories & topics…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+      </div>
+    );
   }
 
   return (
@@ -290,7 +390,7 @@ export default function AdminCategoriesTopics() {
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-            <XAxis type="number" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <XAxis type="number" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <YAxis type="category" dataKey="category" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
             <Tooltip content={<ChartTooltip />} />
             <Bar dataKey="count" name="Questions" radius={[0, 4, 4, 0]} maxBarSize={22}>
@@ -301,18 +401,25 @@ export default function AdminCategoriesTopics() {
       </div>
 
       {/* ── Category Cards Grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {categoriesData.map((cfg) => (
-          <CategoryCard
-            key={cfg.id}
-            cfg={cfg}
-            questions={questionsData}
-            topics={topicsByCategory[cfg.id] ?? []}
-            onAddTopic={(cat) => setAddModal(cat)}
-            onDeleteTopic={(cat, topic, count) => setDelModal({ category: cat, topic, count })}
-          />
-        ))}
-      </div>
+      {categories.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-16 text-center shadow-sm">
+          <FolderOpen size={36} className="text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+          <p className="font-bold text-slate-800 dark:text-slate-200">No categories yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {categories.map((cfg) => (
+            <CategoryCard
+              key={cfg.id}
+              cfg={cfg}
+              questions={questions}
+              topics={topicsByCategory(cfg.id)}
+              onAddTopic={(cat) => setAddModal(cat)}
+              onDeleteTopic={(cat, topic, count) => setDelModal({ category: cat, topic, count })}
+            />
+          ))}
+        </div>
+      )}
 
       {/* ── Difficulty Legend ───────────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm flex flex-wrap items-center gap-4">

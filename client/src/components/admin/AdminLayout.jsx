@@ -33,7 +33,7 @@ const navSections = [
     items: [
       { label: "Question Bank", to: "/admin/questions", icon: Database, connected: true },
       { label: "Add Question", to: "/admin/questions/add", icon: PlusCircle, connected: true },
-      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen },
+      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen, connected: true },
     ],
   },
   {
@@ -41,13 +41,13 @@ const navSections = [
     items: [
       { label: "All Tests", to: "/admin/tests", icon: ClipboardList, connected: true },
       { label: "Create Mock Test", to: "/admin/tests/create", icon: FilePlus, connected: true },
-      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart },
+      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart, connected: true },
     ],
   },
   {
     title: "Analytics & Reports",
     items: [
-      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp },
+      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp, connected: true },
       { label: "User Reports", to: "/admin/analytics/users", icon: BarChart },
       { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain, disabled: true },
     ],

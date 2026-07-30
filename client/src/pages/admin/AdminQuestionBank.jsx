@@ -8,6 +8,7 @@
 // mock did, so badge colors are assigned deterministically from the id instead.
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Database, Search, X, ChevronDown, ChevronUp,
   Eye, Pencil, Trash2, CheckCircle,
@@ -292,43 +293,90 @@ function DeleteModal({ q, onConfirm, onClose }) {
   );
 }
 
-// Fetches the question bank + all reference-data lists together. Standalone
-// (reads the token fresh each call) so it has a stable identity for effects.
-async function fetchQuestionBankData() {
+// Reference-data lists (categories/topics/techniques/technique-topics/companies)
+// rarely change, so they're fetched once per session and cached at module
+// scope — revisiting the page (or another admin page importing this module)
+// reuses them instead of re-fetching ~1830 questions' worth of lookups.
+let referenceCache = null;
+
+async function fetchReferenceData(force = false) {
+  if (referenceCache && !force) return referenceCache;
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
-  const [qRes, catRes, topRes, techRes, ttRes, compRes] = await Promise.all([
-    fetch(`${API_BASE}/api/admin/questions`, { headers: authHeaders }),
+  const [catRes, topRes, techRes, ttRes, compRes] = await Promise.all([
     fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/techniques`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/technique-topics`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/companies`, { headers: authHeaders }),
   ]);
-  if (![qRes, catRes, topRes, techRes, ttRes, compRes].every((r) => r.ok)) {
-    throw new Error("Failed to load question bank data");
+  if (![catRes, topRes, techRes, ttRes, compRes].every((r) => r.ok)) {
+    throw new Error("Failed to load question bank reference data");
   }
-  return Promise.all([qRes.json(), catRes.json(), topRes.json(), techRes.json(), ttRes.json(), compRes.json()]);
+  const [categories, topics, techniques, techniqueTopics, companies] = await Promise.all([
+    catRes.json(), topRes.json(), techRes.json(), ttRes.json(), compRes.json(),
+  ]);
+  referenceCache = { categories, topics, techniques, techniqueTopics, companies };
+  return referenceCache;
+}
+
+// One page of questions from the server — search/filter/sort/paging all
+// happen in the DB now instead of pulling every row down to the browser.
+async function fetchQuestionsPage({ page, sortField, sortDir, search, categoryFilter, topicFilter, diffFilter }) {
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+  const params = new URLSearchParams({
+    page: String(page - 1),
+    size: String(PAGE_SIZE),
+    sortField,
+    sortDir,
+  });
+  if (search.trim()) params.set("search", search.trim());
+  if (categoryFilter !== "All") params.set("categoryId", String(categoryFilter));
+  if (topicFilter !== "All") params.set("topicId", String(topicFilter));
+  if (diffFilter !== "All") params.set("difficulty", diffFilter);
+
+  const res = await fetch(`${API_BASE}/api/admin/questions/search?${params}`, { headers: authHeaders });
+  if (!res.ok) throw new Error("Failed to load questions");
+  return res.json();
+}
+
+async function fetchStats() {
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+  const res = await fetch(`${API_BASE}/api/admin/questions/stats`, { headers: authHeaders });
+  if (!res.ok) throw new Error("Failed to load question bank stats");
+  return res.json();
 }
 
 // ─── main component ───────────────────────────────────────────────────────────
 export default function AdminQuestionBank() {
-  const [questions, setQuestions] = useState([]);
+  const [searchParams] = useSearchParams();
+  const [questions, setQuestions] = useState([]); // current page only — server-paginated
   const [categories, setCategories] = useState([]);
   const [topics, setTopics] = useState([]);
   const [techniques, setTechniques] = useState([]);
   const [techniqueTopics, setTechniqueTopics] = useState([]);
   const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, easy: 0, medium: 0, hard: 0 });
+  const [loading, setLoading] = useState(true); // initial load (reference data + stats)
+  const [tableLoading, setTableLoading] = useState(false); // subsequent page/filter fetches
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [search, setSearch]       = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Deep-linked from the Categories & Topics page's "View questions in bank"
+  // card link (?categoryId=<id>) — read once on mount as the initial filter.
+  const [categoryFilter, setCategoryFilter] = useState(() => {
+    const fromUrl = searchParams.get("categoryId");
+    return fromUrl ? Number(fromUrl) : "All";
+  });
   const [topicFilter, setTopicFilter]       = useState("All");
   const [diffFilter, setDiffFilter]     = useState("All");
   const [sortField, setSortField]       = useState("id");
   const [sortDir, setSortDir]           = useState("asc");
   const [page, setPage]                 = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages]       = useState(1);
   const [categoryDropOpen, setCategoryDropOpen] = useState(false);
   const [topicDropOpen, setTopicDropOpen]       = useState(false);
   const [preview, setPreview]   = useState(null);
@@ -336,30 +384,70 @@ export default function AdminQuestionBank() {
   const [deleteQ, setDeleteQ]   = useState(null);
   const [toast, setToast]       = useState(null);
 
+  // Debounce the search box so every keystroke doesn't fire a request.
   useEffect(() => {
-    async function load() {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reference data + stats load once (reference data may come straight from cache).
+  useEffect(() => {
+    async function loadInitial() {
       setLoading(true);
       setError(null);
       try {
-        const [q, cat, top, tech, tt, comp] = await fetchQuestionBankData();
-        setQuestions(q); setCategories(cat); setTopics(top);
-        setTechniques(tech); setTechniqueTopics(tt); setCompanies(comp);
+        const [ref, statsData] = await Promise.all([fetchReferenceData(), fetchStats()]);
+        setCategories(ref.categories); setTopics(ref.topics); setTechniques(ref.techniques);
+        setTechniqueTopics(ref.techniqueTopics); setCompanies(ref.companies);
+        setStats(statsData);
       } catch (err) {
         setError(err.message || "Failed to load question bank data");
       } finally {
         setLoading(false);
       }
     }
-    load();
+    loadInitial();
   }, []);
+
+  // Refetch the current page whenever paging/sorting/filters change.
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    async function loadPage() {
+      setTableLoading(true);
+      setError(null);
+      try {
+        const data = await fetchQuestionsPage({
+          page, sortField, sortDir, search: debouncedSearch, categoryFilter, topicFilter, diffFilter,
+        });
+        if (cancelled) return;
+        setQuestions(data.content);
+        setTotalElements(data.totalElements);
+        const pages = Math.max(1, data.totalPages);
+        setTotalPages(pages);
+        if (page > pages) setPage(pages);
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load questions");
+      } finally {
+        if (!cancelled) setTableLoading(false);
+      }
+    }
+    loadPage();
+    return () => { cancelled = true; };
+  }, [loading, page, sortField, sortDir, debouncedSearch, categoryFilter, topicFilter, diffFilter, reloadKey]);
 
   async function handleRefresh() {
     setRefreshing(true);
     setError(null);
     try {
-      const [q, cat, top, tech, tt, comp] = await fetchQuestionBankData();
-      setQuestions(q); setCategories(cat); setTopics(top);
-      setTechniques(tech); setTechniqueTopics(tt); setCompanies(comp);
+      const [ref, statsData] = await Promise.all([fetchReferenceData(true), fetchStats()]);
+      setCategories(ref.categories); setTopics(ref.topics); setTechniques(ref.techniques);
+      setTechniqueTopics(ref.techniqueTopics); setCompanies(ref.companies);
+      setStats(statsData);
+      setReloadKey((k) => k + 1);
     } catch (err) {
       setError(err.message || "Failed to load question bank data");
     } finally {
@@ -372,40 +460,13 @@ export default function AdminQuestionBank() {
   const topicName    = useCallback((id) => topics.find((t) => t.id === id)?.name ?? "", [topics]);
   const topicsInCategory = useCallback((categoryId) => topics.filter((t) => t.categoryId === categoryId), [topics]);
 
-  // ── stats ──────────────────────────────────────────────────────────────────
-  const total  = questions.length;
-  const easy   = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Easy").length;
-  const medium = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Medium").length;
-  const hard   = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Hard").length;
-
   // ── topics for current category filter ─────────────────────────────────────
   const availTopics = useMemo(() => {
     if (categoryFilter === "All") return [];
     return topicsInCategory(categoryFilter);
   }, [categoryFilter, topicsInCategory]);
 
-  // ── filtering + sorting ────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let r = [...questions];
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      r = r.filter((x) => x.question.toLowerCase().includes(s) || String(x.id) === s.trim());
-    }
-    if (categoryFilter !== "All") r = r.filter((x) => x.categoryId === categoryFilter);
-    if (topicFilter !== "All")    r = r.filter((x) => x.topicId === topicFilter);
-    if (diffFilter !== "All")     r = r.filter((x) => normalizeDifficulty(x.difficulty) === diffFilter);
-    r.sort((a, b) => {
-      let av = a[sortField], bv = b[sortField];
-      if (sortField === "categoryId") { av = categoryName(a.categoryId); bv = categoryName(b.categoryId); }
-      if (sortField === "difficulty") { av = normalizeDifficulty(av); bv = normalizeDifficulty(bv); }
-      return (av < bv ? -1 : av > bv ? 1 : 0) * (sortDir === "asc" ? 1 : -1);
-    });
-    return r;
-  }, [questions, categoryName, search, categoryFilter, topicFilter, diffFilter, sortField, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const pageItems  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageItems = questions;
 
   function handleSort(field) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -420,9 +481,11 @@ export default function AdminQuestionBank() {
         headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
       });
       if (!res.ok) throw new Error("Failed to delete question");
-      setQuestions((prev) => prev.filter((q) => q.id !== id));
       setDeleteQ(null);
       showToast("Question deleted.");
+      fetchStats().then(setStats).catch(() => {});
+      if (questions.length === 1 && page > 1) setPage((p) => p - 1);
+      else setReloadKey((k) => k + 1);
     } catch (err) {
       showToast(err.message || "Failed to delete question");
     }
@@ -439,10 +502,10 @@ export default function AdminQuestionBank() {
         body: JSON.stringify(updated),
       });
       if (!res.ok) throw new Error("Failed to update question");
-      const saved = await res.json();
-      setQuestions((prev) => prev.map((q) => (q.id === saved.id ? saved : q)));
       setEditQ(null);
       showToast("Question updated successfully.");
+      fetchStats().then(setStats).catch(() => {});
+      setReloadKey((k) => k + 1);
     } catch (err) {
       showToast(err.message || "Failed to update question");
     }
@@ -495,10 +558,10 @@ export default function AdminQuestionBank() {
 
       {/* ── Stats ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <StatCard label="Total Questions" value={total}  color="blue"    />
-        <StatCard label="Easy"            value={easy}   color="emerald" />
-        <StatCard label="Medium"          value={medium} color="amber"   />
-        <StatCard label="Hard"            value={hard}   color="rose"    />
+        <StatCard label="Total Questions" value={stats.total}  color="blue"    />
+        <StatCard label="Easy"            value={stats.easy}   color="emerald" />
+        <StatCard label="Medium"          value={stats.medium} color="amber"   />
+        <StatCard label="Hard"            value={stats.hard}   color="rose"    />
         <StatCard label="Categories"      value={categories.length} color="slate" />
       </div>
 
@@ -579,14 +642,15 @@ export default function AdminQuestionBank() {
       </div>
 
       <div className="flex items-center justify-between -mt-1">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Showing <span className="font-semibold text-slate-700 dark:text-slate-300">{filtered.length}</span> of {total} questions
+        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+          Showing <span className="font-semibold text-slate-700 dark:text-slate-300">{totalElements}</span> of {stats.total} questions
+          {tableLoading && <Loader2 size={12} className="animate-spin text-slate-400 ml-1" />}
         </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Page {safePage} of {totalPages}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Page {page} of {totalPages}</p>
       </div>
 
       {/* ── Table (desktop) ────────────────────────────────────────────── */}
-      {filtered.length === 0 ? (
+      {pageItems.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-16 text-center shadow-sm">
           <Database size={36} className="text-slate-300 dark:text-slate-700 mx-auto mb-3" />
           <p className="font-bold text-slate-800 dark:text-slate-200">No questions found</p>
@@ -656,21 +720,21 @@ export default function AdminQuestionBank() {
           {/* ── Pagination ────────────────────────────────────────────── */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              {paginationRange(safePage, totalPages).map((n, i) =>
+              {paginationRange(page, totalPages).map((n, i) =>
                 n === "…" ? (
                   <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-sm text-slate-400 dark:text-slate-600 select-none">…</span>
                 ) : (
                   <button key={n} onClick={() => setPage(n)}
-                    className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${n === safePage ? "bg-blue-600 text-white" : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                    className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${n === page ? "bg-blue-600 text-white" : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     {n}
                   </button>
                 )
               )}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <ChevronRight size={16} />
               </button>
