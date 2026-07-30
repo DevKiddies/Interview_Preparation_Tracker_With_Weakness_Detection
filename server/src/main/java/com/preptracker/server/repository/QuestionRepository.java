@@ -6,12 +6,15 @@ package com.preptracker.server.repository;
 
 import com.preptracker.server.model.Question;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 
-public interface QuestionRepository extends JpaRepository<Question, Long> {
+public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSpecificationExecutor<Question> {
     List<Question> findByTopicId(Long topicId);
     List<Question> findByTopicIdIn(List<Long> topicIds);
     List<Question> findByCategoryId(Long categoryId);
     List<Question> findByCategoryIdIn(List<Long> categoryIds);
+    long countByDifficultyIgnoreCase(String difficulty);
+    long countByTopicId(Long topicId);
 }

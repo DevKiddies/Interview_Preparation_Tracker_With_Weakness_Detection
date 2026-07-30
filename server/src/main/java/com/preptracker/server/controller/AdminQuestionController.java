@@ -4,8 +4,10 @@ package com.preptracker.server.controller;
 // Gated by ROLE_ADMIN via SecurityConfig.
 
 import com.preptracker.server.dto.AdminQuestionDTO;
+import com.preptracker.server.dto.QuestionBankStatsDTO;
 import com.preptracker.server.service.AdminQuestionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +23,29 @@ public class AdminQuestionController {
     @GetMapping
     public ResponseEntity<List<AdminQuestionDTO>> getAllQuestions() {
         return ResponseEntity.ok(adminQuestionService.getAllQuestions());
+    }
+
+    // Paginated/filtered listing for the admin Question Bank table — unlike
+    // the plain GET above (still used by AdminCreateMockTest to count
+    // questions per topic), this only returns one page of rows at a time.
+    @GetMapping("/search")
+    public ResponseEntity<Page<AdminQuestionDTO>> searchQuestions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortField,
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long topicId,
+            @RequestParam(required = false) String difficulty
+    ) {
+        return ResponseEntity.ok(adminQuestionService.searchQuestions(
+                page, size, sortField, sortDir, search, categoryId, topicId, difficulty));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<QuestionBankStatsDTO> getStats() {
+        return ResponseEntity.ok(adminQuestionService.getStats());
     }
 
     @PostMapping
