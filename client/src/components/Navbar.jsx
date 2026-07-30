@@ -65,10 +65,13 @@ const guestNavItems = [
     items: [
       { label: "Notes", to: "/resources/notes" },
       { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
-      { label: "Interview Experiences", to: "/resources/interview-experiences" },
+      {
+        label: "Interview Experiences",
+        to: "/resources/interview-experiences",
+      },
     ],
   },
-  { label: "AI Interview", to: "/ai-interview" },
+  { label: "AI Interview", to: "/ai-interview", disabled: true },
   {
     label: "About",
     items: [
@@ -101,11 +104,15 @@ const studentNavItems = [
     items: [
       { label: "Notes", to: "/resources/notes" },
       { label: "Cheat Sheets", to: "/resources/cheat-sheets" },
-      { label: "Interview Experiences", to: "/resources/interview-experiences" },
+      {
+        label: "Interview Experiences",
+        to: "/resources/interview-experiences",
+      },
     ],
   },
   {
     label: "AI Interview",
+    disabled: true,
     items: [
       { label: "Start Session", to: "/ai-interview/start" },
       { label: "Past Sessions", to: "/ai-interview/past-sessions" },
@@ -133,14 +140,32 @@ function NavDropdown({
   label,
   to,
   items,
+  disabled = false,
   align = "left",
   buttonClassName = "flex items-center gap-1 py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200",
 }) {
   const [open, setOpen] = useState(false);
 
+  if (disabled) {
+    return (
+      <div
+        title="Coming soon"
+        className="flex items-center gap-1.5 py-2 text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+      >
+        {label}
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+          Upcoming
+        </span>
+      </div>
+    );
+  }
+
   if (!items) {
     return (
-      <Link to={to} className="py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
+      <Link
+        to={to}
+        className="py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+      >
         {label}
       </Link>
     );
@@ -187,7 +212,7 @@ function NavDropdown({
               >
                 {item.label}
               </button>
-            )
+            ),
           )}
         </div>
       </div>
@@ -196,7 +221,30 @@ function NavDropdown({
 }
 
 // ---- Mobile accordion section ----
-function MobileNavSection({ label, sectionKey, to, items, openSection, setOpenSection, onNavigate }) {
+function MobileNavSection({
+  label,
+  sectionKey,
+  to,
+  items,
+  disabled = false,
+  openSection,
+  setOpenSection,
+  onNavigate,
+}) {
+  if (disabled) {
+    return (
+      <div
+        title="Coming soon"
+        className="flex items-center justify-between gap-2 text-slate-400 dark:text-slate-600 font-medium py-2 cursor-not-allowed select-none"
+      >
+        {label}
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+          Upcoming
+        </span>
+      </div>
+    );
+  }
+
   if (!items) {
     return (
       <Link
@@ -249,7 +297,7 @@ function MobileNavSection({ label, sectionKey, to, items, openSection, setOpenSe
               >
                 {item.label}
               </button>
-            )
+            ),
           )}
         </div>
       )}
@@ -275,8 +323,12 @@ function ThemeToggle({ className = "" }) {
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openMobileSection, setOpenMobileSection] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
-  const [username, setUsername] = useState(() => localStorage.getItem("username") || "");
+  const [avatarUrl, setAvatarUrl] = useState(
+    () => localStorage.getItem("avatarUrl") || "",
+  );
+  const [username, setUsername] = useState(
+    () => localStorage.getItem("username") || "",
+  );
   const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
@@ -327,7 +379,11 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  const navItems = adminToken ? adminNavItems : token ? studentNavItems : guestNavItems;
+  const navItems = adminToken
+    ? adminNavItems
+    : token
+      ? studentNavItems
+      : guestNavItems;
 
   const avatarLabel = (
     <div className="flex items-center gap-2">
@@ -379,7 +435,10 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md px-6 py-2.5 shadow-sm transition-colors duration-200">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo and Brand */}
-        <Link to="/" className="flex items-center gap-2 group transition-transform duration-200 active:scale-95">
+        <Link
+          to="/"
+          className="flex items-center gap-2 group transition-transform duration-200 active:scale-95"
+        >
           <Logo className="w-9 h-9 text-blue-600 transition-transform group-hover:rotate-6" />
           <span className="text-xl font-extrabold tracking-tight">
             <span className="text-slate-900 dark:text-white">Prep</span>

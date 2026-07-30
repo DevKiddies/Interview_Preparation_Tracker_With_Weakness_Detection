@@ -57,7 +57,9 @@ function AdminLoginPage() {
         setError(message || "Invalid credentials.");
       }
     } catch {
-      setError("Something went wrong. Please check your connection and try again.");
+      setError(
+        "Something went wrong. Please check your connection and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,10 @@ function AdminLoginPage() {
 
           <p className="text-xs text-gray-500 dark:text-slate-400 font-normal mt-4 text-center w-full">
             Not an admin?{" "}
-            <Link to="/login" className="text-blue-500 hover:underline font-medium">
+            <Link
+              to="/login"
+              className="text-blue-500 hover:underline font-medium"
+            >
               Go to user login
             </Link>
           </p>

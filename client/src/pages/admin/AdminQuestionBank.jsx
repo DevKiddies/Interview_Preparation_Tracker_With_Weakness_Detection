@@ -1,22 +1,23 @@
 // AdminQuestionBank.jsx — Admin page for browsing, previewing, editing, and deleting
-// all questions in the question bank. Supports live search, multi-filter (topic /
-// category / difficulty), sortable table with pagination, a full-detail preview
+// all questions in the question bank. Supports live search, multi-filter (category /
+// topic / difficulty), sortable table with pagination, a full-detail preview
 // modal, an inline edit modal, and a delete confirmation modal.
-// Data is mocked in adminQuestionsData.js — wire to API when ready.
+// Fetches live data from GET /api/admin/questions and the reference-data
+// endpoints (/api/admin/categories, /topics, /techniques, /companies,
+// /technique-topics). Categories no longer carry a `color` field like the old
+// mock did, so badge colors are assigned deterministically from the id instead.
 
-import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Database, Search, X, ChevronDown, ChevronUp,
-  Eye, Pencil, Trash2, PlusCircle, CheckCircle,
-  AlertTriangle, Download, Filter, ChevronLeft, ChevronRight,
+  Eye, Pencil, Trash2, CheckCircle,
+  AlertTriangle, Filter, ChevronLeft, ChevronRight, Loader2, RefreshCw,
 } from "lucide-react";
-import {
-  questionsData, topicsConfig, difficultyLevels,
-} from "../../data/adminQuestionsData";
+import API_BASE from "../../utils/api";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
+const difficultyLevels = ["Easy", "Medium", "Hard"];
 
 const DIFF_STYLE = {
   Easy:   "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
@@ -25,10 +26,8 @@ const DIFF_STYLE = {
 };
 const CORRECT_STYLE = "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
 
-const TOPIC_COLOR = Object.fromEntries(
-  topicsConfig.map(({ topic, color }) => [topic, color])
-);
-const TOPIC_BADGE = {
+const CATEGORY_PALETTE = ["blue", "indigo", "teal", "amber", "purple", "emerald"];
+const CATEGORY_BADGE = {
   blue:    "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
   indigo:  "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400",
   teal:    "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400",
@@ -36,14 +35,41 @@ const TOPIC_BADGE = {
   purple:  "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
   emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
 };
-
-function topicBadge(topic) {
-  return TOPIC_BADGE[TOPIC_COLOR[topic]] ?? "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
+// Categories are plain {id, name} from the DB (no color field), so badge
+// colors are assigned deterministically from the id instead.
+function categoryBadge(categoryId) {
+  const key = CATEGORY_PALETTE[Number(categoryId) % CATEGORY_PALETTE.length];
+  return CATEGORY_BADGE[key] ?? "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function optionLetter(q, letter) {
   return q[`option${letter}`];
+}
+
+// The DB stores difficulty in whatever case it was inserted with (e.g. "easy"),
+// but the UI's badges/filters key off "Easy"/"Medium"/"Hard" — normalize for
+// comparison and display rather than assuming a specific stored case.
+function normalizeDifficulty(d) {
+  if (!d) return "";
+  return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
+}
+
+// Windowed page list, e.g. [1, "…", 24, 25, 26, "…", 103] instead of every
+// page number — with ~1,030 real questions at 10/page that's ~103 pages, far
+// too many buttons to render in a row.
+function paginationRange(current, total, delta = 1) {
+  if (total <= 1) return [1];
+  const range = [1];
+  const left = Math.max(2, current - delta);
+  const right = Math.min(total - 1, current + delta);
+
+  if (left > 2) range.push("…");
+  for (let i = left; i <= right; i++) range.push(i);
+  if (right < total - 1) range.push("…");
+  range.push(total);
+
+  return range;
 }
 
 function SortIcon({ field, sortField, sortDir }) {
@@ -69,7 +95,13 @@ function StatCard({ label, value, color }) {
 }
 
 // ─── Question Preview Modal ───────────────────────────────────────────────────
-function PreviewModal({ q, onClose }) {
+function PreviewModal({ q, categories, topics, techniques, companies, onClose }) {
+  const categoryName = categories.find((c) => c.id === q.categoryId)?.name ?? "";
+  const topicName = topics.find((t) => t.id === q.topicId)?.name ?? "";
+  const techniqueName = techniques.find((t) => t.id === q.techniqueId)?.name ?? "";
+  const companyName = companies.find((c) => c.id === q.companyId)?.name ?? "";
+  const hasMeta = q.questionType || q.techniqueId || q.companyId;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -77,15 +109,21 @@ function PreviewModal({ q, onClose }) {
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
 
         {/* badges */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span>
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{q.category}</span>
-          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span>
+        <div className="flex flex-wrap gap-2 mb-2">
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${categoryBadge(q.categoryId)}`}>{categoryName}</span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicName}</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[normalizeDifficulty(q.difficulty)]}`}>{normalizeDifficulty(q.difficulty)}</span>
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500">ID #{q.id}</span>
         </div>
 
+        {hasMeta && (
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3">
+            {[q.questionType, q.techniqueId && techniqueName, q.companyId && companyName].filter(Boolean).join(" · ")}
+          </p>
+        )}
+
         {/* question */}
-        <p className="text-[15px] font-semibold text-slate-900 dark:text-white leading-relaxed mb-5">{q.text}</p>
+        <p className="text-[15px] font-semibold text-slate-900 dark:text-white leading-relaxed mb-5 mt-3">{q.question}</p>
 
         {/* options */}
         <div className="flex flex-col gap-2.5">
@@ -123,11 +161,18 @@ function PreviewModal({ q, onClose }) {
 }
 
 // ─── Edit Modal ───────────────────────────────────────────────────────────────
-function EditModal({ q, onSave, onClose }) {
-  const [form, setForm] = useState({ ...q });
+function EditModal({ q, categories, topics, techniques, techniqueTopics, companies, onSave, onClose }) {
+  const [form, setForm] = useState({ ...q, difficulty: normalizeDifficulty(q.difficulty) });
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const cats = topicsConfig.find((t) => t.topic === form.topic)?.categories ?? [];
+  const topicOptions = useMemo(
+    () => topics.filter((t) => t.categoryId === Number(form.categoryId)),
+    [topics, form.categoryId],
+  );
+  const techniqueOptions = useMemo(() => {
+    const ids = techniqueTopics.filter((tt) => tt.topicId === Number(form.topicId)).map((tt) => tt.techniqueId);
+    return ids.length ? techniques.filter((t) => ids.includes(t.id)) : techniques;
+  }, [techniques, techniqueTopics, form.topicId]);
 
   const inputCls = "w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors";
   const labelCls = "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1";
@@ -142,7 +187,7 @@ function EditModal({ q, onSave, onClose }) {
         <div className="space-y-4">
           <div>
             <label className={labelCls}>Question Text</label>
-            <textarea rows={3} value={form.text} onChange={set("text")} className={inputCls + " resize-none"} />
+            <textarea rows={3} value={form.question} onChange={set("question")} className={inputCls + " resize-none"} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {["A", "B", "C", "D"].map((l) => (
@@ -173,21 +218,42 @@ function EditModal({ q, onSave, onClose }) {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className={labelCls}>Topic</label>
-              <select value={form.topic} onChange={(e) => setForm((p) => ({ ...p, topic: e.target.value, category: "" }))} className={inputCls}>
-                {topicsConfig.map((t) => <option key={t.topic} value={t.topic}>{t.topic}</option>)}
+              <label className={labelCls}>Category</label>
+              <select value={form.categoryId} onChange={(e) => setForm((p) => ({ ...p, categoryId: Number(e.target.value), topicId: "" }))} className={inputCls}>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className={labelCls}>Category</label>
-              <select value={form.category} onChange={set("category")} className={inputCls}>
-                {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+              <label className={labelCls}>Topic</label>
+              <select value={form.topicId} onChange={(e) => setForm((p) => ({ ...p, topicId: Number(e.target.value) }))} className={inputCls}>
+                {topicOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Difficulty</label>
               <select value={form.difficulty} onChange={set("difficulty")} className={inputCls}>
                 {difficultyLevels.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>Question Type <span className="text-slate-400 font-normal">(optional)</span></label>
+              <input value={form.questionType ?? ""} onChange={set("questionType")} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Technique <span className="text-slate-400 font-normal">(optional)</span></label>
+              <select value={form.techniqueId ?? ""} onChange={(e) => setForm((p) => ({ ...p, techniqueId: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
+                <option value="">None</option>
+                {techniqueOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Company <span className="text-slate-400 font-normal">(optional)</span></label>
+              <select value={form.companyId ?? ""} onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
+                <option value="">None</option>
+                {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
@@ -212,7 +278,7 @@ function DeleteModal({ q, onConfirm, onClose }) {
           <Trash2 size={24} className="text-rose-600 dark:text-rose-400" />
         </div>
         <p className="text-base font-bold text-slate-900 dark:text-white mb-2">Delete Question #{q.id}?</p>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">"{q.text}"</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">"{q.question}"</p>
         <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg mb-5 text-left">
           <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 dark:text-amber-400">This action cannot be undone. The question will be permanently removed.</p>
@@ -226,51 +292,116 @@ function DeleteModal({ q, onConfirm, onClose }) {
   );
 }
 
+// Fetches the question bank + all reference-data lists together. Standalone
+// (reads the token fresh each call) so it has a stable identity for effects.
+async function fetchQuestionBankData() {
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+  const [qRes, catRes, topRes, techRes, ttRes, compRes] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/questions`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/techniques`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/technique-topics`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/companies`, { headers: authHeaders }),
+  ]);
+  if (![qRes, catRes, topRes, techRes, ttRes, compRes].every((r) => r.ok)) {
+    throw new Error("Failed to load question bank data");
+  }
+  return Promise.all([qRes.json(), catRes.json(), topRes.json(), techRes.json(), ttRes.json(), compRes.json()]);
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 export default function AdminQuestionBank() {
-  const [questions, setQuestions] = useState(questionsData);
+  const [questions, setQuestions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [techniques, setTechniques] = useState([]);
+  const [techniqueTopics, setTechniqueTopics] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [search, setSearch]       = useState("");
-  const [topicFilter, setTopicFilter]   = useState("All");
-  const [catFilter, setCatFilter]       = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [topicFilter, setTopicFilter]       = useState("All");
   const [diffFilter, setDiffFilter]     = useState("All");
   const [sortField, setSortField]       = useState("id");
   const [sortDir, setSortDir]           = useState("asc");
   const [page, setPage]                 = useState(1);
-  const [topicDropOpen, setTopicDropOpen] = useState(false);
-  const [catDropOpen, setCatDropOpen]     = useState(false);
+  const [categoryDropOpen, setCategoryDropOpen] = useState(false);
+  const [topicDropOpen, setTopicDropOpen]       = useState(false);
   const [preview, setPreview]   = useState(null);
   const [editQ, setEditQ]       = useState(null);
   const [deleteQ, setDeleteQ]   = useState(null);
   const [toast, setToast]       = useState(null);
 
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [q, cat, top, tech, tt, comp] = await fetchQuestionBankData();
+        setQuestions(q); setCategories(cat); setTopics(top);
+        setTechniques(tech); setTechniqueTopics(tt); setCompanies(comp);
+      } catch (err) {
+        setError(err.message || "Failed to load question bank data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const [q, cat, top, tech, tt, comp] = await fetchQuestionBankData();
+      setQuestions(q); setCategories(cat); setTopics(top);
+      setTechniques(tech); setTechniqueTopics(tt); setCompanies(comp);
+    } catch (err) {
+      setError(err.message || "Failed to load question bank data");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  // ── lookups ──────────────────────────────────────────────────────────────
+  const categoryName = useCallback((id) => categories.find((c) => c.id === id)?.name ?? "", [categories]);
+  const topicName    = useCallback((id) => topics.find((t) => t.id === id)?.name ?? "", [topics]);
+  const topicsInCategory = useCallback((categoryId) => topics.filter((t) => t.categoryId === categoryId), [topics]);
+
   // ── stats ──────────────────────────────────────────────────────────────────
   const total  = questions.length;
-  const easy   = questions.filter((q) => q.difficulty === "Easy").length;
-  const medium = questions.filter((q) => q.difficulty === "Medium").length;
-  const hard   = questions.filter((q) => q.difficulty === "Hard").length;
+  const easy   = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Easy").length;
+  const medium = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Medium").length;
+  const hard   = questions.filter((q) => normalizeDifficulty(q.difficulty) === "Hard").length;
 
-  // ── categories for current topic filter ────────────────────────────────────
-  const availCats = useMemo(() => {
-    if (topicFilter === "All") return [];
-    return topicsConfig.find((t) => t.topic === topicFilter)?.categories ?? [];
-  }, [topicFilter]);
+  // ── topics for current category filter ─────────────────────────────────────
+  const availTopics = useMemo(() => {
+    if (categoryFilter === "All") return [];
+    return topicsInCategory(categoryFilter);
+  }, [categoryFilter, topicsInCategory]);
 
   // ── filtering + sorting ────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let r = [...questions];
     if (search.trim()) {
-      const q = search.toLowerCase();
-      r = r.filter((x) => x.text.toLowerCase().includes(q) || String(x.id) === q.trim());
+      const s = search.toLowerCase();
+      r = r.filter((x) => x.question.toLowerCase().includes(s) || String(x.id) === s.trim());
     }
-    if (topicFilter !== "All") r = r.filter((x) => x.topic === topicFilter);
-    if (catFilter !== "All")   r = r.filter((x) => x.category === catFilter);
-    if (diffFilter !== "All")  r = r.filter((x) => x.difficulty === diffFilter);
+    if (categoryFilter !== "All") r = r.filter((x) => x.categoryId === categoryFilter);
+    if (topicFilter !== "All")    r = r.filter((x) => x.topicId === topicFilter);
+    if (diffFilter !== "All")     r = r.filter((x) => normalizeDifficulty(x.difficulty) === diffFilter);
     r.sort((a, b) => {
-      const av = a[sortField], bv = b[sortField];
+      let av = a[sortField], bv = b[sortField];
+      if (sortField === "categoryId") { av = categoryName(a.categoryId); bv = categoryName(b.categoryId); }
+      if (sortField === "difficulty") { av = normalizeDifficulty(av); bv = normalizeDifficulty(bv); }
       return (av < bv ? -1 : av > bv ? 1 : 0) * (sortDir === "asc" ? 1 : -1);
     });
     return r;
-  }, [questions, search, topicFilter, catFilter, diffFilter, sortField, sortDir]);
+  }, [questions, categoryName, search, categoryFilter, topicFilter, diffFilter, sortField, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -282,16 +413,39 @@ export default function AdminQuestionBank() {
     setPage(1);
   }
 
-  function handleDelete(id) {
-    setQuestions((prev) => prev.filter((q) => q.id !== id));
-    setDeleteQ(null);
-    showToast("Question deleted.");
+  async function handleDelete(id) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/questions/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete question");
+      setQuestions((prev) => prev.filter((q) => q.id !== id));
+      setDeleteQ(null);
+      showToast("Question deleted.");
+    } catch (err) {
+      showToast(err.message || "Failed to delete question");
+    }
   }
 
-  function handleSave(updated) {
-    setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
-    setEditQ(null);
-    showToast("Question updated successfully.");
+  async function handleSave(updated) {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/questions/${updated.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify(updated),
+      });
+      if (!res.ok) throw new Error("Failed to update question");
+      const saved = await res.json();
+      setQuestions((prev) => prev.map((q) => (q.id === saved.id ? saved : q)));
+      setEditQ(null);
+      showToast("Question updated successfully.");
+    } catch (err) {
+      showToast(err.message || "Failed to update question");
+    }
   }
 
   function showToast(msg) {
@@ -301,6 +455,23 @@ export default function AdminQuestionBank() {
 
   const TH = "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap select-none";
   const THs = TH + " cursor-pointer hover:text-slate-700 dark:hover:text-slate-200";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading question bank…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-6">
@@ -313,14 +484,13 @@ export default function AdminQuestionBank() {
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Browse, edit and delete all questions in the database</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm">
-            <Download size={14} /> Export
-          </button>
-          <Link to="/admin/questions/add" className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-sm">
-            <PlusCircle size={14} /> Add Question
-          </Link>
-        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+        </button>
       </div>
 
       {/* ── Stats ──────────────────────────────────────────────────────── */}
@@ -329,54 +499,54 @@ export default function AdminQuestionBank() {
         <StatCard label="Easy"            value={easy}   color="emerald" />
         <StatCard label="Medium"          value={medium} color="amber"   />
         <StatCard label="Hard"            value={hard}   color="rose"    />
-        <StatCard label="Topics"          value={topicsConfig.length} color="slate" />
+        <StatCard label="Categories"      value={categories.length} color="slate" />
       </div>
 
       {/* ── Filters ────────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-50">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input type="text" placeholder="Search question text or ID…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="w-full pl-9 pr-9 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors" />
             {search && <button onClick={() => { setSearch(""); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={14} /></button>}
           </div>
 
-          {/* Topic dropdown */}
+          {/* Category dropdown */}
           <div className="relative shrink-0">
-            <button onClick={() => { setTopicDropOpen((v) => !v); setCatDropOpen(false); }}
-              className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-[130px]">
+            <button onClick={() => { setCategoryDropOpen((v) => !v); setTopicDropOpen(false); }}
+              className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-32.5">
               <Filter size={14} className="text-slate-400" />
-              <span className="flex-1 text-left">{topicFilter === "All" ? "All Topics" : topicFilter}</span>
-              <ChevronDown size={14} className={`text-slate-400 transition-transform ${topicDropOpen ? "rotate-180" : ""}`} />
+              <span className="flex-1 text-left">{categoryFilter === "All" ? "All Categories" : categoryName(categoryFilter)}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${categoryDropOpen ? "rotate-180" : ""}`} />
             </button>
-            {topicDropOpen && (
+            {categoryDropOpen && (
               <div className="absolute left-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-20 py-1">
-                {["All", ...topicsConfig.map((t) => t.topic)].map((t) => (
-                  <button key={t} onClick={() => { setTopicFilter(t); setCatFilter("All"); setTopicDropOpen(false); setPage(1); }}
-                    className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${topicFilter === t ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
-                    {t === "All" ? "All Topics" : t}
+                {["All", ...categories.map((c) => c.id)].map((c) => (
+                  <button key={c} onClick={() => { setCategoryFilter(c); setTopicFilter("All"); setCategoryDropOpen(false); setPage(1); }}
+                    className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${categoryFilter === c ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+                    {c === "All" ? "All Categories" : categoryName(c)}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Category dropdown (only when topic selected) */}
-          {topicFilter !== "All" && (
+          {/* Topic dropdown (only when category selected) */}
+          {categoryFilter !== "All" && (
             <div className="relative shrink-0">
-              <button onClick={() => { setCatDropOpen((v) => !v); setTopicDropOpen(false); }}
-                className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-[150px]">
-                <span className="flex-1 text-left">{catFilter === "All" ? "All Categories" : catFilter}</span>
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${catDropOpen ? "rotate-180" : ""}`} />
+              <button onClick={() => { setTopicDropOpen((v) => !v); setCategoryDropOpen(false); }}
+                className="flex items-center gap-2 px-3.5 py-2.5 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-w-37.5">
+                <span className="flex-1 text-left">{topicFilter === "All" ? "All Topics" : topicName(topicFilter)}</span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${topicDropOpen ? "rotate-180" : ""}`} />
               </button>
-              {catDropOpen && (
+              {topicDropOpen && (
                 <div className="absolute left-0 mt-1.5 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-20 py-1 max-h-52 overflow-y-auto">
-                  {["All", ...availCats].map((c) => (
-                    <button key={c} onClick={() => { setCatFilter(c); setCatDropOpen(false); setPage(1); }}
-                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${catFilter === c ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
-                      {c === "All" ? "All Categories" : c}
+                  {["All", ...availTopics.map((t) => t.id)].map((t) => (
+                    <button key={t} onClick={() => { setTopicFilter(t); setTopicDropOpen(false); setPage(1); }}
+                      className={`w-full px-4 py-2 text-left text-[13px] transition-colors ${topicFilter === t ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-semibold" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+                      {t === "All" ? "All Topics" : topicName(t)}
                     </button>
                   ))}
                 </div>
@@ -396,14 +566,14 @@ export default function AdminQuestionBank() {
         </div>
 
         {/* Active chips */}
-        {(search || topicFilter !== "All" || catFilter !== "All" || diffFilter !== "All") && (
+        {(search || categoryFilter !== "All" || topicFilter !== "All" || diffFilter !== "All") && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <span className="text-[11px] text-slate-400">Filters:</span>
             {search && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">"{search}" <button onClick={() => { setSearch(""); setPage(1); }}><X size={9} /></button></span>}
-            {topicFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicFilter} <button onClick={() => { setTopicFilter("All"); setCatFilter("All"); setPage(1); }}><X size={9} /></button></span>}
-            {catFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{catFilter} <button onClick={() => { setCatFilter("All"); setPage(1); }}><X size={9} /></button></span>}
+            {categoryFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{categoryName(categoryFilter)} <button onClick={() => { setCategoryFilter("All"); setTopicFilter("All"); setPage(1); }}><X size={9} /></button></span>}
+            {topicFilter !== "All" && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicName(topicFilter)} <button onClick={() => { setTopicFilter("All"); setPage(1); }}><X size={9} /></button></span>}
             {diffFilter !== "All" && <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${DIFF_STYLE[diffFilter]}`}>{diffFilter} <button onClick={() => { setDiffFilter("All"); setPage(1); }}><X size={9} /></button></span>}
-            <button onClick={() => { setSearch(""); setTopicFilter("All"); setCatFilter("All"); setDiffFilter("All"); setPage(1); }} className="text-[11px] text-slate-400 hover:text-slate-600 underline ml-1">Clear all</button>
+            <button onClick={() => { setSearch(""); setCategoryFilter("All"); setTopicFilter("All"); setDiffFilter("All"); setPage(1); }} className="text-[11px] text-slate-400 hover:text-slate-600 underline ml-1">Clear all</button>
           </div>
         )}
       </div>
@@ -430,8 +600,8 @@ export default function AdminQuestionBank() {
                 <tr>
                   <th className={THs} onClick={() => handleSort("id")}><span className="flex items-center gap-1"># <SortIcon field="id" sortField={sortField} sortDir={sortDir} /></span></th>
                   <th className={TH}>Question</th>
-                  <th className={THs} onClick={() => handleSort("topic")}><span className="flex items-center gap-1">Topic <SortIcon field="topic" sortField={sortField} sortDir={sortDir} /></span></th>
-                  <th className={TH}>Category</th>
+                  <th className={THs} onClick={() => handleSort("categoryId")}><span className="flex items-center gap-1">Category <SortIcon field="categoryId" sortField={sortField} sortDir={sortDir} /></span></th>
+                  <th className={TH}>Topic</th>
                   <th className={THs} onClick={() => handleSort("difficulty")}><span className="flex items-center gap-1">Difficulty <SortIcon field="difficulty" sortField={sortField} sortDir={sortDir} /></span></th>
                   <th className={TH}>Correct Ans</th>
                   <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
@@ -441,12 +611,12 @@ export default function AdminQuestionBank() {
                 {pageItems.map((q) => (
                   <tr key={q.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
                     <td className="px-4 py-3.5 text-[12px] font-mono text-slate-400 dark:text-slate-500">#{q.id}</td>
-                    <td className="px-4 py-3.5 max-w-[320px]">
-                      <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">{q.text}</p>
+                    <td className="px-4 py-3.5 max-w-80">
+                      <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">{q.question}</p>
                     </td>
-                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span></td>
-                    <td className="px-4 py-3.5 text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{q.category}</td>
-                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span></td>
+                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${categoryBadge(q.categoryId)}`}>{categoryName(q.categoryId)}</span></td>
+                    <td className="px-4 py-3.5 text-[12px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{topicName(q.topicId)}</td>
+                    <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${DIFF_STYLE[normalizeDifficulty(q.difficulty)]}`}>{normalizeDifficulty(q.difficulty)}</span></td>
                     <td className="px-4 py-3.5"><span className={`px-2.5 py-0.5 rounded-full text-[12px] font-bold ${CORRECT_STYLE}`}>{q.correctAnswer}</span></td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
@@ -467,13 +637,13 @@ export default function AdminQuestionBank() {
               <div key={q.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex flex-wrap gap-1.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${topicBadge(q.topic)}`}>{q.topic}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${DIFF_STYLE[q.difficulty]}`}>{q.difficulty}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${categoryBadge(q.categoryId)}`}>{categoryName(q.categoryId)}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${DIFF_STYLE[normalizeDifficulty(q.difficulty)]}`}>{normalizeDifficulty(q.difficulty)}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${CORRECT_STYLE}`}>Ans: {q.correctAnswer}</span>
                   </div>
                   <span className="text-[11px] text-slate-400 font-mono shrink-0">#{q.id}</span>
                 </div>
-                <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug mb-3">{q.text}</p>
+                <p className="text-[13px] text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug mb-3">{q.question}</p>
                 <div className="flex gap-2">
                   <button onClick={() => setPreview(q)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><Eye size={13} /> View</button>
                   <button onClick={() => setEditQ(q)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[12px] font-semibold border border-indigo-200 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"><Pencil size={13} /> Edit</button>
@@ -490,12 +660,16 @@ export default function AdminQuestionBank() {
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button key={n} onClick={() => setPage(n)}
-                  className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${n === safePage ? "bg-blue-600 text-white" : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
-                  {n}
-                </button>
-              ))}
+              {paginationRange(safePage, totalPages).map((n, i) =>
+                n === "…" ? (
+                  <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-sm text-slate-400 dark:text-slate-600 select-none">…</span>
+                ) : (
+                  <button key={n} onClick={() => setPage(n)}
+                    className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${n === safePage ? "bg-blue-600 text-white" : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                    {n}
+                  </button>
+                )
+              )}
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
                 className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <ChevronRight size={16} />
@@ -506,9 +680,29 @@ export default function AdminQuestionBank() {
       )}
 
       {/* ── Modals ─────────────────────────────────────────────────────── */}
-      {preview  && <PreviewModal q={preview}  onClose={() => setPreview(null)} />}
-      {editQ    && <EditModal    q={editQ}    onSave={handleSave} onClose={() => setEditQ(null)} />}
-      {deleteQ  && <DeleteModal  q={deleteQ}  onConfirm={handleDelete} onClose={() => setDeleteQ(null)} />}
+      {preview && (
+        <PreviewModal
+          q={preview}
+          categories={categories}
+          topics={topics}
+          techniques={techniques}
+          companies={companies}
+          onClose={() => setPreview(null)}
+        />
+      )}
+      {editQ && (
+        <EditModal
+          q={editQ}
+          categories={categories}
+          topics={topics}
+          techniques={techniques}
+          techniqueTopics={techniqueTopics}
+          companies={companies}
+          onSave={handleSave}
+          onClose={() => setEditQ(null)}
+        />
+      )}
+      {deleteQ && <DeleteModal q={deleteQ} onConfirm={handleDelete} onClose={() => setDeleteQ(null)} />}
 
       {/* ── Toast ──────────────────────────────────────────────────────── */}
       {toast && (

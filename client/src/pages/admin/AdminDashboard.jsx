@@ -1,6 +1,6 @@
 // AdminDashboard.jsx — Admin overview dashboard showing platform-wide stats, user growth
-// charts, question distribution, test completion trends, recent activity feed, top
-// performers leaderboard, platform health metrics, and quick-action shortcuts.
+// charts, question distribution, test completion trends, recent activity feed,
+// platform health metrics, and quick-action shortcuts.
 // All data is currently mocked in adminDashboardData.js — swap for API calls when ready.
 
 import { useState } from "react";
@@ -11,9 +11,9 @@ import {
 } from "recharts";
 import {
   Users, UserCheck, BookOpen, ClipboardList, TrendingUp, UserX,
-  PlusCircle, FilePlus, BarChart2, ArrowUpRight, ArrowDownRight,
+  PlusCircle, FilePlus, ArrowUpRight, ArrowDownRight,
   Activity, CheckCircle, AlertCircle, Eye, Clock, Target,
-  RefreshCw, Award,
+  RefreshCw,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import {
@@ -23,7 +23,6 @@ import {
   questionsByCategory,
   weeklyTestCompletion,
   recentActivity,
-  topUsers,
   platformHealthMetrics,
 } from "../../data/adminDashboardData";
 
@@ -170,14 +169,6 @@ export default function AdminDashboard() {
     day: "numeric",
   });
 
-  // rank badge style
-  const rankStyle = (rank) => {
-    if (rank === 1) return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
-    if (rank === 2) return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300";
-    if (rank === 3) return "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400";
-    return "bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500";
-  };
-
   return (
     <div className="space-y-5 pb-6">
 
@@ -215,7 +206,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Platform Health ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {platformHealthMetrics.map((metric) => {
           const Icon = ICON_MAP[metric.icon];
           const c = COLOR[metric.color];
@@ -374,121 +365,31 @@ export default function AdminDashboard() {
         </ResponsiveContainer>
       </SectionCard>
 
-      {/* ── Bottom Row: Activity Feed + Leaderboard ─────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-        {/* Recent Activity */}
-        <SectionCard
-          title="Recent Activity"
-          subtitle="Latest events across the platform"
-          action={<ViewAllLink to="/admin/analytics" />}
-        >
-          <div className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800/70">
-            {recentActivity.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
-                <ActivityStatusIcon status={item.status} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug truncate">
-                    {item.message}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                    {item.detail}
-                  </p>
-                </div>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 pt-0.5">
-                  {item.time}
-                </span>
+      {/* ── Recent Activity ──────────────────────────────────────────────── */}
+      <SectionCard
+        title="Recent Activity"
+        subtitle="Latest events across the platform"
+        action={<ViewAllLink to="/admin/analytics" />}
+      >
+        <div className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800/70">
+          {recentActivity.map((item) => (
+            <div key={item.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+              <ActivityStatusIcon status={item.status} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug truncate">
+                  {item.message}
+                </p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                  {item.detail}
+                </p>
               </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* Top Performers Leaderboard */}
-        <SectionCard
-          title="Top Performers"
-          subtitle="Highest scoring users this month"
-          action={<ViewAllLink to="/admin/users" />}
-        >
-          <div className="flex flex-col gap-1.5">
-            {topUsers.map((user) => (
-              <div
-                key={user.rank}
-                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer group"
-              >
-                {/* Rank badge */}
-                <span
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${rankStyle(user.rank)}`}
-                >
-                  {user.rank === 1 ? "🥇" : user.rank === 2 ? "🥈" : user.rank === 3 ? "🥉" : user.rank}
-                </span>
-
-                {/* Avatar initial */}
-                <div className="w-7 h-7 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-                  {user.name.charAt(0)}
-                </div>
-
-                {/* Name + email */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {user.name}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{user.email}</p>
-                </div>
-
-                {/* Stats */}
-                <div className="flex items-center gap-3 shrink-0 text-right">
-                  <div className="hidden sm:block">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none">Tests</p>
-                    <p className="text-[13px] font-bold text-slate-700 dark:text-slate-200 mt-0.5">{user.tests}</p>
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none">Streak</p>
-                    <p className="text-[13px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">{user.streak}d</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none">Score</p>
-                    <p className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{user.score}%</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* ── Quick Actions ────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-        <p className="text-[15px] font-bold text-slate-900 dark:text-white mb-4">Quick Actions</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Add Question",  icon: PlusCircle, to: "/admin/questions/add",  color: "blue"    },
-            { label: "Create Test",   icon: FilePlus,   to: "/admin/tests/create",   color: "indigo"  },
-            { label: "Manage Users",  icon: Users,      to: "/admin/users",          color: "teal"    },
-            { label: "Analytics",     icon: BarChart2,  to: "/admin/analytics",      color: "amber"   },
-          ].map(({ label, icon: Icon, to, color }) => {
-            const c = COLOR[color];
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={`flex flex-col items-center justify-center gap-2 py-5 px-3 rounded-xl border transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 ${c.bg} ${c.border}`}
-              >
-                <div className={`p-2.5 rounded-lg bg-white/60 dark:bg-slate-900/40`}>
-                  <Icon size={18} className={c.icon} />
-                </div>
-                <span className={`text-[12px] font-semibold text-center leading-tight ${c.icon}`}>
-                  {label}
-                </span>
-              </Link>
-            );
-          })}
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 pt-0.5">
+                {item.time}
+              </span>
+            </div>
+          ))}
         </div>
-      </div>
-
-      {/* ── Footer note ─────────────────────────────────────────────────────── */}
-      <p className="text-center text-[11px] text-slate-400 dark:text-slate-600 pt-1">
-        All data is currently mocked — connect backend API to enable live stats.
-      </p>
+      </SectionCard>
 
     </div>
   );

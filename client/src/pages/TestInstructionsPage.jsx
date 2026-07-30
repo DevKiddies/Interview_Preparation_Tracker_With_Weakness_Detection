@@ -264,7 +264,7 @@ export default function TestInstructionsPage() {
           <button
             onClick={handleBegin}
             disabled={!agreed}
-            className={`flex flex-[2] items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-150 active:scale-[0.98] ${
+            className={`flex flex-2 items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-150 active:scale-98 ${
               agreed
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25 hover:bg-indigo-700 cursor-pointer"
                 : "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed"

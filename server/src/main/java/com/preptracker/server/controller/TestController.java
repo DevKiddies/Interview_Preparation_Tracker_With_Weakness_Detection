@@ -7,13 +7,19 @@ package com.preptracker.server.controller;
 
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
+import com.preptracker.server.model.Category;
 import com.preptracker.server.model.Question;
+import com.preptracker.server.model.TestAttempt;
+import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.QuestionRepository;
+import com.preptracker.server.repository.TestAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tests")
@@ -21,6 +27,8 @@ import java.util.*;
 public class TestController {
 
     private final QuestionRepository questionRepository;
+    private final CategoryRepository categoryRepository;
+    private final TestAttemptRepository testAttemptRepository;
 
     @PostMapping("/submit")
     public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
@@ -28,6 +36,9 @@ public class TestController {
 
         Map<Long, Question> byId = new HashMap<>();
         for (Question q : fetched) byId.put(q.getId(), q);
+
+        Map<Long, String> categoryNames = categoryRepository.findAll().stream()
+                .collect(Collectors.toMap(Category::getId, Category::getName));
 
         int score = 0;
         List<TestResultResponse.QuestionResult> results = new ArrayList<>();
@@ -51,7 +62,8 @@ public class TestController {
             boolean correct  = submitted != null && submitted.equals(correctText);
             if (correct) score++;
 
-            int[] counts = catMap.computeIfAbsent(q.getCategory(), k -> new int[]{0, 0});
+            String categoryName = categoryNames.get(q.getCategoryId());
+            int[] counts = catMap.computeIfAbsent(categoryName, k -> new int[]{0, 0});
             counts[1]++;
             if (correct) counts[0]++;
 
@@ -59,7 +71,7 @@ public class TestController {
                     q.getId(), q.getText(),
                     List.of(q.getOptionA(), q.getOptionB(), q.getOptionC(), q.getOptionD()),
                     submitted, correctText, correct,
-                    q.getCategory(), q.getDifficulty()
+                    categoryName, q.getDifficulty()
             ));
         }
 
@@ -69,6 +81,27 @@ public class TestController {
         int total = results.size();
         double accuracy = total == 0 ? 0.0 : Math.round((score * 100.0 / total) * 10.0) / 10.0;
 
+        if (total > 0) {
+            TestAttempt attempt = new TestAttempt();
+            attempt.setUserId(authenticatedUserId());
+            attempt.setScore(score);
+            attempt.setTotal(total);
+            attempt.setAccuracy(accuracy);
+            attempt.setTimeTakenSeconds(request.timeTaken());
+            // Dominant category = the one with the most questions in this attempt
+            // (a test can mix categories, so this isn't necessarily the only one).
+            catMap.entrySet().stream()
+                    .max(Comparator.comparingInt(e -> e.getValue()[1]))
+                    .ifPresent(e -> attempt.setCategory(e.getKey()));
+            testAttemptRepository.save(attempt);
+        }
+
         return ResponseEntity.ok(new TestResultResponse(score, total, request.timeTaken(), accuracy, results, breakdown));
+    }
+
+    private UUID authenticatedUserId() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return UUID.fromString(principal);
     }
 }

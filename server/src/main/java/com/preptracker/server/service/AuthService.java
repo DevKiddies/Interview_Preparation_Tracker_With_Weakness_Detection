@@ -134,8 +134,28 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new UnauthorizedException("Invalid password");
         }
+        enforceNotBanned(user);
+        user.setLastActiveAt(LocalDateTime.now());
+        userRepository.save(user);
         String token = jwtUtil.generateToken(user);
         return new AuthResponse(token);
+    }
+
+    // Blocks login for banned users. A temporary ban past its expiry is treated as
+    // lifted automatically (self-healing) rather than requiring an admin to unban it.
+    private void enforceNotBanned(User user) {
+        if (!Boolean.TRUE.equals(user.getIsBanned())) return;
+
+        boolean expired = user.getBanExpiresAt() != null && user.getBanExpiresAt().isBefore(LocalDateTime.now());
+        if (expired) {
+            user.setIsBanned(false);
+            user.setBanExpiresAt(null);
+            userRepository.save(user);
+            return;
+        }
+
+        throw new UnauthorizedException("Your account has been suspended" +
+                (user.getBanReason() != null ? ": " + user.getBanReason() : "."));
     }
 
     @Transactional
