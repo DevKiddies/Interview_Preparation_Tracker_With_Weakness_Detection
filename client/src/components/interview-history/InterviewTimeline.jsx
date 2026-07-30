@@ -6,15 +6,15 @@ function InterviewTimeline({ interviews, onViewDetails, onContinue }) {
     return (
         <div className="relative">
             {/* Continuous Timeline Line — Centered exactly at 7px (middle of the 14px dot) */}
-            <div className="absolute left-[7px] top-6 bottom-6 w-0.5 -translate-x-1/2 bg-slate-200 dark:bg-slate-700" />
+            <div className="absolute left-1.75 top-6 bottom-6 w-0.5 -translate-x-1/2 bg-slate-200 dark:bg-slate-700" />
 
             <div className="space-y-4">
                 {interviews.map((interview) => (
                     <div key={interview.id} className="relative flex items-start gap-4">
                         {/* Timeline Node Container */}
-                        <div className="relative z-10 mt-5 flex h-[14px] w-[14px] shrink-0 items-center justify-center">
+                        <div className="relative z-10 mt-5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                             <div
-                                className={`h-[14px] w-[14px] rounded-full border-2 shadow-xs ring-4 ring-indigo-50 dark:ring-slate-950 ${
+                                className={`h-3.5 w-3.5 rounded-full border-2 shadow-xs ring-4 ring-indigo-50 dark:ring-slate-950 ${
                                     interview.status === "ACTIVE"
                                         ? "border-blue-500 bg-blue-500"
                                         : interview.status === "COMPLETED"

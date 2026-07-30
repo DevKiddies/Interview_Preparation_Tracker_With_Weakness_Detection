@@ -3,37 +3,30 @@
 //   Single  — one clean form for a single question.
 //   Bulk    — multiple question forms stacked; "+ Add Another" to grow the list.
 //   CSV     — paste or upload CSV rows, parse, preview, then import all at once.
+//             (Currently marked "coming soon" in the UI — not wired to the backend.)
 // Field shape mirrors the Supabase `questions` table: question, option_a..d,
 // correct_answer, category_id, topic_id, difficulty, question_type, technique_id,
 // company_id. Category -> Topic is a cascading pair (a topic belongs to one category);
 // question_type / technique / company are optional enrichment fields.
-// Wire onSubmit / onBulkSubmit / onCsvImport to POST /api/admin/questions when ready.
+// Single/Bulk submit to POST /api/admin/questions and /api/admin/questions/bulk.
+// Reference data (categories/topics/techniques/technique-topics/companies) is
+// fetched from the same admin metadata endpoints used by the Question Bank page.
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   PlusCircle, Trash2, ChevronDown, ChevronUp,
   CheckCircle, AlertTriangle, FileText, Database,
-  Upload, Eye, X, ArrowLeft,
+  Upload, Eye, X, ArrowLeft, Loader2,
 } from "lucide-react";
-import {
-  categoriesData, topicsData, techniquesData, techniqueTopicsData,
-  companiesData, difficultyLevels,
-} from "../../data/adminQuestionsData";
+import API_BASE from "../../utils/api";
+
+const difficultyLevels = ["Easy", "Medium", "Hard"];
 
 // ─── shared styles ────────────────────────────────────────────────────────────
 const INPUT = "w-full px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-colors";
 const LABEL = "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5";
 const ERR   = "border-rose-400 dark:border-rose-600 focus:ring-rose-400/40 focus:border-rose-400";
-
-// ─── lookup helpers ────────────────────────────────────────────────────────────
-const categoryName = (id) => categoriesData.find((c) => String(c.id) === String(id))?.name ?? "";
-const topicName    = (id) => topicsData.find((t) => String(t.id) === String(id))?.name ?? "";
-const topicsInCategory = (categoryId) => topicsData.filter((t) => String(t.categoryId) === String(categoryId));
-const techniquesForTopic = (topicId) => {
-  const ids = techniqueTopicsData.filter((tt) => String(tt.topicId) === String(topicId)).map((tt) => tt.techniqueId);
-  return ids.length ? techniquesData.filter((t) => ids.includes(t.id)) : techniquesData;
-};
 
 // ─── blank question factory ───────────────────────────────────────────────────
 let _uid = 1000;
@@ -43,6 +36,21 @@ function blankQ() {
     question: "", optionA: "", optionB: "", optionC: "", optionD: "",
     correctAnswer: "", categoryId: "", topicId: "", difficulty: "",
     questionType: "", techniqueId: "", companyId: "",
+  };
+}
+
+// Converts a form question's string ids into the numeric/null shape the API expects.
+function toPayload(q) {
+  return {
+    question: q.question,
+    optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD,
+    correctAnswer: q.correctAnswer,
+    categoryId: q.categoryId ? Number(q.categoryId) : null,
+    topicId: q.topicId ? Number(q.topicId) : null,
+    difficulty: q.difficulty,
+    questionType: q.questionType || null,
+    techniqueId: q.techniqueId ? Number(q.techniqueId) : null,
+    companyId: q.companyId ? Number(q.companyId) : null,
   };
 }
 
@@ -64,9 +72,14 @@ function validate(q) {
 function isValid(q) { return Object.keys(validate(q)).length === 0; }
 
 // ─── Single Question Form ─────────────────────────────────────────────────────
-function QuestionForm({ q, onChange, errors = {}, index = null, onRemove, collapsed, onToggle }) {
-  const topicOptions = topicsInCategory(q.categoryId);
-  const techniqueOptions = techniquesForTopic(q.topicId);
+function QuestionForm({ q, categories, topics, techniques, techniqueTopics, companies, onChange, errors = {}, index = null, onRemove, collapsed, onToggle }) {
+  const categoryName = (id) => categories.find((c) => String(c.id) === String(id))?.name ?? "";
+  const topicOptions = topics.filter((t) => String(t.categoryId) === String(q.categoryId));
+  const techniqueOptions = useMemo(() => {
+    const ids = techniqueTopics.filter((tt) => String(tt.topicId) === String(q.topicId)).map((tt) => tt.techniqueId);
+    return ids.length ? techniques.filter((t) => ids.includes(t.id)) : techniques;
+  }, [techniques, techniqueTopics, q.topicId]);
+
   const set = (k) => (e) => onChange({ ...q, [k]: e.target.value });
   const setField = (k, v) => onChange({ ...q, [k]: v });
 
@@ -161,7 +174,7 @@ function QuestionForm({ q, onChange, errors = {}, index = null, onRemove, collap
           <select value={q.categoryId} onChange={(e) => onChange({ ...q, categoryId: e.target.value, topicId: "" })}
             className={`${INPUT} ${errors.categoryId ? ERR : ""}`}>
             <option value="">Select category…</option>
-            {categoriesData.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {errors.categoryId && <p className="text-[11px] text-rose-500 mt-1">{errors.categoryId}</p>}
         </div>
@@ -206,7 +219,7 @@ function QuestionForm({ q, onChange, errors = {}, index = null, onRemove, collap
           <label className={LABEL}>Company <span className="text-slate-400 font-normal">(optional)</span></label>
           <select value={q.companyId} onChange={set("companyId")} className={INPUT}>
             <option value="">None</option>
-            {companiesData.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
       </div>
@@ -255,10 +268,16 @@ function parseCSV(text) {
 // ─── CSV Import Preview ───────────────────────────────────────────────────────
 // CSV uses human-readable names for category/topic/technique/company; they're
 // resolved to ids here (category/topic are required, the rest stay optional).
-function CsvImportTab({ onImport }) {
+// NOTE: this tab is marked "coming soon" in the UI and unreachable — kept
+// functional (rather than deleted) for when it's wired up.
+function CsvImportTab({ categories, topics, techniques, companies, onImport }) {
   const [raw, setRaw]       = useState("");
   const [parsed, setParsed] = useState(null);
   const [parseErr, setParseErr] = useState("");
+
+  const categoryName = (id) => categories.find((c) => String(c.id) === String(id))?.name ?? "";
+  const topicName    = (id) => topics.find((t) => String(t.id) === String(id))?.name ?? "";
+  const topicsInCategory = (categoryId) => topics.filter((t) => String(t.categoryId) === String(categoryId));
 
   const REQUIRED = ["question","optionA","optionB","optionC","optionD","correctAnswer","category","topic","difficulty"];
   const OPTIONAL = ["questionType","technique","company"];
@@ -287,7 +306,7 @@ function CsvImportTab({ onImport }) {
         const missing = REQUIRED.filter((k) => !row[k]);
         if (missing.length) { issues.push(`Row ${i+1}: missing ${missing.join(", ")}`); return; }
 
-        const category = categoriesData.find((c) => c.name.toLowerCase() === row.category.toLowerCase());
+        const category = categories.find((c) => c.name.toLowerCase() === row.category.toLowerCase());
         if (!category) { issues.push(`Row ${i+1}: unknown category "${row.category}"`); return; }
 
         const topic = topicsInCategory(category.id).find((t) => t.name.toLowerCase() === row.topic.toLowerCase());
@@ -302,14 +321,14 @@ function CsvImportTab({ onImport }) {
 
         let techniqueId = "";
         if (row.technique) {
-          const technique = techniquesData.find((t) => t.name.toLowerCase() === row.technique.toLowerCase());
+          const technique = techniques.find((t) => t.name.toLowerCase() === row.technique.toLowerCase());
           if (!technique) { issues.push(`Row ${i+1}: unknown technique "${row.technique}"`); return; }
           techniqueId = technique.id;
         }
 
         let companyId = "";
         if (row.company) {
-          const company = companiesData.find((c) => c.name.toLowerCase() === row.company.toLowerCase());
+          const company = companies.find((c) => c.name.toLowerCase() === row.company.toLowerCase());
           if (!company) { issues.push(`Row ${i+1}: unknown company "${row.company}"`); return; }
           companyId = company.id;
         }
@@ -398,7 +417,7 @@ function CsvImportTab({ onImport }) {
                 {parsed.map((q, i) => (
                   <tr key={i}>
                     <td className="px-3 py-2 text-slate-400 font-mono">{i+1}</td>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[200px]"><p className="truncate">{q.question}</p></td>
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-50"><p className="truncate">{q.question}</p></td>
                     <td className="px-3 py-2"><span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{categoryName(q.categoryId)}</span></td>
                     <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{topicName(q.topicId)}</td>
                     <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{q.difficulty}</td>
@@ -445,6 +464,14 @@ function SuccessState({ count, onAddMore }) {
 
 // ─── main component ───────────────────────────────────────────────────────────
 export default function AdminAddQuestion() {
+  const [categories, setCategories] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [techniques, setTechniques] = useState([]);
+  const [techniqueTopics, setTechniqueTopics] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
   const [mode, setMode]       = useState("single");   // "single" | "bulk" | "csv"
   const [single, setSingle]   = useState(blankQ());
   const [singleErrs, setSingleErrs] = useState({});
@@ -452,15 +479,66 @@ export default function AdminAddQuestion() {
   const [bulkErrs, setBulkErrs] = useState({});
   const [collapsed, setCollapsed] = useState({});
   const [success, setSuccess] = useState(null);       // { count }
+  const [submitError, setSubmitError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function loadReferenceData() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+        const [catRes, topRes, techRes, ttRes, compRes] = await Promise.all([
+          fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/techniques`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/technique-topics`, { headers: authHeaders }),
+          fetch(`${API_BASE}/api/admin/companies`, { headers: authHeaders }),
+        ]);
+        if (![catRes, topRes, techRes, ttRes, compRes].every((r) => r.ok)) {
+          throw new Error("Failed to load categories/topics data");
+        }
+        const [cat, top, tech, tt, comp] = await Promise.all([
+          catRes.json(), topRes.json(), techRes.json(), ttRes.json(), compRes.json(),
+        ]);
+        setCategories(cat); setTopics(top); setTechniques(tech);
+        setTechniqueTopics(tt); setCompanies(comp);
+      } catch (err) {
+        setLoadError(err.message || "Failed to load categories/topics data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadReferenceData();
+  }, []);
 
   // ── Single submit ─────────────────────────────────────────────────────────
-  function handleSingleSubmit(e) {
+  async function handleSingleSubmit(e) {
     e.preventDefault();
     const errs = validate(single);
     if (Object.keys(errs).length) { setSingleErrs(errs); return; }
     setSingleErrs({});
-    // TODO: POST /api/admin/questions with single question payload
-    setSuccess({ count: 1 });
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify(toPayload(single)),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Failed to add question (${res.status})${detail ? `: ${detail}` : ""}`);
+      }
+      setSuccess({ count: 1 });
+    } catch (err) {
+      setSubmitError(err.message || "Failed to add question");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // ── Bulk: add / remove / update ───────────────────────────────────────────
@@ -477,7 +555,7 @@ export default function AdminAddQuestion() {
   function updateBulk(key, updated) { setBulkList((p) => p.map((q) => (q._key === key ? updated : q))); }
   function toggleCollapse(key) { setCollapsed((p) => ({ ...p, [key]: !p[key] })); }
 
-  function handleBulkSubmit(e) {
+  async function handleBulkSubmit(e) {
     e.preventDefault();
     const allErrs = {};
     let hasErr = false;
@@ -495,13 +573,32 @@ export default function AdminAddQuestion() {
       return;
     }
     setBulkErrs({});
-    // TODO: POST /api/admin/questions/bulk with bulkList payload
-    setSuccess({ count: bulkList.length });
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/questions/bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify(bulkList.map(toPayload)),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Failed to add questions (${res.status})${detail ? `: ${detail}` : ""}`);
+      }
+      setSuccess({ count: bulkList.length });
+    } catch (err) {
+      setSubmitError(err.message || "Failed to add questions");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // ── CSV import ────────────────────────────────────────────────────────────
+  // Not wired to the backend yet — the CSV Import tab is disabled/"coming soon".
   function handleCsvImport(questions) {
-    // TODO: POST /api/admin/questions/bulk with questions payload
     setSuccess({ count: questions.length });
   }
 
@@ -513,11 +610,29 @@ export default function AdminAddQuestion() {
     setBulkErrs({});
     setCollapsed({});
     setSuccess(null);
+    setSubmitError(null);
   }
 
   if (success) return <SuccessState count={success.count} onAddMore={resetAll} />;
 
   const validBulkCount = bulkList.filter(isValid).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading categories & topics…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{loadError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-6">
@@ -540,28 +655,58 @@ export default function AdminAddQuestion() {
         {[
           { key: "single", label: "Single Question" },
           { key: "bulk",   label: `Bulk Add (${bulkList.length})` },
-          { key: "csv",    label: "CSV Import" },
-        ].map(({ key, label }) => (
-          <button key={key} onClick={() => setMode(key)}
-            className={`flex-1 py-2 text-[13px] font-semibold rounded-lg transition-colors ${mode === key ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
-            {label}
-          </button>
-        ))}
+          { key: "csv",    label: "CSV Import", disabled: true },
+        ].map(({ key, label, disabled }) =>
+          disabled ? (
+            <div
+              key={key}
+              title="Coming soon"
+              className="flex-1 py-2 flex items-center justify-center gap-2 text-[13px] font-semibold text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+            >
+              {label}
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                Soon
+              </span>
+            </div>
+          ) : (
+            <button key={key} onClick={() => setMode(key)}
+              className={`flex-1 py-2 text-[13px] font-semibold rounded-lg transition-colors ${mode === key ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+              {label}
+            </button>
+          )
+        )}
       </div>
+
+      {submitError && (
+        <div className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40 rounded-lg">
+          <AlertTriangle size={14} className="text-rose-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-rose-700 dark:text-rose-400">{submitError}</p>
+        </div>
+      )}
 
       {/* ══ SINGLE MODE ════════════════════════════════════════════════════ */}
       {mode === "single" && (
         <form onSubmit={handleSingleSubmit} noValidate>
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-            <QuestionForm q={single} onChange={setSingle} errors={singleErrs} />
+            <QuestionForm
+              q={single}
+              categories={categories}
+              topics={topics}
+              techniques={techniques}
+              techniqueTopics={techniqueTopics}
+              companies={companies}
+              onChange={setSingle}
+              errors={singleErrs}
+            />
           </div>
           <div className="mt-4 flex gap-3">
             <button type="button" onClick={() => { setSingle(blankQ()); setSingleErrs({}); }}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               Clear
             </button>
-            <button type="submit" className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shadow-sm">
-              <PlusCircle size={15} /> Add Question
+            <button type="submit" disabled={submitting}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {submitting ? <Loader2 size={15} className="animate-spin" /> : <PlusCircle size={15} />} Add Question
             </button>
           </div>
         </form>
@@ -586,6 +731,11 @@ export default function AdminAddQuestion() {
               <QuestionForm
                 key={q._key}
                 q={q}
+                categories={categories}
+                topics={topics}
+                techniques={techniques}
+                techniqueTopics={techniqueTopics}
+                companies={companies}
                 onChange={(updated) => updateBulk(q._key, updated)}
                 errors={bulkErrs[q._key] ?? {}}
                 index={i}
@@ -608,9 +758,9 @@ export default function AdminAddQuestion() {
               className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               Reset All
             </button>
-            <button type="submit"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shadow-sm">
-              <Upload size={15} /> Submit All ({bulkList.length}) Questions
+            <button type="submit" disabled={submitting}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {submitting ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Submit All ({bulkList.length}) Questions
             </button>
           </div>
 
@@ -628,7 +778,13 @@ export default function AdminAddQuestion() {
       {/* ══ CSV IMPORT MODE ════════════════════════════════════════════════ */}
       {mode === "csv" && (
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-          <CsvImportTab onImport={handleCsvImport} />
+          <CsvImportTab
+            categories={categories}
+            topics={topics}
+            techniques={techniques}
+            companies={companies}
+            onImport={handleCsvImport}
+          />
         </div>
       )}
     </div>

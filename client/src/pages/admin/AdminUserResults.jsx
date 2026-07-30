@@ -68,7 +68,7 @@ function ResultDetailModal({ result, onClose }) {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${avatarColor(result.userId)} flex items-center justify-center text-white text-base font-bold shrink-0`}>
+          <div className={`w-12 h-12 rounded-full bg-linear-to-br ${avatarColor(result.userId)} flex items-center justify-center text-white text-base font-bold shrink-0`}>
             {getInitials(result.userName)}
           </div>
           <div>
@@ -258,7 +258,7 @@ export default function AdminUserResults() {
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-50">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
@@ -406,7 +406,7 @@ export default function AdminUserResults() {
                     <tr key={res.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer" onClick={() => setViewResult(res)}>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarColor(res.userId)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
+                          <div className={`w-7 h-7 rounded-full bg-linear-to-br ${avatarColor(res.userId)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
                             {getInitials(res.userName)}
                           </div>
                           <div className="min-w-0">
@@ -459,7 +459,7 @@ export default function AdminUserResults() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${avatarColor(res.userId)} flex items-center justify-center text-white text-[11px] font-bold shrink-0`}>
+                    <div className={`w-9 h-9 rounded-full bg-linear-to-br ${avatarColor(res.userId)} flex items-center justify-center text-white text-[11px] font-bold shrink-0`}>
                       {getInitials(res.userName)}
                     </div>
                     <div className="min-w-0">

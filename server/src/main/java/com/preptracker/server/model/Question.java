@@ -49,7 +49,9 @@ public class Question {
     @Column(nullable = false)
     private String difficulty;
 
-    @Column(name = "question_type")
+    // NOT NULL in the live table despite being an "optional" field in the admin
+    // UI — AdminQuestionService defaults it to "General" when left blank.
+    @Column(name = "question_type", nullable = false)
     private String questionType;
 
     @Column(name = "technique_id")

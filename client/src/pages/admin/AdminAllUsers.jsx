@@ -103,7 +103,7 @@ function UserDetailModal({ user, onClose, onBan, onUnban }) {
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-5">
-          <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
+          <div className={`w-14 h-14 rounded-full bg-linear-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
             {getInitials(user.name)}
           </div>
           <div className="min-w-0">
@@ -562,7 +562,7 @@ export default function AdminAllUsers() {
                     <tr key={user.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-[11px] font-bold shrink-0`}>
+                          <div className={`w-8 h-8 rounded-full bg-linear-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-[11px] font-bold shrink-0`}>
                             {getInitials(user.name)}
                           </div>
                           <div className="min-w-0">
@@ -634,7 +634,7 @@ export default function AdminAllUsers() {
             {displayed.map((user) => (
               <div key={user.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-sm font-bold shrink-0`}>
+                  <div className={`w-10 h-10 rounded-full bg-linear-to-br ${avatarColor(user.id)} flex items-center justify-center text-white text-sm font-bold shrink-0`}>
                     {getInitials(user.name)}
                   </div>
                   <div className="flex-1 min-w-0">

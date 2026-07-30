@@ -1,21 +1,19 @@
 // AdminAllTests.jsx — Test Management > All Tests page.
-// Displays admin-defined mock test templates with search, topic/status filtering,
+// Displays admin-defined mock test templates with search, category/status filtering,
 // sortable table, and view/edit/delete modals. Manage test configs from here.
+// Fetches live data from GET /api/admin/tests and the reference-data endpoints
+// (/api/admin/categories, /api/admin/topics) shared with the Question Bank page.
+// attemptCount/avgScore are always 0 for now — test_attempts has no FK back to
+// a specific test template yet (see server MockTest.java for details).
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardList, Plus, Search, ChevronUp, ChevronDown, Eye, Edit2, Trash2,
   X, Clock, Target, Users, CheckCircle, AlertCircle, BookOpen, Shuffle,
-  BarChart2,
+  BarChart2, Loader2, RefreshCw, AlertTriangle,
 } from "lucide-react";
-import { testConfigs as initialConfigs, TOPIC_COLORS, difficultyOptions } from "../../data/adminTestsData";
-import { categoriesData, topicsData } from "../../data/adminQuestionsData";
-
-// NOTE: this page's "topic"/"categories" fields mean the same thing as in
-// AdminCreateMockTest.jsx — "topic" = top-level grouping (DB `categories`),
-// "categories" = nested grouping (DB `topics`). Kept as-is; only the
-// adminQuestionsData.js lookups below were updated.
+import API_BASE from "../../utils/api";
 
 const DIFF_COLORS = {
   Easy:   { bg: "bg-green-100 dark:bg-green-900/30",  text: "text-green-700 dark:text-green-300"  },
@@ -24,11 +22,30 @@ const DIFF_COLORS = {
   Mixed:  { bg: "bg-slate-100 dark:bg-slate-700/30",  text: "text-slate-500 dark:text-slate-300"  },
 };
 
+const difficultyOptions = ["Easy", "Medium", "Hard", "Mixed"];
+
+// Categories are plain {id, name} from the DB (no color field), so badge
+// colors are assigned deterministically from the id instead — same approach
+// as the Question Bank page.
+const CATEGORY_PALETTE = ["blue", "indigo", "teal", "amber", "purple", "emerald"];
+const CATEGORY_BADGE = {
+  blue:    { bg: "bg-blue-100 dark:bg-blue-900/30",    text: "text-blue-700 dark:text-blue-300"    },
+  indigo:  { bg: "bg-indigo-100 dark:bg-indigo-900/30",text: "text-indigo-700 dark:text-indigo-300"},
+  teal:    { bg: "bg-teal-100 dark:bg-teal-900/30",    text: "text-teal-700 dark:text-teal-300"    },
+  amber:   { bg: "bg-amber-100 dark:bg-amber-900/30",  text: "text-amber-700 dark:text-amber-300"  },
+  purple:  { bg: "bg-purple-100 dark:bg-purple-900/30",text: "text-purple-700 dark:text-purple-300"},
+  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30",text:"text-emerald-700 dark:text-emerald-300"},
+};
+function categoryColor(categoryId) {
+  const key = CATEGORY_PALETTE[Number(categoryId) % CATEGORY_PALETTE.length];
+  return CATEGORY_BADGE[key] ?? { bg: "bg-slate-100 dark:bg-slate-700", text: "text-slate-600 dark:text-slate-300" };
+}
+
 const PAGE_SIZE = 10;
 
-function TopicBadge({ topic }) {
-  const c = TOPIC_COLORS[topic] || TOPIC_COLORS["DSA"];
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>{topic}</span>;
+function CategoryBadge({ categoryId, name }) {
+  const c = categoryColor(categoryId);
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>{name}</span>;
 }
 
 function DiffBadge({ difficulty }) {
@@ -56,18 +73,37 @@ function TH({ label, sk, sortKey, sortDir, onSort }) {
 }
 
 const EMPTY_FORM = {
-  name: "", description: "", topic: "", categories: [],
+  name: "", description: "", categoryId: "", topicIds: [],
   questionCount: 20, timeLimitMinutes: 30,
-  difficulty: "Mixed", difficultyMix: { Easy: 7, Medium: 9, Hard: 4 },
+  difficulty: "Mixed", difficultyEasy: 7, difficultyMedium: 9, difficultyHard: 4,
   randomize: true, status: "Active",
 };
+
+async function fetchTestsData() {
+  const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
+  const [testsRes, catRes, topRes] = await Promise.all([
+    fetch(`${API_BASE}/api/admin/tests`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
+  ]);
+  if (![testsRes, catRes, topRes].every((r) => r.ok)) {
+    throw new Error("Failed to load test data");
+  }
+  return Promise.all([testsRes.json(), catRes.json(), topRes.json()]);
+}
 
 export default function AdminAllTests() {
   const navigate = useNavigate();
 
-  const [tests, setTests] = useState(initialConfigs);
+  const [tests, setTests] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [search, setSearch] = useState("");
-  const [topicFilter, setTopicFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortKey, setSortKey] = useState("id");
   const [sortDir, setSortDir] = useState("asc");
@@ -76,6 +112,7 @@ export default function AdminAllTests() {
   const [selected, setSelected] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [editErrors, setEditErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -83,7 +120,54 @@ export default function AdminAllTests() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const openModal = (m, test) => { setSelected(test); setModal(m); if (m === "edit") setEditForm({ ...test }); };
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [t, cat, top] = await fetchTestsData();
+        setTests(t); setCategories(cat); setTopics(top);
+      } catch (err) {
+        setError(err.message || "Failed to load test data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const [t, cat, top] = await fetchTestsData();
+      setTests(t); setCategories(cat); setTopics(top);
+    } catch (err) {
+      setError(err.message || "Failed to load test data");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  // ── lookups ──────────────────────────────────────────────────────────────
+  const categoryName = useCallback((id) => categories.find((c) => c.id === id)?.name ?? "—", [categories]);
+  const topicName = useCallback((id) => topics.find((t) => t.id === id)?.name ?? "—", [topics]);
+  const topicsInCategory = (categoryId) => topics.filter((t) => t.categoryId === categoryId);
+
+  const openModal = (m, test) => {
+    setSelected(test);
+    setModal(m);
+    if (m === "edit") {
+      setEditForm({
+        name: test.name, description: test.description ?? "",
+        categoryId: test.categoryId, topicIds: [...test.topicIds],
+        questionCount: test.questionCount, timeLimitMinutes: test.timeLimitMinutes,
+        difficulty: test.difficulty,
+        difficultyEasy: test.difficultyEasy, difficultyMedium: test.difficultyMedium, difficultyHard: test.difficultyHard,
+        randomize: test.randomize, status: test.status,
+      });
+    }
+  };
   const closeModal = () => { setModal(null); setSelected(null); setEditErrors({}); };
 
   const handleSort = (key) => {
@@ -96,18 +180,23 @@ export default function AdminAllTests() {
     let arr = [...tests];
     if (search.trim()) {
       const q = search.toLowerCase();
-      arr = arr.filter(t => t.name.toLowerCase().includes(q) || t.topic.toLowerCase().includes(q) || t.description.toLowerCase().includes(q));
+      arr = arr.filter(t =>
+        t.name.toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q) ||
+        categoryName(t.categoryId).toLowerCase().includes(q)
+      );
     }
-    if (topicFilter !== "All") arr = arr.filter(t => t.topic === topicFilter);
+    if (categoryFilter !== "All") arr = arr.filter(t => t.categoryId === categoryFilter);
     if (statusFilter !== "All") arr = arr.filter(t => t.status === statusFilter);
     arr.sort((a, b) => {
       let av = a[sortKey] ?? "", bv = b[sortKey] ?? "";
+      if (sortKey === "categoryId") { av = categoryName(a.categoryId); bv = categoryName(b.categoryId); }
       if (typeof av === "string") av = av.toLowerCase();
       if (typeof bv === "string") bv = bv.toLowerCase();
       return sortDir === "asc" ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
     });
     return arr;
-  }, [tests, search, topicFilter, statusFilter, sortKey, sortDir]);
+  }, [tests, categoryName, search, categoryFilter, statusFilter, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -116,47 +205,91 @@ export default function AdminAllTests() {
     total: tests.length,
     active: tests.filter(t => t.status === "Active").length,
     draft: tests.filter(t => t.status === "Draft").length,
-    totalAttempts: tests.reduce((s, t) => s + t.attemptCount, 0),
+    totalAttempts: tests.reduce((s, t) => s + (t.attemptCount ?? 0), 0),
   };
 
   // Edit modal helpers
-  const editCategoryMeta = categoriesData.find(c => c.name === editForm.topic);
-  const topicCategories = editCategoryMeta ? topicsData.filter(t => t.categoryId === editCategoryMeta.id).map(t => t.name) : [];
-  const toggleCategory = (cat) => {
+  const topicOptionsForEdit = editForm.categoryId ? topicsInCategory(Number(editForm.categoryId)) : [];
+  const toggleTopic = (topicId) => {
     setEditForm(f => ({
       ...f,
-      categories: f.categories.includes(cat) ? f.categories.filter(c => c !== cat) : [...f.categories, cat],
+      topicIds: f.topicIds.includes(topicId) ? f.topicIds.filter(id => id !== topicId) : [...f.topicIds, topicId],
     }));
   };
-  const handleTopicChange = (t) => setEditForm(f => ({ ...f, topic: t, categories: [] }));
+  const handleCategoryChange = (id) => setEditForm(f => ({ ...f, categoryId: Number(id), topicIds: [] }));
 
   const validateEdit = () => {
     const errs = {};
     if (!editForm.name.trim()) errs.name = "Name is required";
-    if (!editForm.topic) errs.topic = "Topic is required";
-    if (editForm.categories.length === 0) errs.categories = "Select at least one category";
+    if (!editForm.categoryId) errs.categoryId = "Category is required";
+    if (editForm.topicIds.length === 0) errs.topicIds = "Select at least one topic";
     if (!editForm.questionCount || editForm.questionCount < 5 || editForm.questionCount > 50) errs.questionCount = "5–50 questions";
     if (!editForm.timeLimitMinutes || editForm.timeLimitMinutes < 5 || editForm.timeLimitMinutes > 120) errs.timeLimit = "5–120 minutes";
     if (editForm.difficulty === "Mixed") {
-      const sum = (editForm.difficultyMix.Easy || 0) + (editForm.difficultyMix.Medium || 0) + (editForm.difficultyMix.Hard || 0);
+      const sum = (editForm.difficultyEasy || 0) + (editForm.difficultyMedium || 0) + (editForm.difficultyHard || 0);
       if (sum !== Number(editForm.questionCount)) errs.mixSum = `Mix total (${sum}) must equal question count (${editForm.questionCount})`;
     }
     setEditErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!validateEdit()) return;
-    setTests(prev => prev.map(t => t.id === selected.id ? { ...t, ...editForm } : t));
-    showToast("Test updated successfully");
-    closeModal();
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/tests/${selected.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error("Failed to update test");
+      const saved = await res.json();
+      setTests(prev => prev.map(t => t.id === saved.id ? saved : t));
+      showToast("Test updated successfully");
+      closeModal();
+    } catch (err) {
+      showToast(err.message || "Failed to update test", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const confirmDelete = () => {
-    setTests(prev => prev.filter(t => t.id !== selected.id));
-    showToast("Test deleted", "error");
-    closeModal();
+  const confirmDelete = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/tests/${selected.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete test");
+      setTests(prev => prev.filter(t => t.id !== selected.id));
+      showToast("Test deleted", "error");
+      closeModal();
+    } catch (err) {
+      showToast(err.message || "Failed to delete test", "error");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading tests…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+          <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -168,12 +301,21 @@ export default function AdminAllTests() {
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage all mock test templates available on the platform.</p>
         </div>
-        <button
-          onClick={() => navigate("/admin/tests/create")}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <Plus size={16} /> Create New Test
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+          </button>
+          <button
+            onClick={() => navigate("/admin/tests/create")}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus size={16} /> Create New Test
+          </button>
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -204,17 +346,17 @@ export default function AdminAllTests() {
             <input
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search by test name or topic…"
+              placeholder="Search by test name or category…"
               className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
-            value={topicFilter}
-            onChange={e => { setTopicFilter(e.target.value); setPage(1); }}
+            value={categoryFilter}
+            onChange={e => { setCategoryFilter(e.target.value === "All" ? "All" : Number(e.target.value)); setPage(1); }}
             className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="All">All Topics</option>
-            {categoriesData.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+            <option value="All">All Categories</option>
+            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
           </select>
           <div className="flex gap-2">
             {["All", "Active", "Draft"].map(s => (
@@ -232,6 +374,14 @@ export default function AdminAllTests() {
         <p className="mt-3 text-xs text-slate-400">{filtered.length} test{filtered.length !== 1 ? "s" : ""} found</p>
       </div>
 
+      {filtered.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-16 text-center">
+          <ClipboardList size={36} className="text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <p className="font-bold text-slate-700 dark:text-slate-200">No tests found</p>
+          <p className="text-sm text-slate-500 mt-1">Try adjusting your filters, or create a new test.</p>
+        </div>
+      ) : (
+      <>
       {/* Desktop Table */}
       <div className="hidden lg:block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
@@ -240,8 +390,8 @@ export default function AdminAllTests() {
               <tr>
                 <TH label="#" sk="id" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <TH label="Test Name" sk="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <TH label="Topic" sk="topic" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Categories</th>
+                <TH label="Category" sk="categoryId" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Topics</th>
                 <TH label="Questions" sk="questionCount" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <TH label="Time" sk="timeLimitMinutes" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <TH label="Difficulty" sk="difficulty" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
@@ -252,23 +402,21 @@ export default function AdminAllTests() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {paginated.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-12 text-center text-slate-400">No tests found</td></tr>
-              ) : paginated.map(test => (
+              {paginated.map(test => (
                 <tr key={test.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                   <td className="px-4 py-3 text-slate-400 font-mono text-xs">{test.id}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900 dark:text-white">{test.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 max-w-[200px] truncate">{test.description}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 max-w-50 truncate">{test.description}</p>
                   </td>
-                  <td className="px-4 py-3"><TopicBadge topic={test.topic} /></td>
+                  <td className="px-4 py-3"><CategoryBadge categoryId={test.categoryId} name={categoryName(test.categoryId)} /></td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1 max-w-[200px]">
-                      {test.categories.slice(0, 2).map(c => (
-                        <span key={c} className="px-1.5 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{c}</span>
+                    <div className="flex flex-wrap gap-1 max-w-50">
+                      {test.topicIds.slice(0, 2).map(id => (
+                        <span key={id} className="px-1.5 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicName(id)}</span>
                       ))}
-                      {test.categories.length > 2 && (
-                        <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-500">+{test.categories.length - 2}</span>
+                      {test.topicIds.length > 2 && (
+                        <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-500">+{test.topicIds.length - 2}</span>
                       )}
                     </div>
                   </td>
@@ -276,7 +424,7 @@ export default function AdminAllTests() {
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{test.timeLimitMinutes} min</td>
                   <td className="px-4 py-3"><DiffBadge difficulty={test.difficulty} /></td>
                   <td className="px-4 py-3"><StatusBadge status={test.status} /></td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{test.attemptCount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{(test.attemptCount ?? 0).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     {test.avgScore > 0 ? (
                       <div className="flex items-center gap-2">
@@ -317,7 +465,6 @@ export default function AdminAllTests() {
 
       {/* Mobile Cards */}
       <div className="lg:hidden space-y-3">
-        {paginated.length === 0 && <p className="text-center text-slate-400 py-8">No tests found</p>}
         {paginated.map(test => (
           <div key={test.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -328,18 +475,18 @@ export default function AdminAllTests() {
               <StatusBadge status={test.status} />
             </div>
             <div className="flex flex-wrap gap-2">
-              <TopicBadge topic={test.topic} />
+              <CategoryBadge categoryId={test.categoryId} name={categoryName(test.categoryId)} />
               <DiffBadge difficulty={test.difficulty} />
             </div>
             <div className="flex gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span className="flex items-center gap-1"><BookOpen size={12} />{test.questionCount} Qs</span>
               <span className="flex items-center gap-1"><Clock size={12} />{test.timeLimitMinutes} min</span>
-              <span className="flex items-center gap-1"><Users size={12} />{test.attemptCount} attempts</span>
+              <span className="flex items-center gap-1"><Users size={12} />{test.attemptCount ?? 0} attempts</span>
               {test.avgScore > 0 && <span className="flex items-center gap-1"><BarChart2 size={12} />{test.avgScore}% avg</span>}
             </div>
             <div className="flex flex-wrap gap-1">
-              {test.categories.map(c => (
-                <span key={c} className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{c}</span>
+              {test.topicIds.map(id => (
+                <span key={id} className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{topicName(id)}</span>
               ))}
             </div>
             <div className="flex gap-2 pt-1">
@@ -357,6 +504,8 @@ export default function AdminAllTests() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* View Modal */}
       {modal === "view" && selected && (
@@ -367,7 +516,7 @@ export default function AdminAllTests() {
                 <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30"><ClipboardList size={18} className="text-blue-600 dark:text-blue-400" /></div>
                 <div>
                   <h2 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{selected.name}</h2>
-                  <div className="flex gap-2 mt-1"><TopicBadge topic={selected.topic} /><StatusBadge status={selected.status} /></div>
+                  <div className="flex gap-2 mt-1"><CategoryBadge categoryId={selected.categoryId} name={categoryName(selected.categoryId)} /><StatusBadge status={selected.status} /></div>
                 </div>
               </div>
               <button onClick={closeModal} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><X size={18} /></button>
@@ -379,7 +528,7 @@ export default function AdminAllTests() {
                   { label: "Questions",  value: selected.questionCount, icon: BookOpen },
                   { label: "Time Limit", value: `${selected.timeLimitMinutes} min`, icon: Clock },
                   { label: "Difficulty", value: <DiffBadge difficulty={selected.difficulty} />, icon: Target },
-                  { label: "Attempts",   value: selected.attemptCount.toLocaleString(), icon: Users },
+                  { label: "Attempts",   value: (selected.attemptCount ?? 0).toLocaleString(), icon: Users },
                   { label: "Avg Score",  value: selected.avgScore > 0 ? `${selected.avgScore}%` : "—", icon: BarChart2 },
                   { label: "Randomize",  value: selected.randomize ? "Yes" : "No", icon: Shuffle },
                 ].map(({ label, value, icon: Icon }) => (
@@ -393,22 +542,23 @@ export default function AdminAllTests() {
                 <div>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-2">Difficulty Mix</p>
                   <div className="flex rounded-lg overflow-hidden h-4">
-                    {[["Easy", "#22c55e"], ["Medium", "#f59e0b"], ["Hard", "#ef4444"]].map(([d, color]) => {
-                      const count = selected.difficultyMix?.[d] || 0;
+                    {[["Easy", "#22c55e", selected.difficultyEasy], ["Medium", "#f59e0b", selected.difficultyMedium], ["Hard", "#ef4444", selected.difficultyHard]].map(([d, color, count]) => {
                       const pct = (count / selected.questionCount * 100).toFixed(1);
                       return count > 0 ? <div key={d} style={{ width: `${pct}%`, background: color }} title={`${d}: ${count}`} className="relative group"><span className="hidden group-hover:block absolute top-full mt-1 left-1/2 -translate-x-1/2 text-xs bg-slate-900 text-white px-2 py-0.5 rounded z-10">{d}: {count}</span></div> : null;
                     })}
                   </div>
                   <div className="flex gap-4 mt-2 text-xs text-slate-600 dark:text-slate-400">
-                    {["Easy", "Medium", "Hard"].map(d => <span key={d}>{d}: {selected.difficultyMix?.[d] || 0}</span>)}
+                    <span>Easy: {selected.difficultyEasy}</span>
+                    <span>Medium: {selected.difficultyMedium}</span>
+                    <span>Hard: {selected.difficultyHard}</span>
                   </div>
                 </div>
               )}
               <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-2">Categories ({selected.categories.length})</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-2">Topics ({selected.topicIds.length})</p>
                 <div className="flex flex-wrap gap-2">
-                  {selected.categories.map(c => (
-                    <span key={c} className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">{c}</span>
+                  {selected.topicIds.map(id => (
+                    <span key={id} className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">{topicName(id)}</span>
                   ))}
                 </div>
               </div>
@@ -442,28 +592,28 @@ export default function AdminAllTests() {
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Description</label>
                 <textarea rows={2} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
               </div>
-              {/* Topic */}
+              {/* Category */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Topic *</label>
-                <select value={editForm.topic} onChange={e => handleTopicChange(e.target.value)} className={`w-full px-3 py-2 text-sm rounded-lg border ${editErrors.topic ? "border-rose-400" : "border-slate-200 dark:border-slate-600"} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}>
-                  <option value="">Select topic…</option>
-                  {categoriesData.map(cat => <option key={cat.id} value={cat.name}>{cat.label}</option>)}
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Category *</label>
+                <select value={editForm.categoryId} onChange={e => handleCategoryChange(e.target.value)} className={`w-full px-3 py-2 text-sm rounded-lg border ${editErrors.categoryId ? "border-rose-400" : "border-slate-200 dark:border-slate-600"} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}>
+                  <option value="">Select category…</option>
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
-                {editErrors.topic && <p className="text-xs text-rose-500 mt-1">{editErrors.topic}</p>}
+                {editErrors.categoryId && <p className="text-xs text-rose-500 mt-1">{editErrors.categoryId}</p>}
               </div>
-              {/* Categories */}
-              {editForm.topic && (
+              {/* Topics */}
+              {editForm.categoryId && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Categories *</label>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Topics *</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {topicCategories.map(cat => (
-                      <label key={cat} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${editForm.categories.includes(cat) ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300"}`}>
-                        <input type="checkbox" className="accent-blue-600" checked={editForm.categories.includes(cat)} onChange={() => toggleCategory(cat)} />
-                        {cat}
+                    {topicOptionsForEdit.map(t => (
+                      <label key={t.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors text-sm ${editForm.topicIds.includes(t.id) ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-300"}`}>
+                        <input type="checkbox" className="accent-blue-600" checked={editForm.topicIds.includes(t.id)} onChange={() => toggleTopic(t.id)} />
+                        {t.name}
                       </label>
                     ))}
                   </div>
-                  {editErrors.categories && <p className="text-xs text-rose-500 mt-1">{editErrors.categories}</p>}
+                  {editErrors.topicIds && <p className="text-xs text-rose-500 mt-1">{editErrors.topicIds}</p>}
                 </div>
               )}
               {/* Q count + Time */}
@@ -493,14 +643,14 @@ export default function AdminAllTests() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Difficulty Mix (must sum to {editForm.questionCount})</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {[["Easy","green"],["Medium","amber"],["Hard","rose"]].map(([d, color]) => (
+                    {[["Easy","green","difficultyEasy"],["Medium","amber","difficultyMedium"],["Hard","rose","difficultyHard"]].map(([d, color, key]) => (
                       <div key={d}>
                         <label className={`block text-xs font-medium text-${color}-600 dark:text-${color}-400 mb-1`}>{d}</label>
-                        <input type="number" min={0} value={editForm.difficultyMix[d] || 0} onChange={e => setEditForm(f => ({ ...f, difficultyMix: { ...f.difficultyMix, [d]: Number(e.target.value) } }))} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input type="number" min={0} value={editForm[key] || 0} onChange={e => setEditForm(f => ({ ...f, [key]: Number(e.target.value) }))} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                     ))}
                   </div>
-                  {(() => { const sum = (editForm.difficultyMix.Easy||0)+(editForm.difficultyMix.Medium||0)+(editForm.difficultyMix.Hard||0); return <p className={`text-xs mt-1 ${sum === Number(editForm.questionCount) ? "text-green-600 dark:text-green-400" : "text-rose-500"}`}>Total: {sum} / {editForm.questionCount}{editErrors.mixSum ? " — " + editErrors.mixSum : ""}</p>; })()}
+                  {(() => { const sum = (editForm.difficultyEasy||0)+(editForm.difficultyMedium||0)+(editForm.difficultyHard||0); return <p className={`text-xs mt-1 ${sum === Number(editForm.questionCount) ? "text-green-600 dark:text-green-400" : "text-rose-500"}`}>Total: {sum} / {editForm.questionCount}{editErrors.mixSum ? " — " + editErrors.mixSum : ""}</p>; })()}
                 </div>
               )}
               {/* Status + Randomize */}
@@ -520,7 +670,9 @@ export default function AdminAllTests() {
               </div>
             </div>
             <div className="flex gap-2 px-5 pb-5">
-              <button onClick={saveEdit} className="flex-1 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors">Save Changes</button>
+              <button onClick={saveEdit} disabled={saving} className="flex-1 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {saving && <Loader2 size={14} className="animate-spin" />} Save Changes
+              </button>
               <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
             </div>
           </div>

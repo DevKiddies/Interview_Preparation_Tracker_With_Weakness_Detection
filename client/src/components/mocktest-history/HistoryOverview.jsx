@@ -52,7 +52,7 @@ function HistoryOverview() {
                 return (
                     <div
                         key={s.title}
-                        className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${s.bg} p-3 ring-1 ${s.glow}`}
+                        className={`relative overflow-hidden rounded-xl bg-linear-to-br ${s.bg} p-3 ring-1 ${s.glow}`}
                     >
                         <div className="flex items-center gap-2.5">
                             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg backdrop-blur-sm ${s.iconBg}`}>

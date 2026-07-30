@@ -10,11 +10,11 @@ function FormStepper({ steps, currentStep }) {
       <div className="relative w-full px-4">
 
         {/* Background track */}
-        <div className="absolute top-1/2 left-4 right-4 h-[3px] bg-gray-200 dark:bg-slate-700 -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-4 right-4 h-0.75 bg-gray-200 dark:bg-slate-700 -translate-y-1/2 z-0" />
 
         {/* Progress fill */}
         <div
-          className="absolute top-1/2 left-4 h-[3px] bg-indigo-600 -translate-y-1/2 z-0 transition-all duration-300 ease-in-out"
+          className="absolute top-1/2 left-4 h-0.75 bg-indigo-600 -translate-y-1/2 z-0 transition-all duration-300 ease-in-out"
           style={{
             width: `calc(${(currentStep / (steps.length - 1)) * 100}% - ${currentStep === 0 ? "0px" : "2rem"})`,
           }}

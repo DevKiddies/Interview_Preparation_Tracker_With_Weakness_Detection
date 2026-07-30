@@ -236,7 +236,7 @@ export default function AdminWeaknessAnalysis() {
               const tc = TOPIC_COLORS[q.topic];
               return (
                 <div key={q.id} className="flex gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700">
-                  <span className={`text-base font-bold min-w-[24px] ${q.correctRate < 40 ? "text-rose-500" : q.correctRate < 50 ? "text-amber-500" : "text-blue-500"}`}>
+                  <span className={`text-base font-bold min-w-6 ${q.correctRate < 40 ? "text-rose-500" : q.correctRate < 50 ? "text-amber-500" : "text-blue-500"}`}>
                     {idx + 1}
                   </span>
                   <div className="flex-1 min-w-0">

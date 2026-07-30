@@ -7,7 +7,7 @@ const SORTS = ["Newest", "Oldest", "Most Questions", "Highest Accuracy"];
 function HistoryFilters({ search, onSearchChange, status, onStatusChange, target, onTargetChange, sort, onSortChange }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="relative flex-1 min-w-[180px]">
+      <div className="relative flex-1 min-w-45">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         <input
           type="text"

@@ -51,7 +51,7 @@ function AdminLoginPage() {
         const data = await response.json();
         // Store under 'adminToken', not 'token', to avoid colliding with the user session.
         localStorage.setItem("adminToken", data.token);
-        navigate("/");
+        navigate("/admin/dashboard");
       } else {
         const message = await response.text();
         setError(message || "Invalid credentials.");

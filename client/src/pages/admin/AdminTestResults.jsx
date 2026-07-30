@@ -281,7 +281,7 @@ export default function AdminTestResults() {
                     <p className="font-medium text-slate-900 dark:text-white">{attempt.user.name}</p>
                     <p className="text-xs text-slate-400">{attempt.user.email}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate">{attempt.testName}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-40 truncate">{attempt.testName}</td>
                   <td className="px-4 py-3"><TopicBadge topic={attempt.topic} /></td>
                   <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{attempt.score}<span className="text-slate-400 font-normal">/{attempt.total}</span></td>
                   <td className="px-4 py-3"><AccuracyBar value={attempt.accuracy} /></td>
