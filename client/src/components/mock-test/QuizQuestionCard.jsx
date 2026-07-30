@@ -15,17 +15,22 @@ export default function QuizQuestionCard({ question, index, total, selectedOptio
         <div className="flex-1 mb-6">
             {/* Meta row — plain text, no color */}
             <div className="mb-6 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-slate-500">
           {question.category} &middot; {question.difficulty}
         </span>
-                <span className="text-[11px] font-medium text-zinc-400 tabular-nums">
+                <span className="text-[11px] font-medium text-zinc-400 dark:text-slate-500 tabular-nums">
           {index + 1} / {total}
         </span>
             </div>
 
             {/* Question text */}
-            <div className="mb-7 text-lg sm:text-xl leading-relaxed text-zinc-900 prose prose-sm prose-zinc max-w-none dark:prose-invert" style={{ fontFamily: "'Source Serif 4', Georgia, 'Times New Roman', serif" }}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{question.text}</ReactMarkdown>
+            <div className="mb-7 text-lg sm:text-xl leading-relaxed">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                    p: ({ children }) => <p className="text-zinc-900 dark:text-slate-200">{children}</p>,
+                    strong: ({ children }) => <strong className="font-semibold text-zinc-900 dark:text-white">{children}</strong>,
+                    code: ({ children }) => <code className="rounded bg-zinc-100 px-1 py-0.5 text-sm text-zinc-800 dark:bg-slate-800 dark:text-slate-200">{children}</code>,
+                    li: ({ children }) => <li className="text-zinc-900 dark:text-slate-200">{children}</li>,
+                }}>{question.text}</ReactMarkdown>
             </div>
 
             {/* Options */}
@@ -38,28 +43,28 @@ export default function QuizQuestionCard({ question, index, total, selectedOptio
                             onClick={() => onSelect(option)}
                             className={`group flex items-center gap-4 rounded-lg border px-4 py-3.5 text-left transition-colors duration-100 ${
                                 isSelected
-                                    ? "border-zinc-900 bg-zinc-50"
-                                    : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/60"
+                                    ? "border-zinc-900 bg-zinc-50 dark:border-slate-500 dark:bg-slate-800"
+                                    : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/60 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800/60"
                             }`}
                         >
                             {/* Letter badge */}
                             <span
                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
                                     isSelected
-                                        ? "bg-zinc-900 text-white"
-                                        : "bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200"
+                                        ? "bg-zinc-900 text-white dark:bg-slate-200 dark:text-slate-900"
+                                        : "bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-slate-700"
                                 }`}
                             >
                 {LABELS[idx]}
               </span>
 
                             {/* Option text */}
-                            <span className={`flex-1 text-[14px] leading-snug ${isSelected ? "text-zinc-900 font-medium" : "text-zinc-700"}`}>
+                            <span className={`flex-1 text-[14px] leading-snug ${isSelected ? "text-zinc-900 font-medium dark:text-white" : "text-zinc-700 dark:text-slate-300"}`}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <>{children}</> }}>{option}</ReactMarkdown>
                             </span>
 
                             {isSelected && (
-                                <Check size={16} className="shrink-0 text-zinc-900" strokeWidth={2.5} />
+                                <Check size={16} className="shrink-0 text-zinc-900 dark:text-white" strokeWidth={2.5} />
                             )}
                         </button>
                     );

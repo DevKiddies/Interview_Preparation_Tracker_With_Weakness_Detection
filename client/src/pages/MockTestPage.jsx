@@ -48,6 +48,7 @@ export default function MockTestPage() {
 
   const initialTimeRef = useRef(initialTime);
   const doSubmitRef = useRef(null);
+  const fetchedRef = useRef(false);
   const stateRef = useRef({ questions, selectedAnswers, timeLeft });
   useEffect(() => {
     stateRef.current = { questions, selectedAnswers, timeLeft };
@@ -58,6 +59,9 @@ export default function MockTestPage() {
   };
 
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     // Topic tests: new navigation → clear stale cache so a fresh fetch happens
     if (isTopicTest && category) {
       sessionStorage.removeItem(CACHE_KEY);
@@ -183,7 +187,11 @@ export default function MockTestPage() {
               : "flagged";
       return u;
     });
-    if (currentIndex < questions.length - 1) setCurrentIndex((p) => p + 1);
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex((p) => p + 1);
+    } else {
+      setShowFinishModal(true);
+    }
   };
 
   const handleFlag = () =>
