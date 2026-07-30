@@ -35,7 +35,10 @@ const MockTestSelectionPage = lazy(
 const TopicTestConfigPage = lazy(() => import("./pages/TopicTestConfigPage"));
 const TestResultPage = lazy(() => import("./pages/TestResultPage"));
 const TestInstructionsPage = lazy(() => import("./pages/TestInstructionsPage"));
-const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
+const InterviewPage          = lazy(() => import("./pages/InterviewPage"));
+const InterviewHistoryPage   = lazy(() => import("./pages/InterviewHistoryPage"));
+const MockTestHistoryPage    = lazy(() => import("./pages/MockTestHistoryPage"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminComingSoon = lazy(() => import("./pages/admin/AdminComingSoon"));
@@ -102,6 +105,9 @@ const App = () => {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile/settings" element={<ProfilePage />} />
+            <Route path="/interview-settings" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
+            <Route path="/interview-history" element={<ProtectedRoute><InterviewHistoryPage /></ProtectedRoute>} />
+            <Route path="/history/interview/:interviewId/tests" element={<ProtectedRoute><MockTestHistoryPage /></ProtectedRoute>} />
 
             <Route
               path="/practice/mock-tests"

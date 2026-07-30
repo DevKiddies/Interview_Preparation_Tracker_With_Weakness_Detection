@@ -1,0 +1,130 @@
+import { useState, useMemo, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import PageHeader from "../components/mocktest-history/PageHeader";
+import InterviewSummaryCard from "../components/mocktest-history/InterviewSummaryCard";
+import HistoryOverview from "../components/mocktest-history/HistoryOverview";
+import HistoryFilters from "../components/mocktest-history/HistoryFilters";
+import MockTestTimeline from "../components/mocktest-history/MockTestTimeline";
+import EmptyState from "../components/mocktest-history/EmptyState";
+import API_BASE from "../utils/api";
+
+const MOCK_TESTS = [
+  { id: 1, title: "Mock Test #1", type: "MOCK", completedAt: "2026-03-11", status: "COMPLETED", questionCount: 30, duration: 90, score: 24, accuracy: 80, confidence: 76, weakTopics: ["Trees", "Graphs"] },
+  { id: 2, title: "Mock Test #2", type: "MOCK", completedAt: "2026-03-14", status: "COMPLETED", questionCount: 30, duration: 88, score: 21, accuracy: 70, confidence: 68, weakTopics: ["Dynamic Programming", "Graphs"] },
+  { id: 3, title: "Topic Test (Arrays)", type: "TOPIC", completedAt: "2026-03-16", status: "COMPLETED", questionCount: 15, duration: 45, score: 13, accuracy: 87, confidence: 82, weakTopics: [] },
+  { id: 4, title: "Mock Test #3", type: "MOCK", completedAt: "2026-03-18", status: "COMPLETED", questionCount: 30, duration: 92, score: 18, accuracy: 60, confidence: 55, weakTopics: ["Trees", "Dynamic Programming", "Greedy"] },
+  { id: 5, title: "Mock Test #4", type: "MOCK", completedAt: "2026-03-21", status: "COMPLETED", questionCount: 30, duration: 85, score: 27, accuracy: 90, confidence: 88, weakTopics: ["System Design"] },
+  { id: 6, title: "Mock Test #5", type: "MOCK", completedAt: "2026-03-19", status: "ABANDONED", questionCount: 10, duration: 30, score: 5, accuracy: 50, confidence: 45, weakTopics: ["Graphs", "Dynamic Programming", "Trees"] },
+];
+
+function MockTestHistoryPage() {
+  const { interviewId } = useParams();
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [sort, setSort] = useState("Newest");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => res.json())
+        .then((data) => setProfile(data))
+        .catch(() => {});
+  }, []);
+
+  const daysLeft = useMemo(() => {
+    if (!profile?.interviewDate) return null;
+    const target = new Date(profile.interviewDate);
+    const today = new Date();
+    target.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target - today) / (1000 * 3600 * 24));
+    return diff >= 0 ? diff : 0;
+  }, [profile?.interviewDate]);
+
+  const filtered = useMemo(() => {
+    let result = [...MOCK_TESTS];
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.weakTopics.some((w) => w.toLowerCase().includes(q))
+      );
+    }
+    if (statusFilter !== "All") result = result.filter((t) => t.status === statusFilter.toUpperCase());
+    if (typeFilter !== "All") result = result.filter((t) => t.type === (typeFilter === "Mock Test" ? "MOCK" : "TOPIC"));
+
+    result.sort((a, b) => {
+      switch (sort) {
+        case "Oldest": return new Date(a.completedAt) - new Date(b.completedAt);
+        case "Highest Accuracy": return (b.accuracy || 0) - (a.accuracy || 0);
+        case "Highest Confidence": return (b.confidence || 0) - (a.confidence || 0);
+        default: return new Date(b.completedAt) - new Date(a.completedAt);
+      }
+    });
+
+    return result;
+  }, [search, statusFilter, typeFilter, sort]);
+
+  const overview = useMemo(() => {
+    const completed = MOCK_TESTS.filter((t) => t.status === "COMPLETED");
+    const totalQ = completed.reduce((s, t) => s + (t.questionCount || 0), 0);
+    const avgC = completed.length ? Math.round(completed.reduce((s, t) => s + (t.confidence || 0), 0) / completed.length) : 0;
+    const avgA = completed.length ? Math.round(completed.reduce((s, t) => s + (t.accuracy || 0), 0) / completed.length) : 0;
+    return { total: MOCK_TESTS.length, questionsSolved: totalQ, avgConfidence: avgC, avgAccuracy: avgA };
+  }, []);
+
+  const handleViewAnalysis = (test) => {
+    navigate("/practice/results", { state: { attemptId: test.id } });
+  };
+
+  const hasData = MOCK_TESTS.length > 0;
+
+  return (
+      <div className="min-h-screen bg-indigo-50/40 transition-colors duration-200 dark:bg-slate-950">
+        {/* Reduced container padding to py-4 and stack gaps to space-y-4 */}
+        <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 space-y-4">
+          <PageHeader />
+
+          <InterviewSummaryCard
+              targetCompany={profile?.targetCompany}
+              experienceLevel={profile?.experienceLevel}
+              interviewDate={profile?.interviewDate}
+              status={daysLeft === 0 ? "COMPLETED" : "ACTIVE"}
+          />
+
+          {hasData && (
+              <>
+                <HistoryOverview {...overview} />
+                <HistoryFilters
+                    search={search}
+                    onSearchChange={setSearch}
+                    status={statusFilter}
+                    onStatusChange={setStatusFilter}
+                    type={typeFilter}
+                    onTypeChange={setTypeFilter}
+                    sort={sort}
+                    onSortChange={setSort}
+                />
+              </>
+          )}
+
+          {filtered.length > 0
+              ? <MockTestTimeline tests={filtered} onViewAnalysis={handleViewAnalysis} />
+              : hasData
+                  ? <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-10">No tests match your filters.</p>
+                  : <EmptyState />
+          }
+        </div>
+      </div>
+  );
+}
+
+export default MockTestHistoryPage;

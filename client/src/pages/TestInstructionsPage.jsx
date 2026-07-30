@@ -1,79 +1,21 @@
-// TestInstructionsPage.jsx — pre-test instructions screen shown before every test.
-// Receives test metadata (title, questions, time, etc.) via router state.
-// The "Begin Test" button is gated behind a "I have read the instructions" checkbox
-// to ensure users acknowledge the no-pause/no-refresh rules before starting the timer.
-
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import {
-  ArrowLeft, PlayCircle, Clock, Hash, BarChart3,
-  Timer, RefreshCw, Target, Navigation2, Bookmark,
-  Send, Trophy, Lightbulb, CheckCircle2, AlertCircle,
-  ChevronRight, FileText, Layers,
-} from "lucide-react";
+import { ArrowLeft, PlayCircle, FileText, Clock, HelpCircle, BarChart2 } from "lucide-react";
 
 const RULES = [
-  {
-    icon: Timer,
-    cls: "text-amber-500",
-    bg:  "bg-amber-50 dark:bg-amber-500/10",
-    text: 'The timer starts immediately when you click "Begin Test" and cannot be paused.',
-  },
-  {
-    icon: RefreshCw,
-    cls: "text-rose-500",
-    bg:  "bg-rose-50 dark:bg-rose-500/10",
-    text: "Do not refresh or close the browser tab — your attempt will be lost.",
-  },
-  {
-    icon: Target,
-    cls: "text-indigo-500",
-    bg:  "bg-indigo-50 dark:bg-indigo-500/10",
-    text: "Each question has exactly one correct answer. Choose the best option.",
-  },
-  {
-    icon: Navigation2,
-    cls: "text-indigo-500",
-    bg:  "bg-indigo-50 dark:bg-indigo-500/10",
-    text: "Use the question navigator to jump freely between any question at any time.",
-  },
-  {
-    icon: Bookmark,
-    cls: "text-violet-500",
-    bg:  "bg-violet-50 dark:bg-violet-500/10",
-    text: "Flag questions for review and revisit them before your final submission.",
-  },
-  {
-    icon: Send,
-    cls: "text-emerald-500",
-    bg:  "bg-emerald-50 dark:bg-emerald-500/10",
-    text: "You may submit early at any time — unanswered questions are counted as skipped.",
-  },
-  {
-    icon: Trophy,
-    cls: "text-amber-500",
-    bg:  "bg-amber-50 dark:bg-amber-500/10",
-    text: "Your score and a full category breakdown appear immediately after submission.",
-  },
+  "The timer begins immediately upon start and cannot be paused.",
+  "Do not reload or close the tab — your attempt will be lost.",
+  "Each question contains exactly one correct choice.",
+  "Move freely between questions using the question index.",
+  "Flag questions to revisit them prior to final submission.",
+  "You may submit at any time. Unanswered questions are scored as 0.",
 ];
 
 const TIPS = [
-  "Read all options carefully before selecting — the correct answer may not be obvious.",
-  "On uncertain questions, eliminate clearly wrong options to improve your accuracy.",
-  "Don't spend more than 90 seconds on one question — flag it and come back.",
-  "Use the last few minutes to revisit all flagged questions.",
+  "Eliminate obviously incorrect choices to narrow your options.",
+  "If stuck on a question for > 90 seconds, flag it and move forward.",
+  "Allocate the final 3 minutes to review flagged questions.",
 ];
-
-const STEPS = ["Read Instructions", "Take the Test", "View Results"];
-
-function Chip({ icon: Icon, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-700 dark:text-slate-200">
-      <Icon size={11} className="text-slate-400 dark:text-slate-500" />
-      {label}
-    </span>
-  );
-}
 
 export default function TestInstructionsPage() {
   const navigate = useNavigate();
@@ -82,204 +24,181 @@ export default function TestInstructionsPage() {
 
   const st = location.state;
 
-  /* Redirect if landed here directly with no state */
   if (!st?.nextUrl) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white dark:bg-slate-950">
-        <p className="text-slate-500 dark:text-slate-400">
-          Please start from the test selection page.
-        </p>
-        <button
-          onClick={() => navigate("/practice/mock-tests")}
-          className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          Browse Tests
-        </button>
-      </div>
+        <div className="flex min-h-[calc(100vh-4rem)] w-full items-center justify-center bg-zinc-50 px-4 dark:bg-slate-950">
+          <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-xl shadow-zinc-200/50 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-slate-800">
+              <FileText size={20} className="text-zinc-400 dark:text-slate-500" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-white">No assessment selected</h2>
+            <p className="mt-2 text-sm text-zinc-500 leading-relaxed dark:text-slate-400">
+              Select an assessment from the test library to view instructions.
+            </p>
+            <button
+                onClick={() => navigate("/practice/mock-tests")}
+                className="mt-6 w-full rounded-full bg-zinc-900 py-3 text-sm font-medium text-white shadow-md hover:bg-zinc-800 transition-all active:scale-95 dark:bg-slate-700 dark:hover:bg-slate-600"
+            >
+              Back to test library
+            </button>
+          </div>
+        </div>
     );
   }
 
   const {
-    nextUrl    = "/practice/mock-tests/dsa",
-    nextState  = null,
-    testTitle  = "Mock Assessment",
-    questions  = 20,
-    timeMins   = 90,
+    nextUrl = "/practice/mock-tests/dsa",
+    nextState = null,
+    testTitle = "Mock Assessment",
+    questions = 20,
+    timeMins = 90,
     difficulty = "Mixed",
     description = "",
   } = st;
 
-  const handleBegin = () =>
+  const handleBegin = () => {
+    if (!agreed) return;
     navigate(nextUrl, nextState ? { state: nextState } : undefined);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="flex min-h-[calc(100vh-4rem)] w-full max-w-full flex-col justify-center overflow-x-hidden bg-zinc-50/60 p-4 font-sans text-zinc-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+        <div className="mx-auto flex w-full max-w-2xl flex-col py-4">
 
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-6 flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-        >
-          <ArrowLeft size={15} />
-          Back
-        </button>
+          {/* Top bar */}
+          <div className="mb-4 flex shrink-0 items-center justify-between px-2">
+            <button
+                onClick={() => navigate(-1)}
+                className="group inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-200/50 hover:text-zinc-800 transition-colors dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white"
+            >
+              <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+              <span>Back to selection</span>
+            </button>
 
-        <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10">
-              <FileText size={26} className="text-indigo-600 dark:text-indigo-400" />
-            </div>
+            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[11px] font-medium text-zinc-500 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+            Test Instructions
+          </span>
+          </div>
 
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-extrabold text-slate-900 dark:text-white leading-tight">
+          {/* Card - Made puffy with rounded-3xl and soft shadows */}
+          <div className="flex flex-col overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+
+            {/* Header + Stats */}
+            <div className="border-b border-zinc-200 px-6 py-5 shrink-0 dark:border-slate-800">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+              <h1 className="mt-0 mb-2 text-xl font-extrabold text-zinc-900 dark:text-white">
                 {testTitle}
               </h1>
-              {description && (
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                  {description}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Chip icon={Hash}     label={`${questions} Questions`} />
-                <Chip icon={Clock}    label={`${timeMins} min`} />
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                  <BarChart3 size={11} />
-                  {difficulty}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <Layers size={11} />
-                  MCQ
-                </span>
+                  {description && (
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-slate-400">
+                        {description}
+                      </p>
+                  )}
+                </div>
+
+                {/* Stat badges — rounded-2xl with slightly more padding */}
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+                    <HelpCircle size={12} className="text-zinc-400 dark:text-slate-500" />
+                    <span className="text-zinc-500 dark:text-slate-400">Items:</span>
+                    <span className="font-semibold text-zinc-900 dark:text-white">{questions}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+                    <Clock size={12} className="text-zinc-400 dark:text-slate-500" />
+                    <span className="text-zinc-500 dark:text-slate-400">Time:</span>
+                    <span className="font-semibold text-zinc-900 dark:text-white">{timeMins}m</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-2xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+                    <BarChart2 size={12} className="text-zinc-400 dark:text-slate-500" />
+                    <span className="text-zinc-500 dark:text-slate-400">Level:</span>
+                    <span className="font-semibold text-zinc-900 dark:text-white">{difficulty}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-6 flex items-center">
-            {STEPS.map((step, i) => (
-              <div key={i} className="flex items-center flex-1 min-w-0">
-                <div className="flex items-center gap-2 shrink-0">
-                  <div
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-extrabold transition-colors ${
-                      i === 0
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    {i === 0 ? "✓" : i + 1}
-                  </div>
-                  <span
-                    className={`hidden sm:inline text-xs font-semibold whitespace-nowrap ${
-                      i === 0
-                        ? "text-indigo-700 dark:text-indigo-300"
-                        : "text-slate-400 dark:text-slate-500"
-                    }`}
-                  >
-                    {step}
-                  </span>
-                </div>
-                {i < STEPS.length - 1 && (
-                  <div className="flex-1 mx-2 h-px bg-slate-200 dark:bg-slate-700" />
-                )}
+            {/* Split content */}
+            <div className="grid grid-cols-1 divide-y divide-zinc-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 dark:divide-slate-800">
+
+              <div className="flex flex-col justify-center p-6">
+                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-slate-500">
+                  Examination rules
+                </h2>
+                <ol className="space-y-3">
+                  {RULES.map((rule, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-600 dark:text-slate-300">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-500 dark:bg-slate-800 dark:text-slate-400">{i + 1}</span>
+                        <span>{rule}</span>
+                      </li>
+                  ))}
+                </ol>
               </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-900 dark:text-white">
-            <AlertCircle size={14} className="text-indigo-500" />
-            Instructions
-          </h2>
-          <div className="space-y-3">
-            {RULES.map((rule, i) => {
-              const Icon = rule.icon;
-              return (
-                <div key={i} className="flex items-start gap-3">
-                  <div
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${rule.bg}`}
+              <div className="flex flex-col justify-center bg-zinc-50/50 p-6 dark:bg-slate-900/40">
+                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-slate-500">
+                  Recommended strategy
+                </h2>
+                <ul className="space-y-3">
+                  {TIPS.map((tip, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-zinc-600 dark:text-slate-300">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300 dark:bg-slate-600" />
+                        <span>{tip}</span>
+                      </li>
+                  ))}
+                </ul>
+              </div>
+
+            </div>
+
+            {/* Action footer — rounded buttons and slightly more padding */}
+            <div className="shrink-0 border-t border-zinc-200 bg-zinc-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                <label className="flex cursor-pointer select-none items-center gap-2.5">
+                  <input
+                      type="checkbox"
+                      checked={agreed}
+                      onChange={(e) => setAgreed(e.target.checked)}
+                      className="h-4 w-4 rounded-md border-zinc-300 text-zinc-900 focus:ring-zinc-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:focus:ring-slate-500"
+                  />
+                  <span className="text-[13px] font-medium text-zinc-700 dark:text-slate-300">
+                  I have read and agree to follow all examination rules.
+                </span>
+                </label>
+
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <button
+                      onClick={() => navigate(-1)}
+                      className="h-10 rounded-full border border-zinc-200 bg-white px-5 text-[13px] font-semibold text-zinc-600 shadow-sm hover:bg-zinc-50 hover:shadow transition-all active:scale-95 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
-                    <Icon size={14} className={rule.cls} />
-                  </div>
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">
-                      {i + 1}.{" "}
-                    </span>
-                    {rule.text}
-                  </p>
+                    Cancel
+                  </button>
+
+                  <button
+                      onClick={handleBegin}
+                      disabled={!agreed}
+                      className={`flex h-10 items-center justify-center gap-2 rounded-full px-5 text-[13px] font-semibold shadow-sm transition-all active:scale-95 ${
+                          agreed
+                              ? "bg-zinc-900 text-white shadow-zinc-900/20 hover:bg-zinc-800 hover:shadow-md dark:bg-slate-700 dark:hover:bg-slate-600"
+                              : "cursor-not-allowed bg-zinc-100 text-zinc-400 shadow-none dark:bg-slate-800 dark:text-slate-600"
+                      }`}
+                  >
+                    <PlayCircle size={16} />
+                    <span>Begin assessment</span>
+                  </button>
                 </div>
-              );
-            })}
+
+              </div>
+            </div>
+
           </div>
+
+          <p className="mt-3 shrink-0 text-center text-[11px] font-medium text-zinc-400 dark:text-slate-600">
+            Submissions are final and automatically log timestamp.
+          </p>
+
         </div>
-
-        <div className="mb-5 rounded-2xl border border-amber-200 dark:border-amber-500/25 bg-amber-50 dark:bg-amber-500/5 p-5">
-          <h2 className="mb-3 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">
-            <Lightbulb size={14} />
-            Pro Tips
-          </h2>
-          <ul className="space-y-2.5">
-            {TIPS.map((tip, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-amber-900 dark:text-amber-200/80">
-                <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-amber-500" />
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <label
-          className={`mb-6 flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-all duration-150 ${
-            agreed
-              ? "border-indigo-300 dark:border-indigo-500/50 bg-indigo-50 dark:bg-indigo-500/5"
-              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-indigo-200 dark:hover:border-indigo-500/30"
-          }`}
-        >
-          <div
-            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-all duration-150 ${
-              agreed
-                ? "border-indigo-600 bg-indigo-600"
-                : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-            }`}
-          >
-            <input
-              type="checkbox"
-              className="sr-only"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-            />
-            {agreed && <CheckCircle2 size={12} className="text-white" strokeWidth={3} />}
-          </div>
-          <span className="text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-300">
-            I have read and understood all the instructions above. I&apos;m ready to begin the test.
-          </span>
-        </label>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleBegin}
-            disabled={!agreed}
-            className={`flex flex-[2] items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-150 active:scale-[0.98] ${
-              agreed
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25 hover:bg-indigo-700 cursor-pointer"
-                : "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed"
-            }`}
-          >
-            <PlayCircle size={16} />
-            Begin Test
-            {agreed && <ChevronRight size={14} />}
-          </button>
-        </div>
-
-        <p className="mt-4 text-center text-[11px] text-slate-400 dark:text-slate-600">
-          Results are auto-graded and shown immediately after submission.
-        </p>
       </div>
-    </div>
   );
 }

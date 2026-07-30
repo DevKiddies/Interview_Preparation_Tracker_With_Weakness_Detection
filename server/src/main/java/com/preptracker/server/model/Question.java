@@ -1,11 +1,5 @@
 package com.preptracker.server.model;
 
-// Represents a single multiple-choice question in the question bank.
-// Each question has four options (A–D) and a correctAnswer field that stores
-// the letter of the right option ("A", "B", "C", or "D").
-// Questions are tagged by topic (e.g. "DSA") and category (e.g. "Arrays")
-// so they can be filtered when building a test session.
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,8 +16,8 @@ public class Question {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String text;
+    @Column(name = "question", nullable = false, columnDefinition = "TEXT")
+    private String question;
 
     @Column(name = "option_a", nullable = false)
     private String optionA;
@@ -38,14 +32,28 @@ public class Question {
     private String optionD;
 
     @Column(name = "correct_answer", nullable = false)
-    private String correctAnswer; // "A", "B", "C", or "D"
-
-    @Column(nullable = false)
-    private String category;
+    private String correctAnswer;
 
     @Column(nullable = false)
     private String difficulty;
 
-    @Column(nullable = false)
-    private String topic;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_type", nullable = false)
+    private QuestionType questionType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "technique_id")
+    private Technique technique;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
 }

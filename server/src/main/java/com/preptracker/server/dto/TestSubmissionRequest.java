@@ -9,10 +9,9 @@ import java.util.List;
 import java.util.Map;
 
 public record TestSubmissionRequest(
+        String category,
         String topic,
         int timeTaken,
         List<Long> questionIds,
-        // maps questionId -> the full option text the user selected (e.g. "O(1)", not "A"/"B")
-        // so result comparison works without needing to re-fetch questions
         Map<Long, String> answers
 ) {}
