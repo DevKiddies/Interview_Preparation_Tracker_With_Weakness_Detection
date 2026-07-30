@@ -301,43 +301,43 @@ export default function MockTestPage() {
 
         {showFinishModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-              <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${timedOut ? "bg-amber-100 dark:bg-amber-500/10" : "bg-rose-100 dark:bg-rose-500/10"}`}>
+              <div className="w-full max-w-sm rounded-md border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800">
                     {timedOut
-                        ? <Timer size={20} className="text-amber-600 dark:text-amber-400" />
-                        : <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" />
+                        ? <Timer size={20} className="text-zinc-500 dark:text-zinc-400" />
+                        : <AlertTriangle size={20} className="text-zinc-500 dark:text-zinc-400" />
                     }
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white">
-                      {timedOut ? "Time's Up!" : "Submit Assessment?"}
+                    <h3 className="font-bold text-zinc-900 dark:text-white">
+                      {timedOut ? "Time's Up" : "Submit Assessment?"}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       {timedOut
-                          ? "Your time has expired. Answers will be submitted."
-                          : "This action cannot be undone."
+                          ? "Your time has expired. Your answers will be submitted."
+                          : "Review your progress before submitting."
                       }
                     </p>
                   </div>
                 </div>
 
-                <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 dark:bg-slate-800 p-3">
+                <div className="mb-5 grid grid-cols-3 gap-2 rounded-md bg-zinc-50 dark:bg-zinc-800 p-3">
                   <div className="text-center">
-                    <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{answeredCount}</p>
-                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    <p className="text-lg font-extrabold text-zinc-900 dark:text-white">{answeredCount}</p>
+                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
                       <CheckCircle2 size={10} /> Answered
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-extrabold text-amber-600 dark:text-amber-400">{flaggedCount}</p>
-                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    <p className="text-lg font-extrabold text-zinc-900 dark:text-white">{flaggedCount}</p>
+                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
                       <Flag size={10} /> Flagged
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-extrabold text-rose-600 dark:text-rose-400">{notAnsweredCount}</p>
-                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    <p className="text-lg font-extrabold text-zinc-900 dark:text-white">{notAnsweredCount}</p>
+                    <p className="flex items-center justify-center gap-0.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
                       <XCircle size={10} /> Unanswered
                     </p>
                   </div>
@@ -347,7 +347,7 @@ export default function MockTestPage() {
                   {!timedOut && (
                       <button
                           onClick={() => setShowFinishModal(false)}
-                          className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          className="flex-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                       >
                         Continue
                       </button>
@@ -361,7 +361,7 @@ export default function MockTestPage() {
                           setShowConfirmModal(true);
                         }
                       }}
-                      className="flex-1 rounded-xl bg-rose-500 hover:bg-rose-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/20 transition-colors"
+                      className="flex-1 rounded-md bg-zinc-900 hover:bg-zinc-800 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-300"
                   >
                     Submit
                   </button>
@@ -372,28 +372,28 @@ export default function MockTestPage() {
 
         {showConfirmModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-              <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                    <AlertTriangle size={20} className="text-slate-500 dark:text-slate-400" />
+              <div className="w-full max-w-sm rounded-md border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800">
+                    <AlertTriangle size={20} className="text-zinc-500 dark:text-zinc-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white">Unanswered Questions</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {notAnsweredCount} question{notAnsweredCount !== 1 ? "s" : ""} not answered. Submit anyway?
+                    <h3 className="font-bold text-zinc-900 dark:text-white">Submit anyway?</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {notAnsweredCount} question{notAnsweredCount !== 1 ? "s" : ""} not answered.
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <button
                       onClick={() => setShowConfirmModal(false)}
-                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 py-2.5 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                   >
                     Review
                   </button>
                   <button
                       onClick={() => { setShowConfirmModal(false); doSubmit(); }}
-                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                      className="flex-1 rounded-md bg-zinc-900 hover:bg-zinc-800 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-300"
                   >
                     Submit Anyway
                   </button>
