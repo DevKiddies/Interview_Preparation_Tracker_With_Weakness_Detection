@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -17,11 +18,11 @@ import {
 import API_BASE from "../../utils/api.js";
 
 const NAV_ITEMS = [
-  { label: "Dashboard",      icon: LayoutDashboard, to: "/dashboard",           exact: true  },
-  { label: "Mock Tests",     icon: ClipboardList,   to: "/practice/mock-tests", exact: false },
-  { label: "History", icon: History,       to: "/interview-history",   exact: false },
-  { label: "Profile",        icon: User,            to: "/profile/settings",    exact: false },
-  { label: "Help Center",    icon: HelpCircle,      to: "/help/faqs",           exact: false },
+  { label: "Dashboard",  icon: LayoutDashboard, to: "/dashboard",        exact: true  },
+  { label: "Mock Tests", icon: ClipboardList,   to: "/practice/mock-tests", exact: false },
+  { label: "History",    icon: History,         to: "/interview-history", exact: false },
+  { label: "Profile",    icon: User,            to: "/profile/settings", exact: false },
+  { label: "Help Center",icon: HelpCircle,      to: "/help/faqs",        exact: false },
 ];
 
 export default function Sidebar({ username, targetLabel, experienceLabel, daysLeft }) {
@@ -125,15 +126,15 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                 <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
                   <span>Interview Goal</span>
                   <span className="flex items-center gap-0.5 font-medium">
-                    <Clock size={10} className="text-slate-400" />
-                    <span>
-                      {daysLeft === null
-                          ? "No Interview"
-                          : daysLeft === 0
-                              ? "Interview Today"
-                              : `${daysLeft}d left`}
-                    </span>
+                  <Clock size={10} className="text-slate-400" />
+                  <span>
+                    {daysLeft === null
+                        ? "No Interview"
+                        : daysLeft === 0
+                            ? "Interview Today"
+                            : `${daysLeft}d left`}
                   </span>
+                </span>
                 </div>
               </button>
             </div>
@@ -146,28 +147,62 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
               <ul className="space-y-0.5">
                 {NAV_ITEMS.map((item) => {
                   const active = isActive(item);
-                  const Icon   = item.icon;
+                  const Icon = item.icon;
                   return (
                       <li key={item.label}>
                         <Link
                             to={item.to}
-                            className={`group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-150 ${
-                                active
-                                    ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
-                                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-                            }`}
+                            className="group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors duration-150"
                         >
-                          <Icon
-                              size={16}
-                              className={`transition-transform duration-150 group-hover:scale-105 ${
-                                  active ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300"
+                          {/* Animated Active Indicator Pill */}
+                          {active && (
+                              <motion.div
+                                  layoutId="active-nav-pill"
+                                  className="absolute inset-0 rounded-lg bg-blue-600 shadow-sm shadow-blue-500/20"
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 380,
+                                    damping: 30,
+                                  }}
+                              />
+                          )}
+
+                          {/* Animated Icon */}
+                          <motion.div
+                              whileHover={{ scale: 1.15 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="relative z-10 flex items-center justify-center"
+                          >
+                            <Icon
+                                size={16}
+                                className={`transition-colors duration-150 ${
+                                    active
+                                        ? "text-white"
+                                        : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300"
+                                }`}
+                            />
+                          </motion.div>
+
+                          {/* Label Text */}
+                          <span
+                              className={`relative z-10 flex-1 transition-colors duration-150 ${
+                                  active
+                                      ? "text-white font-semibold"
+                                      : "text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200"
                               }`}
-                          />
-                          <span className="flex-1">{item.label}</span>
+                          >
+                        {item.label}
+                      </span>
+
+                          {/* Badge if present */}
                           {item.badge && (
-                              <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                                  active ? "bg-white/20 text-white" : "bg-rose-500 text-white"
-                              }`}>
+                              <span
+                                  className={`relative z-10 rounded-full px-1.5 py-0.2 text-[10px] font-bold transition-colors ${
+                                      active
+                                          ? "bg-white/20 text-white"
+                                          : "bg-rose-500 text-white"
+                                  }`}
+                              >
                           {item.badge}
                         </span>
                           )}

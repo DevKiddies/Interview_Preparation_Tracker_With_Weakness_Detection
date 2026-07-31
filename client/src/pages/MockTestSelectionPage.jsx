@@ -137,7 +137,7 @@ export default function MockTestSelectionPage() {
     };
 
     return (
-        <div className="min-h-screen bg-indigo-50/50 transition-colors duration-200 dark:bg-slate-950">
+        <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
             <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6">
                 <Sidebar
                     username={username}
