@@ -123,28 +123,102 @@ export const topicConfidence = [
     id: 1,
     name: "Data Structures",
     confidence: 88,
+    weakTopics: 1,
+    trend: "up",
+    questionCount: 428,
   },
   {
     id: 2,
     name: "Algorithms",
     confidence: 74,
+    weakTopics: 2,
+    trend: "down",
+    questionCount: 356,
   },
   {
     id: 3,
     name: "Database",
     confidence: 39,
+    weakTopics: 4,
+    trend: "down",
+    questionCount: 215,
   },
   {
     id: 4,
     name: "Operating System",
     confidence: 61,
+    weakTopics: 3,
+    trend: "up",
+    questionCount: 189,
   },
   {
     id: 5,
     name: "Computer Networks",
     confidence: 47,
+    weakTopics: 3,
+    trend: "up",
+    questionCount: 172,
   },
 ];
+
+export const categoryTopics = {
+  1: [
+    { id: 1, name: "Arrays", confidence: 92, questions: 87 },
+    { id: 2, name: "Strings", confidence: 85, questions: 72 },
+    { id: 3, name: "Linked List", confidence: 71, questions: 65 },
+    { id: 4, name: "Stack & Queue", confidence: 76, questions: 53 },
+    { id: 5, name: "Trees", confidence: 63, questions: 112 },
+    { id: 6, name: "Graphs", confidence: 41, questions: 43 },
+    { id: 7, name: "Dynamic Programming", confidence: 38, questions: 98 },
+  ],
+  2: [
+    { id: 8, name: "Sorting", confidence: 85, questions: 45 },
+    { id: 9, name: "Searching", confidence: 79, questions: 38 },
+    { id: 10, name: "Recursion", confidence: 72, questions: 52 },
+    { id: 11, name: "Greedy", confidence: 61, questions: 41 },
+    { id: 12, name: "Divide & Conquer", confidence: 55, questions: 33 },
+  ],
+  3: [
+    { id: 13, name: "SQL", confidence: 62, questions: 48 },
+    { id: 14, name: "Normalization", confidence: 45, questions: 35 },
+    { id: 15, name: "Transactions", confidence: 38, questions: 29 },
+    { id: 16, name: "Indexing", confidence: 55, questions: 42 },
+  ],
+  4: [
+    { id: 17, name: "Process Management", confidence: 68, questions: 44 },
+    { id: 18, name: "Memory Management", confidence: 52, questions: 38 },
+    { id: 19, name: "File Systems", confidence: 71, questions: 32 },
+    { id: 20, name: "Synchronization", confidence: 45, questions: 36 },
+  ],
+  5: [
+    { id: 21, name: "TCP/IP", confidence: 58, questions: 41 },
+    { id: 22, name: "HTTP/HTTPS", confidence: 72, questions: 33 },
+    { id: 23, name: "DNS", confidence: 44, questions: 28 },
+    { id: 24, name: "Routing", confidence: 38, questions: 35 },
+  ],
+};
+
+export const topicTechniques = {
+  5: [
+    { id: 1, name: "Binary Tree Traversal", confidence: 91, questions: 28 },
+    { id: 2, name: "Binary Search Tree", confidence: 84, questions: 35 },
+    { id: 3, name: "AVL Tree", confidence: 67, questions: 22 },
+    { id: 4, name: "Segment Tree", confidence: 42, questions: 18 },
+    { id: 5, name: "Fenwick Tree", confidence: 31, questions: 9 },
+  ],
+  6: [
+    { id: 6, name: "BFS", confidence: 72, questions: 25 },
+    { id: 7, name: "DFS", confidence: 68, questions: 28 },
+    { id: 8, name: "Dijkstra", confidence: 45, questions: 22 },
+    { id: 9, name: "Topological Sort", confidence: 38, questions: 15 },
+  ],
+  7: [
+    { id: 10, name: "Memoization", confidence: 52, questions: 32 },
+    { id: 11, name: "Tabulation", confidence: 44, questions: 28 },
+    { id: 12, name: "Knapsack", confidence: 35, questions: 24 },
+    { id: 13, name: "LCS", confidence: 41, questions: 20 },
+  ],
+};
 
 export const techniqueConfidence = {
   Database: [

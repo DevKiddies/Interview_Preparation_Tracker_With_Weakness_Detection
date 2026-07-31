@@ -29,8 +29,6 @@ public class QuestionController {
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        boolean noFilters = (topic == null || topic.isEmpty()) && (category == null || category.isEmpty());
-        List<String> categories = noFilters ? List.of("DSA") : category;
-        return ResponseEntity.ok(questionService.getQuestions(topic, categories, limit));
+        return ResponseEntity.ok(questionService.getQuestions(topic, category, limit));
     }
 }

@@ -7,10 +7,8 @@ package com.preptracker.server.controller;
 
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
-import com.preptracker.server.model.Category;
 import com.preptracker.server.model.Question;
 import com.preptracker.server.model.TestAttempt;
-import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.QuestionRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tests")
@@ -27,7 +24,6 @@ import java.util.stream.Collectors;
 public class TestController {
 
     private final QuestionRepository questionRepository;
-    private final CategoryRepository categoryRepository;
     private final TestAttemptRepository testAttemptRepository;
 
     @PostMapping("/submit")
@@ -36,9 +32,6 @@ public class TestController {
 
         Map<Long, Question> byId = new HashMap<>();
         for (Question q : fetched) byId.put(q.getId(), q);
-
-        Map<Long, String> categoryNames = categoryRepository.findAll().stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
 
         int score = 0;
         List<TestResultResponse.QuestionResult> results = new ArrayList<>();
@@ -62,16 +55,16 @@ public class TestController {
             boolean correct  = submitted != null && submitted.equals(correctText);
             if (correct) score++;
 
-            String categoryName = categoryNames.get(q.getCategoryId());
-            int[] counts = catMap.computeIfAbsent(categoryName, k -> new int[]{0, 0});
+            String catName = q.getCategory().getName();
+            int[] counts = catMap.computeIfAbsent(catName, k -> new int[]{0, 0});
             counts[1]++;
             if (correct) counts[0]++;
 
             results.add(new TestResultResponse.QuestionResult(
-                    q.getId(), q.getText(),
+                    q.getId(), q.getQuestion(),
                     List.of(q.getOptionA(), q.getOptionB(), q.getOptionC(), q.getOptionD()),
                     submitted, correctText, correct,
-                    categoryName, q.getDifficulty()
+                    catName, q.getDifficulty()
             ));
         }
 

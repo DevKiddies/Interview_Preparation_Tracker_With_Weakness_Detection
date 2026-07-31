@@ -15,11 +15,39 @@ const ICONS = {
     flame: Flame,
 };
 
-const COLORS = {
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400",
-    green: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
-    purple: "bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400",
-    orange: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400",
+const THEME_STYLES = {
+    blue: {
+        bg: "from-blue-600 to-cyan-500 dark:from-blue-700 dark:to-cyan-600",
+        glow: "ring-1 ring-blue-400 shadow-[0_4px_20px_-2px_rgba(59,130,246,0.4)]",
+        hoverGlow: "hover:shadow-[0_0_22px_rgba(59,130,246,0.65)] hover:ring-blue-300",
+        trendUp: "text-emerald-100",
+        trendDown: "text-red-200",
+        trendNeutral: "text-white/70",
+    },
+    green: {
+        bg: "from-emerald-600 to-teal-500 dark:from-emerald-700 dark:to-teal-600",
+        glow: "ring-1 ring-emerald-400 shadow-[0_4px_20px_-2px_rgba(16,185,129,0.4)]",
+        hoverGlow: "hover:shadow-[0_0_22px_rgba(16,185,129,0.65)] hover:ring-emerald-300",
+        trendUp: "text-emerald-100",
+        trendDown: "text-red-200",
+        trendNeutral: "text-white/70",
+    },
+    purple: {
+        bg: "from-violet-600 to-purple-500 dark:from-violet-700 dark:to-purple-600",
+        glow: "ring-1 ring-violet-400 shadow-[0_4px_20px_-2px_rgba(139,92,246,0.4)]",
+        hoverGlow: "hover:shadow-[0_0_22px_rgba(139,92,246,0.65)] hover:ring-violet-300",
+        trendUp: "text-emerald-100",
+        trendDown: "text-red-200",
+        trendNeutral: "text-white/70",
+    },
+    orange: {
+        bg: "from-orange-600 to-amber-500 dark:from-orange-700 dark:to-amber-600",
+        glow: "ring-1 ring-orange-400 shadow-[0_4px_20px_-2px_rgba(249,115,22,0.4)]",
+        hoverGlow: "hover:shadow-[0_0_22px_rgba(249,115,22,0.65)] hover:ring-orange-300",
+        trendUp: "text-emerald-100",
+        trendDown: "text-red-200",
+        trendNeutral: "text-white/70",
+    },
 };
 
 export default function StatCard({
@@ -33,6 +61,8 @@ export default function StatCard({
                                  }) {
     const Icon = ICONS[icon] || Brain;
 
+    const theme = THEME_STYLES[color] || THEME_STYLES.blue;
+
     const TrendIcon =
         trend === "up"
             ? ArrowUpRight
@@ -42,49 +72,32 @@ export default function StatCard({
 
     const trendColor =
         trend === "up"
-            ? "text-emerald-600 dark:text-emerald-400"
+            ? theme.trendUp
             : trend === "down"
-                ? "text-red-600 dark:text-red-400"
-                : "text-slate-400";
+                ? theme.trendDown
+                : theme.trendNeutral;
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-
+        <div
+            className={`cursor-default rounded-xl bg-gradient-to-br ${theme.bg} p-3 shadow-sm transition-all duration-700 ease-in-out ${theme.glow} ${theme.hoverGlow}`}
+        >
             {/* Header */}
-            <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs font-black uppercase tracking-widest text-white opacity-80">
                     {title}
                 </p>
 
-                <div
-                    className={`flex h-7 w-7 items-center justify-center rounded-lg ${COLORS[color]}`}
-                >
-                    <Icon size={14} />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-white ring-1 ring-white/25 backdrop-blur-xs">
+                    <Icon size={14} strokeWidth={2.5} />
                 </div>
             </div>
 
             {/* Main Value */}
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            <h2 className="text-xl font-black tracking-tight text-white">
                 {value}
             </h2>
 
             {/* Footer */}
-            <div className="mt-1 flex items-center gap-1">
-                {change && (
-                    <>
-                        <TrendIcon size={12} className={trendColor} />
-                        <span className={`text-xs font-semibold ${trendColor}`}>
-              {change}
-            </span>
-                    </>
-                )}
-
-                {description && (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-            {description}
-          </span>
-                )}
-            </div>
         </div>
     );
 }
