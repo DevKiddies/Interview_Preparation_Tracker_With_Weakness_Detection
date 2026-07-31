@@ -10,7 +10,6 @@ import com.preptracker.server.dto.KpiDTO;
 import com.preptracker.server.dto.MonthlyPointDTO;
 import com.preptracker.server.dto.PlatformHealthDTO;
 import com.preptracker.server.dto.TopicPerformanceDTO;
-import com.preptracker.server.model.Question;
 import com.preptracker.server.model.TestAttempt;
 import com.preptracker.server.model.Topic;
 import com.preptracker.server.model.User;
@@ -124,7 +123,7 @@ public class AdminAnalyticsService {
 
         List<Topic> topics = topicRepository.findAll();
         Map<Long, Long> questionsPerTopic = questionRepository.findAll().stream()
-                .collect(Collectors.groupingBy(Question::getTopicId, Collectors.counting()));
+                .collect(Collectors.groupingBy(q -> q.getTopic().getId(), Collectors.counting()));
         double questionCoverage = topics.isEmpty() ? 0
                 : 100.0 * topics.stream().filter(t -> questionsPerTopic.getOrDefault(t.getId(), 0L) >= MIN_QUESTIONS_PER_TOPIC).count() / topics.size();
 

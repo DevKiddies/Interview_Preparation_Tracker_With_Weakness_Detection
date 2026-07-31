@@ -64,7 +64,7 @@ public class AdminMetadataController {
         }
         Topic topic = new Topic();
         topic.setName(request.name().trim());
-        topic.setCategoryId(request.categoryId());
+        topic.setCategory(categoryRepository.getReferenceById(request.categoryId()));
         return ResponseEntity.ok(topicRepository.save(topic));
     }
 
@@ -76,7 +76,7 @@ public class AdminMetadataController {
         if (!topicRepository.existsById(id)) {
             throw new NotFoundException("Topic not found");
         }
-        long questionCount = questionRepository.countByTopicId(id);
+        long questionCount = questionRepository.countByTopic_Id(id);
         if (questionCount > 0) {
             throw new ConflictException(
                     questionCount + " question" + (questionCount > 1 ? "s are" : " is")
