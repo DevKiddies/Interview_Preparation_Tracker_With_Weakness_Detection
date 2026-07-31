@@ -81,7 +81,7 @@ export default function BlindSpotAnalysis({ data = [] }) {
                 </div>
             ) : (
                 <div className="mt-6 flex-1 h-full min-h-65 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={100}>
                         <ComposedChart
                             layout="vertical"
                             data={data}

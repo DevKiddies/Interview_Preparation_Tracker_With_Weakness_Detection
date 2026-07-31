@@ -14,6 +14,8 @@ import {
   Clock,
   Sparkles,
   History,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import API_BASE from "../../utils/api.js";
 
@@ -30,6 +32,14 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
   const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
   const [imgError, setImgError] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "1");
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      localStorage.setItem("sidebarCollapsed", c ? "0" : "1");
+      return !c;
+    });
+  };
 
   useEffect(() => {
     const sync = () => {
@@ -63,7 +73,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
   };
 
   return (
-      <aside className="hidden w-64 shrink-0 lg:block">
+      <aside className={`hidden shrink-0 transition-all duration-300 lg:block ${collapsed ? "w-16" : "w-64"}`}>
         {/* Outer Shell preserved strictly as requested */}
         <div className="sticky top-23 flex h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900">
 
@@ -73,7 +83,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
             {/* User Profile & Progress Header */}
             <div className="shrink-0 space-y-2 border-b border-slate-100 p-2.5 dark:border-slate-800/80">
               {/* User Identity Row */}
-              <div className="flex items-center gap-2.5">
+              <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2.5"}`}>
                 <div className="relative shrink-0">
                   {avatarUrl && !imgError ? (
                       <img
@@ -90,42 +100,55 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                   <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold tracking-tight text-slate-900 dark:text-white">
-                    {username || "User"}
-                  </p>
-                  <div className="flex items-center gap-1 text-[11px] leading-tight text-slate-500 dark:text-slate-400">
-                    <Sparkles size={10} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
-                    <span className="truncate">{subtitle}</span>
-                  </div>
-                </div>
+                {!collapsed && (
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold tracking-tight text-slate-900 dark:text-white">
+                        {username || "User"}
+                      </p>
+                      <div className="flex items-center gap-1 text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                        <Sparkles size={10} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
+                        <span className="truncate">{subtitle}</span>
+                      </div>
+                    </div>
+                )}
+
+                <button
+                    onClick={toggleCollapsed}
+                    title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    className={`shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${
+                        collapsed ? "" : "ml-auto"
+                    }`}
+                >
+                  {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                </button>
               </div>
 
               {/* Compact Preparation Widget (Now Clickable Shortcut) */}
-              <button
-                  onClick={() => navigate("/interview-settings")}
-                  className="w-full rounded-lg border border-indigo-100/80 bg-indigo-50/50 p-2 text-left transition hover:border-indigo-200 hover:bg-indigo-100/60 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"
-              >
-                <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-950 dark:text-indigo-200">
-                  <span>30% Completed</span>
-                  <div className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
-                    <Flame size={12} className="fill-amber-500 text-amber-500" />
-                    <span>14d streak</span>
-                  </div>
-                </div>
+              {!collapsed && (
+                  <button
+                      onClick={() => navigate("/interview-settings")}
+                      className="w-full rounded-lg border border-indigo-100/80 bg-indigo-50/50 p-2 text-left transition hover:border-indigo-200 hover:bg-indigo-100/60 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-950 dark:text-indigo-200">
+                      <span>30% Completed</span>
+                      <div className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                        <Flame size={12} className="fill-amber-500 text-amber-500" />
+                        <span>14d streak</span>
+                      </div>
+                    </div>
 
-                {/* Progress Bar */}
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-indigo-200/50 dark:bg-indigo-950/60">
-                  <div
-                      className="h-full rounded-full bg-linear-to-r from-blue-500 to-teal-400 transition-all duration-500"
-                      style={{ width: "30%" }}
-                  />
-                </div>
+                    {/* Progress Bar */}
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-indigo-200/50 dark:bg-indigo-950/60">
+                      <div
+                          className="h-full rounded-full bg-linear-to-r from-blue-500 to-teal-400 transition-all duration-500"
+                          style={{ width: "30%" }}
+                      />
+                    </div>
 
-                {/* Interview Goal Status Footer */}
-                <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                  <span>Interview Goal</span>
-                  <span className="flex items-center gap-0.5 font-medium">
+                    {/* Interview Goal Status Footer */}
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                      <span>Interview Goal</span>
+                      <span className="flex items-center gap-0.5 font-medium">
                   <Clock size={10} className="text-slate-400" />
                   <span>
                     {daysLeft === null
@@ -135,15 +158,18 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                             : `${daysLeft}d left`}
                   </span>
                 </span>
-                </div>
-              </button>
+                    </div>
+                  </button>
+              )}
             </div>
 
             {/* Navigation Links */}
             <nav className="shrink-0 px-2 py-2">
-              <p className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Menu
-              </p>
+              {!collapsed && (
+                  <p className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Menu
+                  </p>
+              )}
               <ul className="space-y-0.5">
                 {NAV_ITEMS.map((item) => {
                   const active = isActive(item);
@@ -152,7 +178,10 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                       <li key={item.label}>
                         <Link
                             to={item.to}
-                            className="group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors duration-150"
+                            title={collapsed ? item.label : undefined}
+                            className={`group relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors duration-150 ${
+                                collapsed ? "justify-center px-0" : ""
+                            }`}
                         >
                           {/* Animated Active Indicator Pill */}
                           {active && (
@@ -184,18 +213,20 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                           </motion.div>
 
                           {/* Label Text */}
-                          <span
-                              className={`relative z-10 flex-1 transition-colors duration-150 ${
-                                  active
-                                      ? "text-white font-semibold"
-                                      : "text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200"
-                              }`}
-                          >
+                          {!collapsed && (
+                              <span
+                                  className={`relative z-10 flex-1 transition-colors duration-150 ${
+                                      active
+                                          ? "text-white font-semibold"
+                                          : "text-slate-600 group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-slate-200"
+                                  }`}
+                              >
                         {item.label}
                       </span>
+                          )}
 
                           {/* Badge if present */}
-                          {item.badge && (
+                          {!collapsed && item.badge && (
                               <span
                                   className={`relative z-10 rounded-full px-1.5 py-0.2 text-[10px] font-bold transition-colors ${
                                       active
@@ -218,25 +249,30 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
           {/* Footer Area with Compact Micro Stats & Logout */}
           <div className="shrink-0 border-t border-slate-100 p-2 space-y-1.5 dark:border-slate-800/80">
             {/* Horizontal Mini Stats Bar */}
-            <div className="flex items-center justify-around rounded-lg border border-slate-100 bg-slate-50/80 py-1.5 px-2 dark:border-slate-800 dark:bg-slate-800/50">
-              <div className="text-center">
-                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Avg</span>
-                <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">76%</span>
-              </div>
-              <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-              <div className="text-center">
-                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Rank</span>
-                <span className="text-xs font-extrabold text-amber-500">#124</span>
-              </div>
-            </div>
+            {!collapsed && (
+                <div className="flex items-center justify-around rounded-lg border border-slate-100 bg-slate-50/80 py-1.5 px-2 dark:border-slate-800 dark:bg-slate-800/50">
+                  <div className="text-center">
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Avg</span>
+                    <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">76%</span>
+                  </div>
+                  <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+                  <div className="text-center">
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Rank</span>
+                    <span className="text-xs font-extrabold text-amber-500">#124</span>
+                  </div>
+                </div>
+            )}
 
             {/* Compact Logout Button */}
             <button
                 onClick={handleLogout}
-                className="group flex w-full items-center justify-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition-all duration-150 hover:bg-rose-100 active:scale-[0.98] dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20"
+                title={collapsed ? "Logout" : undefined}
+                className={`group flex w-full items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-all duration-150 hover:bg-rose-100 active:scale-[0.98] dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20 ${
+                    collapsed ? "p-1.5" : "gap-1.5 px-2.5 py-1.5 text-xs font-semibold"
+                }`}
             >
               <LogOut size={14} className="transition-transform duration-150 group-hover:-translate-x-0.5" />
-              <span>Logout</span>
+              {!collapsed && <span>Logout</span>}
             </button>
           </div>
 
