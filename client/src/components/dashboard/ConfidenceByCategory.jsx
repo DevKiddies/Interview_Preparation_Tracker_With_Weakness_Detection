@@ -1,6 +1,8 @@
 import { ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function ConfidenceByCategory({ topics = [] }) {
+    const navigate = useNavigate();
     const getColor = (confidence) => {
         if (confidence < 40) return "bg-rose-500 dark:bg-rose-600";
         if (confidence < 60) return "bg-amber-500";
@@ -39,6 +41,7 @@ export default function ConfidenceByCategory({ topics = [] }) {
                 {topics.map((topic) => (
                     <div
                         key={topic.id}
+                        onClick={() => navigate(`/confidence/category/${topic.id}`)}
                         className="group flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 rounded-lg p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer relative z-10"
                     >
                         {/* Graph Y-Axis: Topic & Label */}

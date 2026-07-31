@@ -1,35 +1,36 @@
 // PreparationCard.jsx — Universal "Current Interview" widget used across Dashboard & Interview pages.
 
-import { CalendarDays, AlertCircle } from "lucide-react";
+import React, { cloneElement, isValidElement } from "react";
+import { CalendarDays } from "lucide-react";
 
-const STATUS_STYLES = {
-    ACTIVE: {
-        container: "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
-        daysBg: "bg-indigo-50 border-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10",
-        daysText: "text-indigo-700 dark:text-indigo-300",
-        daysSubtext: "text-indigo-500 dark:text-indigo-400",
-        actionBtn: "bg-indigo-600 text-white hover:bg-indigo-700",
-    },
+const THEME_STYLES = {
     COMPLETED: {
-        container: "border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/60 dark:bg-emerald-950/20",
-        daysBg: "bg-emerald-100/80 border-emerald-200 dark:border-emerald-500/20 dark:bg-emerald-500/10",
-        daysText: "text-emerald-700 dark:text-emerald-300",
-        daysSubtext: "text-emerald-600 dark:text-emerald-400",
-        actionBtn: "bg-emerald-600 text-white hover:bg-emerald-700",
+        bg: "from-emerald-600 to-teal-500 dark:from-emerald-700 dark:to-teal-600",
+        textTitle: "text-emerald-100",
+        badge: "bg-white/20 text-white backdrop-blur-xs",
+        glow: "ring-1 ring-emerald-400 shadow-[0_4px_20px_-2px_rgba(16,185,129,0.4)]",
+        divider: "bg-emerald-400/30",
+    },
+    ACTIVE: {
+        bg: "from-blue-600 to-cyan-500 dark:from-blue-700 dark:to-cyan-600",
+        textTitle: "text-blue-100",
+        badge: "bg-white/20 text-white backdrop-blur-xs",
+        glow: "ring-1 ring-blue-400 shadow-[0_4px_20px_-2px_rgba(59,130,246,0.4)]",
+        divider: "bg-blue-400/30",
     },
     UPCOMING: {
-        container: "border-amber-200 bg-amber-50/30 dark:border-amber-800/60 dark:bg-amber-950/20",
-        daysBg: "bg-amber-100/80 border-amber-200 dark:border-amber-500/20 dark:bg-amber-500/10",
-        daysText: "text-amber-700 dark:text-amber-300",
-        daysSubtext: "text-amber-600 dark:text-amber-400",
-        actionBtn: "bg-amber-600 text-white hover:bg-amber-700",
+        bg: "from-amber-600 to-orange-500 dark:from-amber-700 dark:to-orange-600",
+        textTitle: "text-amber-100",
+        badge: "bg-white/20 text-white backdrop-blur-xs",
+        glow: "ring-1 ring-amber-400 shadow-[0_4px_20px_-2px_rgba(245,158,11,0.4)]",
+        divider: "bg-amber-400/30",
     },
     EMPTY: {
-        container: "border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50",
-        daysBg: "bg-slate-100 border-slate-200 dark:border-slate-800 dark:bg-slate-800/50",
-        daysText: "text-slate-400 dark:text-slate-500",
-        daysSubtext: "text-slate-400 dark:text-slate-500",
-        actionBtn: "bg-slate-700 text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600",
+        bg: "from-slate-600 to-slate-500 dark:from-slate-700 dark:to-slate-600",
+        textTitle: "text-slate-200",
+        badge: "bg-white/20 text-white backdrop-blur-xs",
+        glow: "ring-1 ring-slate-400 shadow-[0_4px_20px_-2px_rgba(100,116,139,0.4)]",
+        divider: "bg-slate-400/30",
     },
 };
 
@@ -42,61 +43,70 @@ export default function PreparationCard({
                                             status = "ACTIVE",
                                             action, // { label: string, icon: ReactNode, onClick: () => void, disabled?: boolean }
                                         }) {
-    const styles = STATUS_STYLES[status] || STATUS_STYLES.ACTIVE;
+    const theme = THEME_STYLES[status] || THEME_STYLES.ACTIVE;
 
     const titleText =
         status === "COMPLETED"
-            ? "Interview Complete"
-            : targetLabel || "Interview Preparation";
+            ? "INTERVIEW COMPLETE"
+            : (targetLabel || "INTERVIEW PREPARATION").toUpperCase();
+
+    const formattedDate = interviewDate
+        ? new Date(interviewDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        })
+        : null;
+
+    const showDaysBlock = status !== "EMPTY" || daysLeft !== null;
+    const daysValue =
+        status === "COMPLETED"
+            ? "✓"
+            : daysLeft !== null && daysLeft !== undefined
+                ? daysLeft
+                : "--";
+    const daysLabel =
+        status === "COMPLETED"
+            ? "DONE"
+            : daysLeft === 0
+                ? "TODAY"
+                : "DAYS LEFT";
 
     return (
-        <div
-            className={`rounded-xl border p-4 shadow-sm transition-colors duration-200 ${styles.container}`}
-        >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                {/* Left Side: Info Elements */}
-                <div className="flex-1 space-y-3">
+        <div className={`w-full rounded-xl bg-gradient-to-r ${theme.bg} p-4 ${theme.glow}`}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between">
+
+                {/* Left / Top: Heading + Meta */}
+                <div className="min-w-0 flex-1 space-y-2.5">
                     <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            {status === "COMPLETED" ? "Target Achieved" : "Preparing For"}
+                        <p className={`mb-0.5 text-[9px] font-black uppercase tracking-widest ${theme.textTitle} opacity-80`}>
+                            {status === "COMPLETED" ? "TARGET ACHIEVED" : "PREPARING FOR"}
                         </p>
-                        <h2 className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
+                        <h2 className="truncate text-base font-black tracking-tight uppercase text-white">
                             {titleText}
                         </h2>
-                        {experienceLabel && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {experienceLabel}
-                            </p>
+                    </div>
+
+                    {/* Styled Uppercase Date Pill */}
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-white/90">
+                        {formattedDate && (
+                            <div className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase text-white shadow-xs backdrop-blur-xs">
+                                <CalendarDays size={13} strokeWidth={2.5} className="opacity-90" />
+                                <span>{formattedDate}</span>
+                            </div>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                        <CalendarDays size={14} />
-                        <span>
-              {interviewDate
-                  ? new Date(interviewDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                  })
-                  : "Interview date not set"}
-            </span>
-                    </div>
-
                     {focusTopics.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                                <AlertCircle size={14} />
-                                <span className="text-xs font-semibold">
-                  {focusTopics.length} Weak{" "}
-                                    {focusTopics.length === 1 ? "Topic" : "Topics"}
-                </span>
-                            </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.textTitle} opacity-80`}>
+                {focusTopics.length} WEAK {focusTopics.length === 1 ? "TOPIC" : "TOPICS"}
+              </span>
                             <div className="flex flex-wrap gap-1">
                                 {focusTopics.map((topic) => (
                                     <span
                                         key={topic}
-                                        className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                                        className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${theme.badge}`}
                                     >
                     {topic}
                   </span>
@@ -106,45 +116,31 @@ export default function PreparationCard({
                     )}
                 </div>
 
-                {/* Right Side: Equal-sized Square Blocks */}
-                <div className="flex shrink-0 items-center justify-center gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:border-t-0 sm:pt-0">
-                    {/* Days Left / Status Square */}
-                    <div
-                        className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl border sm:h-20 sm:w-20 ${styles.daysBg}`}
-                    >
-            <span
-                className={`text-lg font-black leading-none sm:text-2xl ${styles.daysText}`}
-            >
-              {status === "COMPLETED"
-                  ? "✓"
-                  : daysLeft !== null && daysLeft !== undefined
-                      ? daysLeft
-                      : "--"}
-            </span>
-                        <span
-                            className={`mt-0.5 text-[10px] font-semibold uppercase tracking-tight sm:text-xs ${styles.daysSubtext}`}
-                        >
-              {status === "COMPLETED"
-                  ? "Done"
-                  : daysLeft === 0
-                      ? "Today"
-                      : "Days Left"}
-            </span>
-                    </div>
+                {/* Right / Bottom: Full-Height Days Block + Scaled Action Button */}
+                <div className="flex shrink-0 items-stretch justify-center gap-3 self-stretch">
+                    {showDaysBlock && (
+                        <div className="flex min-h-[72px] w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-white/15 p-2 ring-1 ring-white/20 backdrop-blur-sm">
+                            <span className="text-2xl font-black leading-none text-white">{daysValue}</span>
+                            <span className="mt-0 text-center text-[11px] font-black uppercase tracking-tight text-white">
+                {daysLabel}
+              </span>
+                        </div>
+                    )}
 
-                    {/* Generic Action Button Square */}
                     {action && (
                         <button
                             onClick={action.onClick}
                             disabled={action.disabled}
-                            className={`group flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition disabled:opacity-50 sm:h-20 sm:w-20 ${styles.actionBtn}`}
+                            className="group flex min-h-[72px] w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-white/15 p-2 text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-white/25 disabled:opacity-50"
                         >
                             {action.icon && (
-                                <span className="transition transform group-hover:scale-110">
-                  {action.icon}
+                                <span className="transition-transform group-hover:scale-110">
+                  {isValidElement(action.icon)
+                      ? cloneElement(action.icon, { size: 20, strokeWidth: 2.5 })
+                      : action.icon}
                 </span>
                             )}
-                            <span className="text-center text-[10px] font-semibold uppercase tracking-tight sm:text-xs">
+                            <span className="text-center text-[12px] font-black uppercase tracking-tight">
                 {action.label}
               </span>
                         </button>
