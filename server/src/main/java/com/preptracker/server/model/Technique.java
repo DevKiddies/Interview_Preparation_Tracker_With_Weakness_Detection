@@ -1,5 +1,6 @@
 package com.preptracker.server.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,6 +23,10 @@ public class Technique {
     @Column(nullable = false, unique = true, length = 100)
     private String name;
 
+    // Not serialized: admin endpoints that need the technique->topics cascade
+    // use the flat /api/admin/technique-topics endpoint instead, and this is a
+    // lazy collection that would throw with open-in-view disabled.
+    @JsonIgnore
     @ManyToMany
     @JoinTable(
             name = "technique_topics",
