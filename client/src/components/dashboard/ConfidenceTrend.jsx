@@ -61,11 +61,11 @@ export default function ConfidenceTrend({ data }) {
 
             {/* Header Container */}
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="space-y-1">
+                    <h2 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">
                         Confidence & Accuracy Trend
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-[9px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                         Performance comparison across your solved matrix timeline.
                     </p>
                 </div>

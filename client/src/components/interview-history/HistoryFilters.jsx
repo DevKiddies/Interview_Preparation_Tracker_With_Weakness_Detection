@@ -16,9 +16,9 @@ function HistoryFilters({
                             onSortChange,
                         }) {
     return (
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
             {/* Search Input - Expands to fill the space cleanly */}
-            <div className="relative flex-1">
+            <div className="relative w-full sm:flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <Search size={16} className="text-slate-400" />
                 </div>
@@ -32,7 +32,7 @@ function HistoryFilters({
             </div>
 
             {/* Filter Dropdowns - Fixed width next to each other */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <FilterSelect
                     label="Status"
                     value={status}

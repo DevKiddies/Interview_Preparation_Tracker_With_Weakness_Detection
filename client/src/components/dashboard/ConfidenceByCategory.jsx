@@ -19,11 +19,11 @@ export default function ConfidenceByCategory({ topics = [] }) {
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+            <div className="mb-4 space-y-1">
+                <h2 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">
                     Confidence by Category
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-[9px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                     Performance metrics breakdown across core concepts.
                 </p>
             </div>

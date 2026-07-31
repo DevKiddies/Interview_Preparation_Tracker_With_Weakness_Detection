@@ -146,7 +146,7 @@ export default function MockTestSelectionPage() {
                     daysLeft={daysLeft}
                 />
 
-                <div className="min-w-0 flex-1 space-y-5">
+                <div className="min-w-0 flex-1 space-y-5 pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:pb-0">
                     <PageHeader />
 
                     {loading ? (
