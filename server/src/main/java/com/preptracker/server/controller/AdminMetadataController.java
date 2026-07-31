@@ -5,7 +5,6 @@ package com.preptracker.server.controller;
 // Mostly read-only, plus topic create/delete for the Categories & Topics page.
 // Gated by ROLE_ADMIN via SecurityConfig.
 
-import com.preptracker.server.dto.TopicDTO;
 import com.preptracker.server.dto.TopicRequest;
 import com.preptracker.server.exception.ConflictException;
 import com.preptracker.server.exception.NotFoundException;
@@ -44,15 +43,13 @@ public class AdminMetadataController {
     }
 
     @GetMapping("/topics")
-    public ResponseEntity<List<TopicDTO>> getTopics() {
-        return ResponseEntity.ok(topicRepository.findAll().stream()
-                .map(t -> new TopicDTO(t.getId(), t.getName(), t.getCategory().getId()))
-                .toList());
+    public ResponseEntity<List<Topic>> getTopics() {
+        return ResponseEntity.ok(topicRepository.findAll());
     }
 
     // Backs the "Add Topic" modal on the admin Categories & Topics page.
     @PostMapping("/topics")
-    public ResponseEntity<TopicDTO> createTopic(@RequestBody TopicRequest request) {
+    public ResponseEntity<Topic> createTopic(@RequestBody TopicRequest request) {
         if (request.name() == null || request.name().isBlank()) {
             throw new IllegalArgumentException("Topic name is required");
         }
@@ -68,8 +65,7 @@ public class AdminMetadataController {
         Topic topic = new Topic();
         topic.setName(request.name().trim());
         topic.setCategory(categoryRepository.getReferenceById(request.categoryId()));
-        Topic saved = topicRepository.save(topic);
-        return ResponseEntity.ok(new TopicDTO(saved.getId(), saved.getName(), request.categoryId()));
+        return ResponseEntity.ok(topicRepository.save(topic));
     }
 
     // topic_id is a NOT NULL FK on questions, so a topic still in use can't be
