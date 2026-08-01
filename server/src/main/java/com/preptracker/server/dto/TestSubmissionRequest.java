@@ -4,6 +4,15 @@ package com.preptracker.server.dto;
 // questionIds preserves the order the user saw questions in (DB fetch order may differ).
 // answers maps questionId -> the full option text the user selected (e.g. "O(1)", not "A"/"B")
 // so result comparison works without re-fetching questions. timeTaken is in seconds.
+//
+// Confidence/behavioral inputs (all keyed by questionId):
+//   switchCounts   -> how many times the user changed their answer for that question
+//   flaggedIds     -> questionIds the user flagged (marked for review)
+//   questionTime   -> seconds the user spent on that specific question
+// Controllers pass these straight through to ConfidenceService — no logic here.
+//
+// Maps are optional/null-safe: a request that omits them (e.g. old clients) is
+// treated as switchCount=0, not-flagged, time=0.
 
 import java.util.List;
 import java.util.Map;
@@ -13,5 +22,8 @@ public record TestSubmissionRequest(
         String topic,
         int timeTaken,
         List<Long> questionIds,
-        Map<Long, String> answers
+        Map<Long, String> answers,
+        Map<Long, Integer> switchCounts,
+        List<Long> flaggedIds,
+        Map<Long, Integer> questionTime
 ) {}

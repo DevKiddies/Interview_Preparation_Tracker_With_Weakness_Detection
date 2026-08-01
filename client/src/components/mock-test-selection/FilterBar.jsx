@@ -15,9 +15,9 @@ function FilterBar({
     const topics = ["All", "DSA", "System Design", "DBMS", "OS", "Networks"];
 
     return (
-        <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
             {/* Search Input - Expands to fill the space cleanly */}
-            <div className="relative flex-1">
+            <div className="relative w-full sm:flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -33,7 +33,7 @@ function FilterBar({
             </div>
 
             {/* Filter Dropdowns - Fixed width next to each other */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <FilterSelect
                     label="Difficulty"
                     value={difficulty}
@@ -59,6 +59,12 @@ function FilterBar({
     );
 }
 
+const PLURALS = { Difficulty: "Difficulties", Company: "Companies" };
+
+function allLabel(label) {
+    return `All ${PLURALS[label] ?? `${label}s`}`;
+}
+
 function FilterSelect({ label, value, options, onChange }) {
     const isSelected = value !== "All";
 
@@ -78,7 +84,7 @@ function FilterSelect({ label, value, options, onChange }) {
                 </option>
                 {options.map((opt) => (
                     <option key={opt} value={opt} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900">
-                        {opt === "All" ? `All ${label}s` : opt}
+                        {opt === "All" ? allLabel(label) : opt}
                     </option>
                 ))}
             </select>

@@ -4,13 +4,14 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Plus, Target } from "lucide-react";
+import { Play, Target, BarChart2 } from "lucide-react";
 import Sidebar from "../components/dashboard/Sidebar";
 import StatCard from "../components/dashboard/StatCard";
 import ActivityHeatmap from "../components/profile/ActivityHeatmap";
 import QuickActions from "../components/dashboard/QuickActions";
 import PreparationCard from "../components/dashboard/PreparationCard";
 import API_BASE from "../utils/api.js";
+import { getInterviewClosed } from "../utils/interviewState";
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
 import { topicConfidence } from "../data/dashboardData";
 import { confidenceTrend } from "../data/dashboardData";
@@ -78,6 +79,7 @@ export default function DashboardPage() {
 
   // Determine status and dynamic action button config for PreparationCard
   const prepCardStatus = useMemo(() => {
+    if (getInterviewClosed()) return "EMPTY";
     if (!profile?.interviewDate) return "EMPTY";
     return daysLeft === 0 ? "COMPLETED" : "ACTIVE";
   }, [profile?.interviewDate, daysLeft]);
@@ -85,8 +87,8 @@ export default function DashboardPage() {
   const prepCardAction = useMemo(() => {
     if (prepCardStatus === "COMPLETED") {
       return {
-        label: "New",
-        icon: <Plus size={16} />,
+        label: "Result",
+        icon: <BarChart2 size={16} />,
         onClick: () => navigate("/interview-settings"),
       };
     }

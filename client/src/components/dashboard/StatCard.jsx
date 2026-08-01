@@ -83,7 +83,7 @@ export default function StatCard({
         >
             {/* Header */}
             <div className="mb-1 flex items-center justify-between">
-                <p className="text-xs font-black uppercase tracking-widest text-white opacity-80">
+                <p className="text-xs font-black uppercase tracking-tight text-white opacity-80">
                     {title}
                 </p>
 

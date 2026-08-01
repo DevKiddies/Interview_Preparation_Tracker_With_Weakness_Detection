@@ -61,11 +61,11 @@ export default function ConfidenceTrend({ data }) {
 
             {/* Header Container */}
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="space-y-1">
+                    <h2 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">
                         Confidence & Accuracy Trend
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-[9px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                         Performance comparison across your solved matrix timeline.
                     </p>
                 </div>
@@ -90,7 +90,7 @@ export default function ConfidenceTrend({ data }) {
 
             {/* Main Chart Area */}
             <div className="h-56 w-full -ml-6">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" debounce={100}>
                     <AreaChart data={data[range]} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
