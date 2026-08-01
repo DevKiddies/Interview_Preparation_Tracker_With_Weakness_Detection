@@ -1,5 +1,6 @@
 package com.preptracker.server.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,5 +29,6 @@ public class Technique {
             joinColumns = @JoinColumn(name = "technique_id"),
             inverseJoinColumns = @JoinColumn(name = "topic_id")
     )
+    @JsonIgnore
     private Set<Topic> topics = new HashSet<>();
 }
