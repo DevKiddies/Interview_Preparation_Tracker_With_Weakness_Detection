@@ -1,11 +1,5 @@
 package com.preptracker.server.model;
 
-// Represents a single multiple-choice question in the question bank.
-// Each question has four options (A–D) and a correctAnswer field that stores
-// the letter of the right option ("A", "B", "C", or "D").
-// Questions are tagged by categoryId/topicId (FKs into Category/Topic), and
-// optionally by techniqueId/companyId — matching the live Supabase schema.
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,7 +17,7 @@ public class Question {
     private Long id;
 
     @Column(name = "question", nullable = false, columnDefinition = "TEXT")
-    private String text;
+    private String question;
 
     @Column(name = "option_a", nullable = false)
     private String optionA;
@@ -38,25 +32,28 @@ public class Question {
     private String optionD;
 
     @Column(name = "correct_answer", nullable = false)
-    private String correctAnswer; // "A", "B", "C", or "D"
-
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
-
-    @Column(name = "topic_id", nullable = false)
-    private Long topicId;
+    private String correctAnswer;
 
     @Column(nullable = false)
     private String difficulty;
 
-    // NOT NULL in the live table despite being an "optional" field in the admin
-    // UI — AdminQuestionService defaults it to "General" when left blank.
+    @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false)
-    private String questionType;
+    private QuestionType questionType;
 
-    @Column(name = "technique_id")
-    private Long techniqueId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
 
-    @Column(name = "company_id")
-    private Long companyId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "technique_id")
+    private Technique technique;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    private Company company;
 }

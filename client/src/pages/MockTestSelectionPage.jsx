@@ -137,7 +137,7 @@ export default function MockTestSelectionPage() {
     };
 
     return (
-        <div className="min-h-screen bg-indigo-50/50 transition-colors duration-200 dark:bg-slate-950">
+        <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
             <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6">
                 <Sidebar
                     username={username}
@@ -146,7 +146,7 @@ export default function MockTestSelectionPage() {
                     daysLeft={daysLeft}
                 />
 
-                <div className="min-w-0 flex-1 space-y-5">
+                <div className="min-w-0 flex-1 space-y-5 pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:pb-0">
                     <PageHeader />
 
                     {loading ? (
