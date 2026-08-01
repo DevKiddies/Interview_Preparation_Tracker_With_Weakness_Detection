@@ -87,16 +87,43 @@ export default function QuestionReviewCard({ result, index }) {
               );
             })}
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
               {result.category}
             </span>
             <span className="rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
               {result.difficulty}
             </span>
+            {result.confidenceState && (
+              <ConfidenceBadge score={result.confidenceScore} state={result.confidenceState} />
+            )}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+const STATE_STYLES = {
+  CONFIDENT_CORRECT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+  BLIND_SPOT: "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+  CLEAR_WEAKNESS: "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300",
+  UNDERCONFIDENT_CORRECT: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  NOT_ATTEMPTED: "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300",
+};
+
+const STATE_LABEL = {
+  CONFIDENT_CORRECT: "Confident & Correct",
+  BLIND_SPOT: "Confident but Wrong",
+  CLEAR_WEAKNESS: "Low Confidence",
+  UNDERCONFIDENT_CORRECT: "Correct despite Doubt",
+  NOT_ATTEMPTED: "Not Attempted",
+};
+
+function ConfidenceBadge({ score, state }) {
+  return (
+    <span className={`rounded-lg px-2 py-0.5 text-xs font-semibold ${STATE_STYLES[state] ?? STATE_STYLES.CLEAR_WEAKNESS}`}>
+      {STATE_LABEL[state] ?? "Confidence"} · {score}
+    </span>
   );
 }

@@ -45,14 +45,29 @@ export default function MockTestPage() {
   const [timeLeft, setTimeLeft]               = useState(initialTime);
   const [tabSwitches, setTabSwitches]         = useState(0);
   const [showTabWarning, setShowTabWarning]   = useState(false);
+  // Confidence/behavioral tracking: how many times the user changed each
+  // answer (switchCounts), and seconds spent on each question (questionTime).
+  // Both are keyed by question index and sent with the submission payload.
+  const [switches, setSwitches]               = useState({});
+  const [questionTimes, setQuestionTimes]     = useState({});
 
   const initialTimeRef = useRef(initialTime);
   const doSubmitRef = useRef(null);
   const fetchedRef = useRef(false);
-  const stateRef = useRef({ questions, selectedAnswers, timeLeft });
+  const stateRef = useRef({ questions, selectedAnswers, timeLeft, statuses, switches, questionTimes });
   useEffect(() => {
-    stateRef.current = { questions, selectedAnswers, timeLeft };
-  }, [questions, selectedAnswers, timeLeft]);
+    stateRef.current = { questions, selectedAnswers, timeLeft, statuses, switches, questionTimes };
+  }, [questions, selectedAnswers, timeLeft, statuses, switches, questionTimes]);
+
+  // Per-question elapsed time: ticks every second for whichever question is
+  // currently visible (mirrors the overall timer's second-granularity).
+  useEffect(() => {
+    if (questions.length === 0) return;
+    const id = setInterval(() => {
+      setQuestionTimes((prev) => ({ ...prev, [currentIndex]: (prev[currentIndex] || 0) + 1 }));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [questions.length, currentIndex]);
 
   const saveToCache = (state) => {
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch {}
@@ -77,6 +92,8 @@ export default function MockTestPage() {
         setCurrentIndex(state.currentIndex);
         setTimeLeft(state.timeLeft);
         setTabSwitches(state.tabSwitches ?? 0);
+        setSwitches(state.switches ?? {});
+        setQuestionTimes(state.questionTimes ?? {});
         initialTimeRef.current = state.initialTime;
         setLoading(false);
         return;
@@ -98,7 +115,7 @@ export default function MockTestPage() {
         .then((data) => {
           setQuestions(data);
           setLoading(false);
-          saveToCache({ questions: data, selectedAnswers: {}, statuses: [], currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, initialTime: initialTimeRef.current });
+          saveToCache({ questions: data, selectedAnswers: {}, statuses: [], currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, switches: {}, questionTimes: {}, initialTime: initialTimeRef.current });
         })
         .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
   }, []);
@@ -106,8 +123,8 @@ export default function MockTestPage() {
   // Persist progress on every meaningful change
   useEffect(() => {
     if (questions.length === 0) return;
-    saveToCache({ questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, initialTime: initialTimeRef.current });
-  }, [questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches]);
+    saveToCache({ questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, switches, questionTimes, initialTime: initialTimeRef.current });
+  }, [questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, switches, questionTimes]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -144,11 +161,23 @@ export default function MockTestPage() {
     if (submitting) return;
     setSubmitting(true);
 
-    const { questions: qs, selectedAnswers: sa, timeLeft: tl } = stateRef.current;
+    const { questions: qs, selectedAnswers: sa, timeLeft: tl, statuses: st, switches: sw, questionTimes: qt } = stateRef.current;
     const token       = localStorage.getItem("token");
     const questionIds = qs.map((q) => q.id);
     const answers     = {};
-    qs.forEach((q, idx) => { if (sa[idx]) answers[q.id] = sa[idx]; });
+    // Behavioral data per question, keyed by questionId for the backend:
+    //   switchCounts = how many times the user changed their selection
+    //   flaggedIds   = questions the user marked for review
+    //   questionTime = seconds spent on that question
+    const switchCounts = {};
+    const flaggedIds = [];
+    const questionTime = {};
+    qs.forEach((q, idx) => {
+      if (sa[idx]) answers[q.id] = sa[idx];
+      if (st[idx] === "flagged") flaggedIds.push(q.id);
+      if (sw[idx] > 0) switchCounts[q.id] = sw[idx];
+      if (qt[idx] > 0) questionTime[q.id] = qt[idx];
+    });
 
     try {
       const res = await fetch(`${API_BASE}/api/tests/submit`, {
@@ -161,6 +190,9 @@ export default function MockTestPage() {
           timeTaken: initialTimeRef.current - tl,
           questionIds,
           answers,
+          switchCounts,
+          flaggedIds,
+          questionTime,
         }),
       });
       if (!res.ok) throw new Error();
@@ -275,7 +307,17 @@ export default function MockTestPage() {
                 index={currentIndex}
                 total={questions.length}
                 selectedOption={selectedAnswers[currentIndex]}
-                onSelect={(opt) => setSelectedAnswers((prev) => ({ ...prev, [currentIndex]: opt }))}
+                onSelect={(opt) => {
+                  // Count answer switches: changing from one selected option to a
+                  // different one increments the switch counter for this question.
+                  setSelectedAnswers((prev) => {
+                    const previous = prev[currentIndex];
+                    if (previous && previous !== opt) {
+                      setSwitches((s) => ({ ...s, [currentIndex]: (s[currentIndex] || 0) + 1 }));
+                    }
+                    return { ...prev, [currentIndex]: opt };
+                  });
+                }}
             />
             <QuizFooterControls
                 onPrev={() => setCurrentIndex((p) => Math.max(0, p - 1))}
