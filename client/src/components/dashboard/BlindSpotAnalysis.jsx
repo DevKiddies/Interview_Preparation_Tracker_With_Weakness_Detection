@@ -65,11 +65,11 @@ export default function BlindSpotAnalysis({ data = [] }) {
     return (
         <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 h-full">
             {/* Header */}
-            <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+            <div className="space-y-1">
+                <h2 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">
                     Blind Spot Analysis
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-[9px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                     Topics where your confidence most often exceeded your performance.
                 </p>
             </div>
@@ -81,7 +81,7 @@ export default function BlindSpotAnalysis({ data = [] }) {
                 </div>
             ) : (
                 <div className="mt-6 flex-1 h-full min-h-65 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={100}>
                         <ComposedChart
                             layout="vertical"
                             data={data}
