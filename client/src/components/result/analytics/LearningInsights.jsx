@@ -1,44 +1,55 @@
 export default function LearningInsights({ results }) {
   const byTopic = {};
   for (const r of results) {
-    const cat = r.category || "Unknown";
-    if (!byTopic[cat]) byTopic[cat] = { correct: 0, wrong: 0, skipped: 0 };
-    if (r.yourAnswer == null) byTopic[cat].skipped++;
-    else if (r.correct) byTopic[cat].correct++;
-    else byTopic[cat].wrong++;
+    const topic = r.topic || r.category || "Unknown";
+    if (!byTopic[topic]) byTopic[topic] = { attempts: [] };
+    byTopic[topic].attempts.push(r);
   }
 
   const entries = Object.entries(byTopic);
   if (entries.length === 0) return null;
 
-  const worst = [...entries].sort((a, b) => {
-    const pctA = a[1].correct + a[1].wrong + a[1].skipped === 0 ? 100 : a[1].correct / (a[1].correct + a[1].wrong + a[1].skipped);
-    const pctB = b[1].correct + b[1].wrong + b[1].skipped === 0 ? 100 : b[1].correct / (b[1].correct + b[1].wrong + b[1].skipped);
-    return pctA - pctB;
+  const stats = entries.map(([topic, s]) => {
+    const attempts = s.attempts;
+    const total = attempts.length;
+    const answered = attempts.filter((a) => a.confidenceState !== "NOT_ATTEMPTED" && a.yourAnswer != null);
+    const correct = attempts.filter((a) => a.correct).length;
+    const wrong = attempts.filter((a) => a.yourAnswer != null && !a.correct).length;
+    const skipped = attempts.filter((a) => a.yourAnswer == null).length;
+    const accuracy = total === 0 ? 0 : Math.round((correct / total) * 100);
+    const confidence = answered.length === 0
+        ? null
+        : Math.round(answered.reduce((sum, a) => sum + (a.confidenceScore || 0), 0) / answered.length);
+    const blindSpots = attempts.filter((a) => a.confidenceState === "BLIND_SPOT").length;
+    const weaknesses = attempts.filter((a) => a.confidenceState === "CLEAR_WEAKNESS").length;
+    return { topic, correct, wrong, skipped, accuracy, confidence, blindSpots, weaknesses };
   });
-  const best = [...worst].reverse();
-
-  const mostWrong = [...entries].sort((a, b) => b[1].wrong - a[1].wrong)[0];
-  const mostSkipped = [...entries].sort((a, b) => b[1].skipped - a[1].skipped)[0];
 
   const insights = [];
 
-  if (best[0] && best[0][1].correct > 0) {
-    const pct = Math.round((best[0][1].correct / (best[0][1].correct + best[0][1].wrong + best[0][1].skipped)) * 100);
-    insights.push({ label: "Highest Accuracy", value: best[0][0], detail: `${pct}%` });
+  const best = [...stats].sort((a, b) => b.accuracy - a.accuracy)[0];
+  if (best && best.correct > 0) {
+    insights.push({ label: "Highest Accuracy", value: best.topic, detail: `${best.accuracy}%` });
   }
 
-  if (worst[0] && worst[0][1].wrong + worst[0][1].skipped > 0) {
-    const pct = Math.round((worst[0][1].correct / (worst[0][1].correct + worst[0][1].wrong + worst[0][1].skipped)) * 100);
-    insights.push({ label: "Needs Most Work", value: worst[0][0], detail: `${pct}% accuracy` });
+  const worst = [...stats].sort((a, b) => a.accuracy - b.accuracy)[0];
+  if (worst && worst.wrong + worst.skipped > 0) {
+    insights.push({ label: "Needs Most Work", value: worst.topic, detail: `${worst.accuracy}% accuracy` });
   }
 
-  if (mostWrong && mostWrong[1].wrong > 0) {
-    insights.push({ label: "Most Blind Spots", value: mostWrong[0], detail: `${mostWrong[1].wrong} wrong` });
+  const mostBlind = [...stats].sort((a, b) => b.blindSpots - a.blindSpots)[0];
+  if (mostBlind && mostBlind.blindSpots > 0) {
+    insights.push({ label: "Most Blind Spots", value: mostBlind.topic, detail: `${mostBlind.blindSpots} wrong with high confidence` });
   }
 
-  if (mostSkipped && mostSkipped[1].skipped > 0) {
-    insights.push({ label: "Most Skipped", value: mostSkipped[0], detail: `${mostSkipped[1].skipped} skipped` });
+  const mostWeak = [...stats].sort((a, b) => b.weaknesses - a.weaknesses)[0];
+  if (mostWeak && mostWeak.weaknesses > 0) {
+    insights.push({ label: "Clear Weaknesses", value: mostWeak.topic, detail: `${mostWeak.weaknesses} wrong with low confidence` });
+  }
+
+  const mostSkipped = [...stats].sort((a, b) => b.skipped - a.skipped)[0];
+  if (mostSkipped && mostSkipped.skipped > 0) {
+    insights.push({ label: "Most Skipped", value: mostSkipped.topic, detail: `${mostSkipped.skipped} skipped` });
   }
 
   if (insights.length === 0) return null;

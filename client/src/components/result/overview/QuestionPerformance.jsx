@@ -3,7 +3,10 @@ import { CheckCircle2, XCircle, MinusCircle, Target, Zap } from "lucide-react";
 export default function QuestionPerformance({ result }) {
   const wrong = result.results.filter((r) => r.yourAnswer != null && !r.correct).length;
   const skipped = result.results.filter((r) => r.yourAnswer == null).length;
-  const confidence = result.total === 0 ? 0 : Math.round(((result.total - skipped) / result.total) * 100);
+  const answered = result.results.filter((r) => r.confidenceState !== "NOT_ATTEMPTED");
+  const confidence = answered.length === 0
+    ? 0
+    : Math.round(answered.reduce((sum, r) => sum + (r.confidenceScore ?? 0), 0) / answered.length);
 
   const cards = [
     { label: "Correct", value: result.score, icon: CheckCircle2, valueClass: "text-zinc-900 dark:text-white" },
