@@ -104,8 +104,11 @@ export default function MockTestPage() {
     const qs    = new URLSearchParams({ limit: questionLimit });
 
     if (category) {
+      // For topic practice, "category" actually holds selected topic names
+      // (e.g. Arrays, Graphs, SQL), so they must be sent as `topic` params —
+      // the API filters topics by name and categories by coarse group name.
       const cats = Array.isArray(category) ? category : [category];
-      cats.forEach((c) => qs.append("category", c));
+      cats.forEach((c) => qs.append("topic", c));
     }
 
     fetch(`${API_BASE}/api/questions?${qs.toString()}`, {
@@ -186,6 +189,7 @@ export default function MockTestPage() {
         body: JSON.stringify({
           category: Array.isArray(category) ? category.join(", ") : (category ?? "Data Structures & Algorithms"),
           topic: null,
+          type: isTopicTest ? "TOPIC" : "MOCK",
           tabSwitches,
           timeTaken: initialTimeRef.current - tl,
           questionIds,

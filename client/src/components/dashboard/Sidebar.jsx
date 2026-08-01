@@ -1,17 +1,4 @@
 // Sidebar.jsx — Navigation panel (Desktop Sidebar + Mobile Bottom Nav & Drawer).
-//
-// Mobile bottom nav notes:
-// - Rendered as a semantic <nav>, fixed to the viewport with `inset-x-0 bottom-0`
-//   so it stays pinned regardless of page scroll position or page-level layout.
-// - z-[60] keeps it above typical page content/modals in the z-40 range, and the
-//   drawer overlay (z-[70]) still layers above it when open.
-// - `env(safe-area-inset-bottom)` padding keeps it clear of the home-indicator
-//   area on iOS devices with a notch/gesture bar.
-// - Height is exported as MOBILE_NAV_HEIGHT so pages can reserve matching bottom
-//   padding/margin and avoid content being hidden behind it — for consistent
-//   layout across every page, wrap page content with something like:
-//     <main style={{ paddingBottom: `calc(${MOBILE_NAV_HEIGHT} + env(safe-area-inset-bottom))` }} className="lg:pb-0">
-//   (only needed below the lg breakpoint, since the bottom nav is desktop-hidden)
 
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -22,8 +9,6 @@ import {
   User,
   HelpCircle,
   LogOut,
-  Flame,
-  Clock,
   Sparkles,
   History,
   PanelLeftClose,
@@ -31,6 +16,7 @@ import {
 } from "lucide-react";
 import API_BASE from "../../utils/api.js";
 import { getInterviewClosed } from "../../utils/interviewState";
+import { clearCachedProfile } from "../../utils/profileCache";
 
 const NAV_ITEMS = [
   { label: "Dashboard",  icon: LayoutDashboard, to: "/dashboard",           exact: true  },
@@ -40,8 +26,6 @@ const NAV_ITEMS = [
   { label: "Help Center",icon: HelpCircle,      to: "/help/faqs",           exact: false },
 ];
 
-// Base row height (h-16 = 4rem). Pages should reserve at least this much
-// bottom spacing (plus safe-area) so content never sits underneath the nav.
 export const MOBILE_NAV_HEIGHT = "4rem";
 
 export default function Sidebar({ username, targetLabel, experienceLabel, daysLeft }) {
@@ -69,7 +53,6 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
 
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
   const subtitle = targetLabel || experienceLabel || "Interview Prep";
-  const hasInterview = !getInterviewClosed() && daysLeft !== null;
 
   const isActive = ({ to, exact }) =>
       exact ? location.pathname === to : location.pathname.startsWith(to);
@@ -87,6 +70,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
     localStorage.removeItem("token");
     localStorage.removeItem("avatarUrl");
     localStorage.removeItem("username");
+    clearCachedProfile();
     navigate("/login");
   };
 
@@ -101,7 +85,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
             {/* Inner Scrollable Wrapper */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
 
-              {/* User Profile & Progress Header */}
+              {/* User Profile Header */}
               <div className="shrink-0 space-y-2 border-b border-slate-100 p-2.5 dark:border-slate-800/80">
                 {/* User Identity Row */}
                 <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2.5"}`}>
@@ -143,45 +127,6 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
                     {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
                   </button>
                 </div>
-
-                {/* Compact Preparation Widget */}
-                {!collapsed && hasInterview && (
-                    <button
-                        onClick={() => navigate("/interview-settings")}
-                        className="w-full rounded-lg border border-indigo-100/80 bg-indigo-50/50 p-2 text-left transition hover:border-indigo-200 hover:bg-indigo-100/60 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"
-                    >
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-indigo-950 dark:text-indigo-200">
-                        <span>30% Completed</span>
-                        <div className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
-                          <Flame size={12} className="fill-amber-500 text-amber-500" />
-                          <span>14d streak</span>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-indigo-200/50 dark:bg-indigo-950/60">
-                        <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-teal-400 transition-all duration-500"
-                            style={{ width: "30%" }}
-                        />
-                      </div>
-
-                      {/* Interview Goal Status Footer */}
-                      <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                        <span>Interview Goal</span>
-                        <span className="flex items-center gap-0.5 font-medium">
-                      <Clock size={10} className="text-slate-400" />
-                      <span>
-                        {daysLeft === null
-                            ? "No Interview"
-                            : daysLeft === 0
-                                ? "Interview Today"
-                                : `${daysLeft}d left`}
-                      </span>
-                    </span>
-                      </div>
-                    </button>
-                )}
               </div>
 
               {/* Navigation Links */}
@@ -263,22 +208,8 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
 
             </div>
 
-            {/* Footer Area with Compact Micro Stats & Logout */}
+            {/* Footer Area with Compact Logout */}
             <div className="shrink-0 border-t border-slate-100 p-2 space-y-1.5 dark:border-slate-800/80">
-              {!collapsed && hasInterview && (
-                  <div className="flex items-center justify-around rounded-lg border border-slate-100 bg-slate-50/80 py-1.5 px-2 dark:border-slate-800 dark:bg-slate-800/50">
-                    <div className="text-center">
-                      <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Avg</span>
-                      <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">76%</span>
-                    </div>
-                    <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-                    <div className="text-center">
-                      <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block leading-none">Rank</span>
-                      <span className="text-xs font-extrabold text-amber-500">#124</span>
-                    </div>
-                  </div>
-              )}
-
               <button
                   onClick={handleLogout}
                   title={collapsed ? "Logout" : undefined}
@@ -296,7 +227,6 @@ export default function Sidebar({ username, targetLabel, experienceLabel, daysLe
 
         {/* ========================================================================= */}
         {/* 2. MOBILE BOTTOM NAVIGATION BAR (Visible lg:hidden)                       */}
-        {/* Fixed to the viewport, safe-area aware, consistent across every page.     */}
         {/* ========================================================================= */}
         <nav
             className="fixed inset-x-0 bottom-0 z-[60] flex h-16 items-center justify-around border-t border-slate-200 bg-white/90 px-2 backdrop-blur-md lg:hidden dark:border-slate-800 dark:bg-slate-900/90"

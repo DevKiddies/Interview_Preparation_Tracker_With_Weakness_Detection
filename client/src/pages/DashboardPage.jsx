@@ -12,6 +12,7 @@ import QuickActions from "../components/dashboard/QuickActions";
 import PreparationCard from "../components/dashboard/PreparationCard";
 import API_BASE from "../utils/api.js";
 import { getInterviewClosed } from "../utils/interviewState";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
 import { topicConfidence } from "../data/dashboardData";
 import { confidenceTrend } from "../data/dashboardData";
@@ -37,7 +38,7 @@ const EXPERIENCE_LABELS = {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCachedProfile());
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -58,6 +59,7 @@ export default function DashboardPage() {
           // Notify the Navbar to refresh the avatar and username without a page reload.
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
           setProfile(data);
+          setCachedProfile(data);
         })
         .catch(() => {});
   }, []);

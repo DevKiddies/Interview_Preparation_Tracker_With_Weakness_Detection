@@ -6,6 +6,7 @@ import ProfileHeader from "../components/profile/ProfileHeader";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import ActivityHeatmap from "../components/profile/ActivityHeatmap";
 import API_BASE from "../utils/api.js";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 
 const TARGET_LABELS = {
   faang: "FAANG / Big Tech",
@@ -22,7 +23,7 @@ const EXPERIENCE_LABELS = {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [profile, setProfile]     = useState(null);
+  const [profile, setProfile]     = useState(() => getCachedProfile());
   const [username, setUsername]   = useState(localStorage.getItem("username") || "");
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
   const [imgError, setImgError]   = useState(false);
@@ -50,6 +51,7 @@ export default function ProfilePage() {
         .then((r) => r.json())
         .then((data) => {
           setProfile(data);
+          setCachedProfile(data);
           if (data.username) {
             setUsername(data.username);
             localStorage.setItem("username", data.username);
@@ -164,6 +166,7 @@ export default function ProfilePage() {
           setUsername(updated.username);
           localStorage.setItem("username", updated.username);
           setProfile((p) => ({ ...p, username: updated.username }));
+          setCachedProfile({ ...profile, username: updated.username });
           setSuccess("Username updated!");
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
         }
@@ -180,6 +183,7 @@ export default function ProfilePage() {
         } else {
           const updated = await res.json();
           setProfile((p) => ({ ...p, interviewDate: updated.interviewDate }));
+          setCachedProfile({ ...profile, interviewDate: updated.interviewDate });
           setSuccess("Interview date updated!");
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
         }

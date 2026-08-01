@@ -30,6 +30,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserProfileRepository userProfileRepository;
+    private final InterviewService interviewService;
 
     public User getUserById(UUID id) {
         return userRepository.findById(id)
@@ -129,5 +130,10 @@ public class UserService {
         }
 
         userRepository.save(user);
+
+        // Keep interview history in sync: every saved goal becomes (or updates)
+        // the user's active interview track; an empty goal archives it.
+        interviewService.upsertFromOnboarding(userId, request.getTargetCompany(),
+                request.getExperienceLevel(), request.getInterviewDate());
     }
 }

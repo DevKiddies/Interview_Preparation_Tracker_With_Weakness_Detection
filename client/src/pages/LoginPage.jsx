@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import API_BASE from "../utils/api.js";
+import { setCachedProfile } from "../utils/profileCache";
 
 import ErrorAlert from "../components/ui/ErrorAlert.jsx";
 import InputField from "../components/ui/InputFields.jsx";
@@ -59,6 +60,8 @@ function LoginPage() {
         });
         const me = await meRes.json();
         if (me.username) localStorage.setItem("username", me.username);
+        if (me.avatarUrl) localStorage.setItem("avatarUrl", me.avatarUrl);
+        setCachedProfile(me);
         navigate(me.onboarded ? "/dashboard" : "/onboarding");
       } else {
         const message = await response.text();
@@ -99,6 +102,7 @@ function LoginPage() {
           if (me.username) localStorage.setItem("username", me.username);
           const avatar = me.avatarUrl || googleInfo.picture || "";
           if (avatar) localStorage.setItem("avatarUrl", avatar);
+          setCachedProfile({ ...me, avatarUrl: avatar || me.avatarUrl });
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
           navigate(me.onboarded ? "/dashboard" : "/onboarding");
         } else {
