@@ -27,6 +27,8 @@ const FAQsPage = lazy(() => import("./pages/FAQsPage"));
 const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
+const NotesPage = lazy(() => import("./pages/NotesPage"));
+const CodingProblemsPage = lazy(() => import("./pages/CodingProblemsPage"));
 
 const MockTestPage = lazy(() => import("./pages/MockTestPage"));
 const MockTestSelectionPage = lazy(
@@ -214,6 +216,8 @@ const App = () => {
               {/* Settings */}
               <Route path="settings" element={<AdminSettings />} />
             </Route>
+            <Route path="/resources/notes" element={<NotesPage />} />
+            <Route path="/practice/coding-problems" element={<CodingProblemsPage />} />
             <Route path="/about/us" element={<AboutUsPage />} />
             <Route path="/about/team" element={<OurTeamPage />} />
             <Route path="/about/contact" element={<ContactPage />} />
