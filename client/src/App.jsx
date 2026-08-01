@@ -39,6 +39,7 @@ const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
 const InterviewPage          = lazy(() => import("./pages/InterviewPage"));
 const InterviewHistoryPage   = lazy(() => import("./pages/InterviewHistoryPage"));
 const MockTestHistoryPage    = lazy(() => import("./pages/MockTestHistoryPage"));
+const ConfidenceExplorerPage = lazy(() => import("./pages/ConfidenceExplorerPage"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminComingSoon = lazy(() => import("./pages/admin/AdminComingSoon"));
@@ -150,6 +151,15 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <TestResultPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/confidence/:level/:id"
+              element={
+                <ProtectedRoute>
+                  <ConfidenceExplorerPage />
                 </ProtectedRoute>
               }
             />

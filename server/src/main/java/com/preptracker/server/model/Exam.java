@@ -1,7 +1,5 @@
 package com.preptracker.server.model;
 
-// A named exam/mock-test definition, e.g. "TCS NQT".
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,6 +16,6 @@ public class Exam {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 100)
     private String name;
 }
