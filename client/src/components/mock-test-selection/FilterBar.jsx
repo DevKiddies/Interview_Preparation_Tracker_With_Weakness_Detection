@@ -59,6 +59,12 @@ function FilterBar({
     );
 }
 
+const PLURALS = { Difficulty: "Difficulties", Company: "Companies" };
+
+function allLabel(label) {
+    return `All ${PLURALS[label] ?? `${label}s`}`;
+}
+
 function FilterSelect({ label, value, options, onChange }) {
     const isSelected = value !== "All";
 
@@ -78,7 +84,7 @@ function FilterSelect({ label, value, options, onChange }) {
                 </option>
                 {options.map((opt) => (
                     <option key={opt} value={opt} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900">
-                        {opt === "All" ? `All ${label}s` : opt}
+                        {opt === "All" ? allLabel(label) : opt}
                     </option>
                 ))}
             </select>

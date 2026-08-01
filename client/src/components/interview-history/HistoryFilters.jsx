@@ -38,6 +38,7 @@ function HistoryFilters({
                     value={status}
                     options={STATUSES}
                     onChange={onStatusChange}
+                    className="w-28"
                 />
 
                 <FilterSelect
@@ -45,6 +46,7 @@ function HistoryFilters({
                     value={target}
                     options={TARGETS}
                     onChange={onTargetChange}
+                    className="w-40"
                 />
 
                 <FilterSelect
@@ -53,13 +55,20 @@ function HistoryFilters({
                     options={SORTS}
                     onChange={onSortChange}
                     isSortSelect={true}
+                    className="w-40"
                 />
             </div>
         </div>
     );
 }
 
-function FilterSelect({ label, value, options, onChange, isSortSelect = false }) {
+const PLURALS = { Status: "Statuses" };
+
+function allLabel(label) {
+    return `All ${PLURALS[label] ?? `${label}s`}`;
+}
+
+function FilterSelect({ label, value, options, onChange, isSortSelect = false, className = "" }) {
     // Check active status based on whether it's a sort field or filter field
     const isSelected = isSortSelect ? value !== "Newest" : value !== "All";
 
@@ -68,7 +77,7 @@ function FilterSelect({ label, value, options, onChange, isSortSelect = false })
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className={`h-9 appearance-none rounded-lg border px-3 pr-8 text-xs font-medium cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-indigo-500/30 ${
+                className={`h-9 appearance-none rounded-lg border px-3 pr-8 text-xs font-medium cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-indigo-500/30 ${className} ${
                     isSelected
                         ? "border-indigo-500/40 bg-indigo-50/70 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
                         : "border-slate-200/80 bg-slate-50/50 text-slate-600 hover:bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-300"
@@ -84,7 +93,7 @@ function FilterSelect({ label, value, options, onChange, isSortSelect = false })
                         className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
                     >
                         {/* Formats "All" options cleanly (e.g., "All Statuses", "All Targets") */}
-                        {opt === "All" ? `All ${label}s` : opt}
+                        {opt === "All" ? allLabel(label) : opt}
                     </option>
                 ))}
             </select>
