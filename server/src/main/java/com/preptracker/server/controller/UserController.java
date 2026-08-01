@@ -7,7 +7,6 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
-import com.preptracker.server.dto.FocusTopicStatsDTO;
 import com.preptracker.server.dto.OnboardingRequest;
 import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
@@ -17,7 +16,6 @@ import com.preptracker.server.exception.NotFoundException;
 import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.UserProfile;
-import com.preptracker.server.service.FocusTopicService;
 import com.preptracker.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +34,6 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
-    private final FocusTopicService focusTopicService;
 
     private UUID authenticatedUserId() {
         String principal = (String) SecurityContextHolder.getContext()
@@ -142,12 +139,5 @@ public class UserController {
         }
 
         return ResponseEntity.ok(response);
-    }
-
-    // Live focus tracker data: per-topic accuracy/confidence + streak, computed
-    // from the user's real attempts. Powers the sidebar focus widget.
-    @GetMapping("/me/focus-topics/stats")
-    public ResponseEntity<FocusTopicStatsDTO> getFocusTopicStats() {
-        return ResponseEntity.ok(focusTopicService.getStats(authenticatedUserId()));
     }
 }

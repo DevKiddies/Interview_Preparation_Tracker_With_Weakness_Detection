@@ -71,10 +71,6 @@ export default function ProfilePage() {
       })
       : null;
 
-  const daysLeft = profile?.interviewDate
-      ? Math.max(0, Math.ceil((new Date(profile.interviewDate) - new Date()) / 86400000))
-      : null;
-
   const openEdit = (type) => {
     setEditType(type);
     setNewUsername("");
@@ -213,7 +209,6 @@ export default function ProfilePage() {
             username={username}
             targetLabel={targetLabel}
             experienceLabel={experienceLabel}
-            daysLeft={daysLeft}
         />
 
         <div className="min-w-0 flex-1 space-y-6">

@@ -130,7 +130,6 @@ export default function DashboardPage() {
               username={username}
               targetLabel={targetLabel}
               experienceLabel={experienceLabel}
-              daysLeft={daysLeft}
           />
 
           <div className="min-w-0 flex-1 space-y-6">

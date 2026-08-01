@@ -91,16 +91,6 @@ function InterviewHistoryPage() {
         .finally(() => setLoading(false));
   }, []);
 
-  const daysLeft = useMemo(() => {
-    if (!profile?.interviewDate) return null;
-    const target = new Date(profile.interviewDate);
-    const today = new Date();
-    target.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    return diff >= 0 ? diff : 0;
-  }, [profile?.interviewDate]);
-
   const targetLabel = TARGET_LABELS[profile?.targetCompany] ?? null;
   const experienceLabel = EXPERIENCE_LABELS[profile?.experienceLevel] ?? null;
 
@@ -196,7 +186,6 @@ function InterviewHistoryPage() {
               username={username}
               targetLabel={targetLabel}
               experienceLabel={experienceLabel}
-              daysLeft={daysLeft}
           />
 
           <div className="min-w-0 flex-1 space-y-6 pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:pb-0">

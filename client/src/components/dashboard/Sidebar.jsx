@@ -15,7 +15,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import API_BASE from "../../utils/api.js";
-import { getInterviewClosed } from "../../utils/interviewState";
 import { clearCachedProfile } from "../../utils/profileCache";
 
 const NAV_ITEMS = [
@@ -28,7 +27,7 @@ const NAV_ITEMS = [
 
 export const MOBILE_NAV_HEIGHT = "4rem";
 
-export default function Sidebar({ username, targetLabel, experienceLabel, daysLeft }) {
+export default function Sidebar({ username, targetLabel, experienceLabel }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("avatarUrl") || "");
