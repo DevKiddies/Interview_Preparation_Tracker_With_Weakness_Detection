@@ -97,22 +97,31 @@ public class DashboardStatsService {
         return out;
     }
 
-    // Full category → topic → technique tree with per-node confidence and
-    // question counts, for the Confidence Explorer. Built from three small
+    // Full category → topic → technique tree with per-node confidence, accuracy
+    // and question counts, for the Confidence Explorer. Built from three small
     // aggregate queries plus the (tiny) reference tables, all merged in memory.
     public ConfidenceTreeDTO getConfidenceTree(UUID userId) {
         Map<Long, Integer> topicConfidence = new HashMap<>();
+        Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
         for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
-            topicConfidence.put(((Number) r[0]).longValue(), round(r[1]));
-            topicQuestions.put(((Number) r[0]).longValue(), ((Number) r[2]).intValue());
+            Long topicId = ((Number) r[0]).longValue();
+            topicConfidence.put(topicId, round(r[1]));
+            topicAccuracy.put(topicId, round100(r[2]));
+            topicQuestions.put(topicId, ((Number) r[3]).intValue());
         }
 
-        Map<Long, Integer> techniqueConfidence = new HashMap<>();
-        Map<Long, Integer> techniqueQuestions = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTechniqueStats(userId)) {
-            techniqueConfidence.put(((Number) r[0]).longValue(), round(r[1]));
-            techniqueQuestions.put(((Number) r[0]).longValue(), ((Number) r[2]).intValue());
+        // topicId -> (techniqueId -> [confidence, accuracy, questionCount])
+        // scoped to the topic the attempt actually happened in.
+        Map<Long, Map<Long, double[]>> techniqueStatsByTopic = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findTechniqueStatsByTopic(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            Long techniqueId = ((Number) r[1]).longValue();
+            double conf = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue();
+            double acc = r[3] == null ? Double.NaN : ((Number) r[3]).doubleValue();
+            int count = ((Number) r[4]).intValue();
+            techniqueStatsByTopic.computeIfAbsent(topicId, k -> new HashMap<>())
+                    .put(techniqueId, new double[]{conf, acc, count});
         }
 
         // technique_id -> topic_id (a technique can hang under several topics,
@@ -136,30 +145,87 @@ public class DashboardStatsService {
             topicsByCategory.computeIfAbsent(categoryId, k -> new ArrayList<>()).add(new ConfidenceNodeDTO(
                     topicId, topicName, "topic",
                     topicConfidence.get(topicId),
+                    topicAccuracy.get(topicId),
                     topicQuestions.getOrDefault(topicId, 0),
                     techniques));
 
-            // Attach techniques to this topic (as their canonical parent).
+            // Attach techniques to this topic (as their canonical parent) using
+            // stats scoped to THIS topic's attempts.
+            Map<Long, double[]> topicTechniqueStats = techniqueStatsByTopic.getOrDefault(topicId, Map.of());
             for (Map.Entry<Long, Long> e : techniqueParent.entrySet()) {
                 if (e.getValue().equals(topicId)) {
                     Long techniqueId = e.getKey();
+                    double[] s = topicTechniqueStats.get(techniqueId);
                     techniques.add(new ConfidenceNodeDTO(
                             techniqueId, techniqueNames.getOrDefault(techniqueId, "Technique"), "technique",
-                            techniqueConfidence.get(techniqueId),
-                            techniqueQuestions.getOrDefault(techniqueId, 0),
+                            s == null || Double.isNaN(s[0]) ? null : (int) Math.round(s[0]),
+                            s == null || Double.isNaN(s[1]) ? null : (int) Math.round(s[1] * 100),
+                            s == null ? 0 : (int) s[2],
                             null));
                 }
             }
+
+            // "General Questions" row capturing everything the technique rows
+            // above don't, so the topic's totals reconcile exactly. Computed as
+            // the remainder in Java (never trusting SQL membership) because a
+            // technique's canonical parent may live in another topic.
+            int techniqueQuestions = 0;
+            double techniqueConfWeighted = 0;
+            int techniqueConfCount = 0;
+            double techniqueAccWeighted = 0;
+            int techniqueAccCount = 0;
+            for (ConfidenceNodeDTO t : techniques) {
+                techniqueQuestions += t.questionCount();
+                if (t.confidence() != null) {
+                    techniqueConfWeighted += (double) t.confidence() * t.questionCount();
+                    techniqueConfCount += t.questionCount();
+                }
+                if (t.accuracy() != null) {
+                    techniqueAccWeighted += (double) t.accuracy() * t.questionCount();
+                    techniqueAccCount += t.questionCount();
+                }
+            }
+            int topicTotal = topicQuestions.getOrDefault(topicId, 0);
+            int generalQuestions = topicTotal - techniqueQuestions;
+            if (generalQuestions > 0) {
+                Integer topicConf = topicConfidence.get(topicId);
+                Integer topicAcc = topicAccuracy.get(topicId);
+                Integer generalConf = null;
+                Integer generalAcc = null;
+                if (topicConf != null) {
+                    if (techniqueConfCount == topicTotal) {
+                        generalConf = topicConf; // degenerate: only listed techniques
+                    } else {
+                        generalConf = (int) Math.round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
+                    }
+                }
+                if (topicAcc != null) {
+                    if (techniqueAccCount == topicTotal) {
+                        generalAcc = topicAcc; // degenerate: only listed techniques
+                    } else {
+                        generalAcc = (int) Math.round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
+                    }
+                }
+                techniques.add(new ConfidenceNodeDTO(
+                        -1L, "General Questions", "general",
+                        generalConf, generalAcc, generalQuestions, null));
+            }
         }
 
-        // Aggregate category-level confidence from topic stats.
+        // Aggregate category-level confidence from topic stats (simple mean for
+        // consistency with the category confidence) and accuracy weighted by
+        // question count (reflects actual progress).
         Map<Long, List<Integer>> categoryConfidences = new HashMap<>();
         Map<Long, Integer> categoryQuestions = new HashMap<>();
+        Map<Long, Double> categoryAccuracy = new HashMap<>();
         for (Map.Entry<Long, List<ConfidenceNodeDTO>> e : topicsByCategory.entrySet()) {
             for (ConfidenceNodeDTO t : e.getValue()) {
                 categoryQuestions.merge(e.getKey(), t.questionCount(), Integer::sum);
                 if (t.confidence() != null) {
                     categoryConfidences.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(t.confidence());
+                }
+                if (t.accuracy() != null) {
+                    categoryAccuracy.merge(e.getKey(), (double) t.accuracy() * t.questionCount(), Double::sum);
                 }
             }
         }
@@ -170,10 +236,14 @@ public class DashboardStatsService {
             List<Integer> confs = categoryConfidences.get(c.getId());
             Integer confidence = (confs == null || confs.isEmpty()) ? null
                     : (int) Math.round(confs.stream().mapToInt(Integer::intValue).average().orElse(0));
+            int catQuestions = categoryQuestions.getOrDefault(c.getId(), 0);
+            Double accWeighted = categoryAccuracy.get(c.getId());
+            Integer accuracy = (accWeighted == null || catQuestions == 0) ? null
+                    : (int) Math.round(accWeighted / catQuestions);
             categories.add(new ConfidenceNodeDTO(
                     c.getId(), c.getName(), "category",
-                    confidence,
-                    categoryQuestions.getOrDefault(c.getId(), 0),
+                    confidence, accuracy,
+                    catQuestions,
                     topics));
         }
         return new ConfidenceTreeDTO(categories);

@@ -22,6 +22,7 @@ function indexTree(tree) {
     for (const topic of category.children || []) {
       index.set(`topic:${topic.id}`, { node: topic, trail: [{ name: category.name, to: `/confidence/category/${category.id}` }] });
       for (const technique of topic.children || []) {
+        if (technique.level === "general") continue; // leaf bucket, not navigable
         index.set(`technique:${technique.id}`, {
           node: technique,
           trail: [
@@ -92,13 +93,16 @@ export default function ConfidenceExplorerPage() {
     id: c.id,
     name: c.name,
     confidence: c.confidence,
+    accuracy: c.accuracy,
     questions: c.questionCount,
+    general: c.level === "general",
   }));
 
-  // Sort weakest first so the explorer immediately surfaces what needs work.
+  // Sort weakest first by accuracy (actual progress) so the explorer surfaces
+  // what needs work, matching the accuracy-driven status bars in the table.
   const sortedChildren = [...children].sort((a, b) => {
-    const ca = a.confidence == null ? Infinity : a.confidence;
-    const cb = b.confidence == null ? Infinity : b.confidence;
+    const ca = a.accuracy == null ? Infinity : a.accuracy;
+    const cb = b.accuracy == null ? Infinity : b.accuracy;
     return ca - cb;
   });
 

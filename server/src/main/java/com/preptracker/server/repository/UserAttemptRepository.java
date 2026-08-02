@@ -58,12 +58,14 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
                                           @Param("thisStart") LocalDateTime thisStart,
                                           @Param("prevStart") LocalDateTime prevStart);
 
-    // Rows of [topicId, confidence, questionCount] — used by the Confidence
-    // Explorer's topic-level table. questionCount counts every attempt, while
-    // confidence only averages answered (non-NOT_ATTEMPTED) scores.
+    // Rows of [topicId, confidence, accuracy, questionCount] — used by the
+    // Confidence Explorer's topic-level table. questionCount counts every
+    // attempt, while confidence only averages answered (non-NOT_ATTEMPTED)
+    // scores and accuracy averages correctness over all attempts.
     @Query(value = """
             SELECT t.id,
               AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS accuracy,
               COUNT(*) AS q_count
             FROM user_attempts ua
             JOIN topics t ON t.id = ua.topic_id
@@ -72,20 +74,23 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             """, nativeQuery = true)
     List<Object[]> findTopicStats(@Param("userId") UUID userId);
 
-    // Rows of [techniqueId, confidence, questionCount] — used by the Confidence
-    // Explorer's technique-level table. Techniques are reached through the
-    // question's technique_id (attempts where the question wasn't tagged with a
-    // technique are simply not counted here).
+    // Rows of [topicId, techniqueId, confidence, accuracy, questionCount] —
+    // per-topic technique stats scoped to the topic the attempt actually
+    // happened in. Used by the Confidence Explorer so a technique's numbers
+    // reflect only the attempts inside that topic, not the technique's global
+    // total across all the other topics it hangs under. accuracy is 0-1
+    // (scaled to 0-100 in Java).
     @Query(value = """
-            SELECT q.technique_id,
+            SELECT ua.topic_id, q.technique_id,
               AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS accuracy,
               COUNT(*) AS q_count
             FROM user_attempts ua
             JOIN questions q ON q.id = ua.question_id
             WHERE ua.user_id = :userId AND q.technique_id IS NOT NULL
-            GROUP BY q.technique_id
+            GROUP BY ua.topic_id, q.technique_id
             """, nativeQuery = true)
-    List<Object[]> findTechniqueStats(@Param("userId") UUID userId);
+    List<Object[]> findTechniqueStatsByTopic(@Param("userId") UUID userId);
 
     // Rows of [topicId, difficulty, accuracy] — the user's per-topic accuracy
     // split by question difficulty (easy/medium/hard), used by the Accuracy
