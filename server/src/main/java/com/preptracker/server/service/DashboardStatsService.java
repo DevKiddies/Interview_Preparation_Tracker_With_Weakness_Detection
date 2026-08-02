@@ -6,6 +6,7 @@ package com.preptracker.server.service;
 // one small result row crosses the wire; the study streak is derived from the
 // distinct dates the user took any test.
 
+import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceNodeDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
@@ -268,7 +269,19 @@ public class DashboardStatsService {
         };
     }
 
-    private String trendOf(Integer recent, Integer prev) {        if (recent == null || prev == null) return "flat";
+    // Top 7 topics ranked by overconfidence (BLIND_SPOT) events for the
+    // "Blind Spot Analysis" widget. Kept at exactly 7 rows to match the chart's
+    // fixed layout.
+    public List<BlindSpotDTO> getBlindSpots(UUID userId) {
+        List<BlindSpotDTO> out = new ArrayList<>();
+        for (Object[] r : userAttemptRepository.findBlindSpots(userId)) {
+            out.add(new BlindSpotDTO((String) r[0], ((Number) r[1]).intValue()));
+        }
+        return out;
+    }
+
+    private String trendOf(Integer recent, Integer prev) {
+        if (recent == null || prev == null) return "flat";
         int diff = recent - prev;
         if (diff > 1) return "up";
         if (diff < -1) return "down";

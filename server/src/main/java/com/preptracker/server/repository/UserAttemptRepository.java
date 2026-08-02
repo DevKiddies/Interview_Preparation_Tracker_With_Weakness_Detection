@@ -87,6 +87,22 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             """, nativeQuery = true)
     List<Object[]> findTechniqueStats(@Param("userId") UUID userId);
 
+    // Rows of [topicName, blindSpotCount] — the top 7 topics ranked by how many
+    // times the user was overconfident (BLIND_SPOT: high confidence + wrong) on
+    // that topic. Backs the "Blind Spot Analysis" widget, which deliberately
+    // shows exactly seven rows even if fewer topics have data.
+    @Query(value = """
+            SELECT t.name,
+              COUNT(*) AS blind_count
+            FROM user_attempts ua
+            JOIN topics t ON t.id = ua.topic_id
+            WHERE ua.user_id = :userId AND ua.confidence_state = 'BLIND_SPOT'
+            GROUP BY t.name
+            ORDER BY blind_count DESC
+            LIMIT 7
+            """, nativeQuery = true)
+    List<Object[]> findBlindSpots(@Param("userId") UUID userId);
+
     // Rows of [day, confidence, accuracy, attemptCount] — one row per calendar
     // day that had at least one attempt, used by the Confidence & Accuracy trend
     // chart. The Java side re-buckets these into daily (7D), weekly (30D) and

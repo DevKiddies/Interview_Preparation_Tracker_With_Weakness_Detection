@@ -7,6 +7,7 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
+import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
@@ -140,6 +141,13 @@ public class UserController {
     @GetMapping("/me/dashboard/trend")
     public ResponseEntity<Map<String, List<TrendPointDTO>>> getConfidenceTrend() {
         return ResponseEntity.ok(dashboardStatsService.getConfidenceTrend(authenticatedUserId()));
+    }
+
+    // Top 7 topics ranked by overconfidence events for the "Blind Spot Analysis"
+    // widget.
+    @GetMapping("/me/dashboard/blind-spots")
+    public ResponseEntity<List<BlindSpotDTO>> getBlindSpots() {
+        return ResponseEntity.ok(dashboardStatsService.getBlindSpots(authenticatedUserId()));
     }
 
     @GetMapping("/me")

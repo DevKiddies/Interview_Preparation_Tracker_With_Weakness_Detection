@@ -17,7 +17,6 @@ import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache"
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
-import { blindSpotData } from "../data/dashboardData";
 import AccuracyHeatmap from "../components/dashboard/AccuracyHeatmap";
 import { accuracyHeatmap } from "../data/dashboardData";
 
@@ -51,6 +50,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState(() => getCachedDashboard()?.stats ?? null);
   const [categories, setCategories] = useState(() => getCachedDashboard()?.categories ?? []);
   const [trend, setTrend] = useState(() => getCachedDashboard()?.trend ?? null);
+  const [blindSpots, setBlindSpots] = useState(() => getCachedDashboard()?.blindSpots ?? []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -104,6 +104,18 @@ export default function DashboardPage() {
         .then((data) => {
           setTrend(data);
           setCachedDashboard({ ...getCachedDashboard(), trend: data });
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/blind-spots`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setBlindSpots(data);
+            setCachedDashboard({ ...getCachedDashboard(), blindSpots: data });
+          }
         })
         .catch(() => {});
   }, []);
@@ -237,7 +249,7 @@ export default function DashboardPage() {
 
             {/* Charts Row 2 — Side by Side Grid */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BlindSpotAnalysis data={blindSpotData} />
+              <BlindSpotAnalysis data={blindSpots} />
               <AccuracyHeatmap data={accuracyHeatmap} />
             </div>
           </div>
