@@ -10,8 +10,8 @@ function PageHeader() {
                 <h1 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
                     Interview History
                 </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                    All completed mock tests for this preparation.
+                <p className="text-[10px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
+                    All completed preparation history.
                 </p>
             </div>
 

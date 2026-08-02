@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> {
     List<UserAttempt> findByUserId(UUID userId);
     List<UserAttempt> findByTestAttemptId(Long testAttemptId);
+    List<UserAttempt> findByTestAttemptIdOrderBySelectionSequenceAsc(Long testAttemptId);
     List<UserAttempt> findByTestAttemptIdIn(Collection<Long> testAttemptIds);
 
     // One row: [overallConfidence, overallAccuracy, questionsSolved,

@@ -56,6 +56,18 @@ public class TestController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    // Reconstructs the full per-question result for one of the current user's
+    // attempts. Backs the results page when deep-linked from mock-test history
+    // or a TEST_RESULT notification, where only the attempt id is known.
+    @GetMapping("/attempts/{attemptId}")
+    public ResponseEntity<TestResultResponse> getAttemptResult(@PathVariable Long attemptId) {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return testService.getAttemptResult(UUID.fromString(principal), attemptId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     // Backs the "Full Assessments" grid on the mock test selection page.
     @GetMapping("/available")
     public ResponseEntity<List<AvailableTestResponse>> availableTests() {

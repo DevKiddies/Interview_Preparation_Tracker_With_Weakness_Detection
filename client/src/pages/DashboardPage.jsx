@@ -175,19 +175,7 @@ export default function DashboardPage() {
     return {
       label: "Start",
       icon: <Play size={14} fill="currentColor" />,
-      onClick: () =>
-          navigate("/practice/instructions", {
-            state: {
-              nextUrl: "/practice/mock-tests/dsa",
-              nextState: null,
-              testTitle: "DSA Fundamentals",
-              questions: 20,
-              timeMins: 90,
-              difficulty: "Mixed",
-              description:
-                  "Arrays, HashMaps, Trees, Graphs, Sorting & Dynamic Programming",
-            },
-          }),
+      onClick: () => navigate("/practice/mock-tests"),
     };
   }, [prepCardStatus, navigate]);
 
