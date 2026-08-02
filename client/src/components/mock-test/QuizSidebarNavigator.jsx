@@ -1,26 +1,34 @@
 // QuizSidebarNavigator.jsx — question palette.
-// Status is now encoded by fill + border weight, not four separate hues:
-//   answered  = solid ink fill
-//   flagged   = ink outline ring (still unanswered but marked)
-//   skipped   = light gray fill with a dash (visited, left blank)
+// Answered and flagged are independent states: a question can be both.
+//   answered  = solid ink fill (a selection exists)
+//   flagged   = ink outline ring (marked for review, regardless of answer)
+//   visited   = any question the user has landed on (answered, flagged, or
+//               left blank) — used for the "skipped" vs "not visited" legend.
 //   unvisited = plain bordered square
 // This keeps the grid genuinely monochrome while remaining scannable.
 
-import { X } from "lucide-react";
+import { Flag, X } from "lucide-react";
 
-export default function QuizSidebarNavigator({ total, currentIndex, statuses, onNavigate, isOpen, onClose }) {
-    const answeredCount = statuses.filter((s) => s === "answered").length;
-    const flaggedCount  = statuses.filter((s) => s === "flagged").length;
-    const skippedCount  = statuses.filter((s) => s === "skipped").length;
-    const notVisited    = total - answeredCount - flaggedCount - skippedCount;
+export default function QuizSidebarNavigator({ total, currentIndex, selectedAnswers, flagged, onNavigate, isOpen, onClose }) {
+    const answeredCount = Object.keys(selectedAnswers).length;
+    const flaggedCount  = Object.values(flagged).filter(Boolean).length;
+    const visitedCount  = new Set([
+        ...Object.keys(selectedAnswers),
+        ...Object.keys(flagged).filter((k) => flagged[k]),
+        ...(currentIndex !== undefined ? [String(currentIndex)] : []),
+    ]).size;
+    const skippedCount  = visitedCount - answeredCount;
+    const notVisited    = total - visitedCount;
     const progressPct   = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
 
-    const getBtnCls = (status, idx) => {
+    const isAnswered = (idx) => !!selectedAnswers[idx];
+    const isFlagged  = (idx) => !!flagged[idx];
+
+    const getBtnCls = (idx) => {
         if (idx === currentIndex)
             return "border-2 border-zinc-900 bg-white text-zinc-900 dark:border-slate-400 dark:bg-slate-800 dark:text-white";
-        if (status === "answered") return "bg-zinc-900 text-white border border-zinc-900 dark:bg-slate-300 dark:text-slate-900 dark:border-slate-300";
-        if (status === "flagged")  return "bg-white text-zinc-900 border-2 border-zinc-500 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-400";
-        if (status === "skipped")  return "bg-zinc-100 text-zinc-400 border border-zinc-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700";
+        if (isAnswered(idx)) return "bg-zinc-900 text-white border border-zinc-900 dark:bg-slate-300 dark:text-slate-900 dark:border-slate-300";
+        if (isFlagged(idx))  return "bg-white text-zinc-900 border-2 border-zinc-500 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-400";
         return "bg-white text-zinc-400 border border-zinc-200 hover:border-zinc-400 hover:text-zinc-600 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-700 dark:hover:border-slate-500 dark:hover:text-slate-300";
     };
 
@@ -74,9 +82,20 @@ export default function QuizSidebarNavigator({ total, currentIndex, statuses, on
                     <button
                         key={idx}
                         onClick={() => { onNavigate(idx); onClose?.(); }}
-                        className={`flex aspect-square items-center justify-center rounded-md text-xs font-semibold transition-colors duration-100 ${getBtnCls(statuses[idx], idx)}`}
+                        className={`relative flex aspect-square items-center justify-center rounded-md text-xs font-semibold transition-colors duration-100 ${getBtnCls(idx)}`}
                     >
                         {idx + 1}
+                        {isFlagged(idx) && (
+                            <Flag
+                                size={8}
+                                strokeWidth={3}
+                                className={`absolute right-0.5 top-0.5 ${
+                                    isAnswered(idx)
+                                        ? "text-zinc-100 dark:text-slate-900"
+                                        : "text-zinc-500 dark:text-slate-400"
+                                }`}
+                            />
+                        )}
                     </button>
                 ))}
             </div>
