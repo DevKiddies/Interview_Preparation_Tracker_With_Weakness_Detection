@@ -10,6 +10,7 @@ import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceNodeDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
+import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
 import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
@@ -19,11 +20,15 @@ import com.preptracker.server.repository.UserAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -167,6 +172,100 @@ public class DashboardStatsService {
                     topics));
         }
         return new ConfidenceTreeDTO(categories);
+    }
+
+    // Confidence & accuracy over time for the trend chart. One daily-bucket query
+    // feeds all three ranges; 7D keeps per-day points (with gaps for inactive
+    // days), 30D rolls those up to 4 weekly points and 90D to 3 monthly points.
+    public Map<String, List<TrendPointDTO>> getConfidenceTrend(UUID userId) {
+        LocalDateTime start = LocalDateTime.now().minusDays(90);
+        List<Object[]> rows = userAttemptRepository.findDailyTrend(userId, start);
+
+        // LocalDate -> [confidence, accuracy, attemptCount]
+        Map<LocalDate, double[]> byDay = new HashMap<>();
+        for (Object[] r : rows) {
+            LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
+            double confidence = r[1] == null ? Double.NaN : ((Number) r[1]).doubleValue();
+            double accuracy = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue() * 100;
+            int count = ((Number) r[3]).intValue();
+            byDay.put(day, new double[]{confidence, accuracy, count});
+        }
+
+        Map<String, List<TrendPointDTO>> trend = new LinkedHashMap<>();
+        trend.put("7D", dailySeries(byDay, 7));
+        trend.put("30D", weeklySeries(byDay, 4));
+        trend.put("90D", monthlySeries(byDay, 3));
+        return trend;
+    }
+
+    // Last `days` days, one point per calendar day (oldest → newest). Days with
+    // no attempts yield null confidence/accuracy so the chart shows a gap.
+    private List<TrendPointDTO> dailySeries(Map<LocalDate, double[]> byDay, int days) {
+        List<TrendPointDTO> out = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            double[] v = byDay.get(day);
+            String label = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            out.add(new TrendPointDTO(label,
+                    v == null || Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
+                    v == null || Double.isNaN(v[1]) ? null : (int) Math.round(v[1])));
+        }
+        return out;
+    }
+
+    // Last 4 calendar weeks, one weighted point per week (oldest → newest).
+    private List<TrendPointDTO> weeklySeries(Map<LocalDate, double[]> byDay, int weeks) {
+        LocalDate today = LocalDate.now();
+        // Week boundaries aligned to Monday so the labels read naturally.
+        LocalDate end = today;
+        int daysBack = end.getDayOfWeek().getValue() - DayOfWeek.MONDAY.getValue(); // days to last Monday
+        LocalDate lastMonday = end.minusDays(daysBack).plusDays(7);
+        List<TrendPointDTO> out = new ArrayList<>();
+        for (int w = weeks - 1; w >= 0; w--) {
+            LocalDate weekEnd = lastMonday.minusDays(7L * w);       // exclusive
+            LocalDate weekStart = weekEnd.minusDays(7);              // inclusive
+            double[] v = aggregate(byDay, weekStart, weekEnd);
+            out.add(new TrendPointDTO("W" + (weeks - w),
+                    Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
+                    Double.isNaN(v[1]) ? null : (int) Math.round(v[1])));
+        }
+        return out;
+    }
+
+    // Last 3 calendar months (including the current one), one weighted point per
+    // month (oldest → newest).
+    private List<TrendPointDTO> monthlySeries(Map<LocalDate, double[]> byDay, int months) {
+        // Exclusive end = first day of next month, so the newest bucket covers the
+        // current month's attempts.
+        LocalDate end = LocalDate.now().withDayOfMonth(1).plusMonths(1);
+        List<TrendPointDTO> out = new ArrayList<>();
+        for (int m = months - 1; m >= 0; m--) {
+            LocalDate monthEnd = end.minusMonths(m);          // exclusive
+            LocalDate monthStart = monthEnd.minusMonths(1);   // inclusive
+            double[] v = aggregate(byDay, monthStart, monthEnd);
+            out.add(new TrendPointDTO("M" + (months - m),
+                    Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
+                    Double.isNaN(v[1]) ? null : (int) Math.round(v[1])));
+        }
+        return out;
+    }
+
+    // Weighted mean of confidence & accuracy across [start, end) using each day's
+    // attempt count as the weight. Returns NaN for a metric with no data.
+    private double[] aggregate(Map<LocalDate, double[]> byDay, LocalDate start, LocalDate end) {
+        double confSum = 0, accSum = 0;
+        int confWeight = 0, accWeight = 0;
+        for (LocalDate d = start; d.isBefore(end); d = d.plusDays(1)) {
+            double[] v = byDay.get(d);
+            if (v == null) continue;
+            if (!Double.isNaN(v[0])) { confSum += v[0] * v[2]; confWeight += v[2]; }
+            if (!Double.isNaN(v[1])) { accSum += v[1] * v[2]; accWeight += v[2]; }
+        }
+        return new double[]{
+                confWeight == 0 ? Double.NaN : confSum / confWeight,
+                accWeight == 0 ? Double.NaN : accSum / accWeight,
+        };
     }
 
     private String trendOf(Integer recent, Integer prev) {        if (recent == null || prev == null) return "flat";

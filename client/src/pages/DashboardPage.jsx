@@ -15,7 +15,6 @@ import { getInterviewClosed } from "../utils/interviewState";
 import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache";
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
-import { confidenceTrend } from "../data/dashboardData";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
 import { blindSpotData } from "../data/dashboardData";
@@ -51,6 +50,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState(() => getCachedProfile());
   const [stats, setStats] = useState(() => getCachedDashboard()?.stats ?? null);
   const [categories, setCategories] = useState(() => getCachedDashboard()?.categories ?? []);
+  const [trend, setTrend] = useState(() => getCachedDashboard()?.trend ?? null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -94,6 +94,16 @@ export default function DashboardPage() {
             setCategories(data);
             setCachedDashboard({ ...getCachedDashboard(), categories: data });
           }
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/trend`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          setTrend(data);
+          setCachedDashboard({ ...getCachedDashboard(), trend: data });
         })
         .catch(() => {});
   }, []);
@@ -222,7 +232,7 @@ export default function DashboardPage() {
             {/* Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <ConfidenceByCategory topics={categories} />
-              <ConfidenceTrend data={confidenceTrend} />
+              <ConfidenceTrend data={trend ?? {}} />
             </div>
 
             {/* Charts Row 2 — Side by Side Grid */}

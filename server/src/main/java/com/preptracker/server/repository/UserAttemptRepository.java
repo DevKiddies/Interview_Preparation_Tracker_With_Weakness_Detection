@@ -86,4 +86,23 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             GROUP BY q.technique_id
             """, nativeQuery = true)
     List<Object[]> findTechniqueStats(@Param("userId") UUID userId);
+
+    // Rows of [day, confidence, accuracy, attemptCount] — one row per calendar
+    // day that had at least one attempt, used by the Confidence & Accuracy trend
+    // chart. The Java side re-buckets these into daily (7D), weekly (30D) and
+    // monthly (90D) series so the client only ever deals with pre-aggregated
+    // points. attemptCount lets the weekly/monthly aggregates be weighted by how
+    // many attempts actually happened on each day.
+    @Query(value = """
+            SELECT DATE_TRUNC('day', ua.created_at) AS day,
+              AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS accuracy,
+              COUNT(*) AS attempt_count
+            FROM user_attempts ua
+            WHERE ua.user_id = :userId AND ua.created_at >= :start
+            GROUP BY DATE_TRUNC('day', ua.created_at)
+            ORDER BY day ASC
+            """, nativeQuery = true)
+    List<Object[]> findDailyTrend(@Param("userId") UUID userId,
+                                  @Param("start") LocalDateTime start);
 }

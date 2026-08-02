@@ -11,6 +11,7 @@ import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.OnboardingRequest;
+import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
@@ -132,6 +133,13 @@ public class UserController {
     @GetMapping("/me/dashboard/confidence-tree")
     public ResponseEntity<ConfidenceTreeDTO> getConfidenceTree() {
         return ResponseEntity.ok(dashboardStatsService.getConfidenceTree(authenticatedUserId()));
+    }
+
+    // Confidence & accuracy series for the trend chart, bucketed as "7D" (daily),
+    // "30D" (weekly) and "90D" (monthly) points.
+    @GetMapping("/me/dashboard/trend")
+    public ResponseEntity<Map<String, List<TrendPointDTO>>> getConfidenceTrend() {
+        return ResponseEntity.ok(dashboardStatsService.getConfidenceTrend(authenticatedUserId()));
     }
 
     @GetMapping("/me")
