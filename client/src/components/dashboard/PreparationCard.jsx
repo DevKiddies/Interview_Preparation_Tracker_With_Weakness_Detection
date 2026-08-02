@@ -34,7 +34,6 @@ export default function PreparationCard({
                                             targetLabel,
                                             daysLeft,
                                             interviewDate,
-                                            focusTopics = [],
                                             status = "ACTIVE",
                                             action, // { label: string, icon: ReactNode, onClick: () => void, disabled?: boolean }
                                         }) {
@@ -90,25 +89,6 @@ export default function PreparationCard({
                             </div>
                         )}
                     </div>
-
-                    {/* Focus Topics Section */}
-                    {focusTopics.length > 0 && (
-                        <div className="pt-0.5 space-y-1 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
-                            <span className={`block text-[9px] font-bold uppercase tracking-wide ${theme.textTitle} opacity-80 sm:inline sm:text-[10px]`}>
-                                {focusTopics.length} WEAK {focusTopics.length === 1 ? "TOPIC" : "TOPICS"}
-                            </span>
-                            <div className="flex flex-wrap gap-1">
-                                {focusTopics.map((topic) => (
-                                    <span
-                                        key={topic}
-                                        className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase sm:px-2 sm:text-[10px] ${theme.badge}`}
-                                    >
-                                        {topic}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Right / Bottom: Full-Width Mobile Action Row / Auto-Sized Desktop Block */}

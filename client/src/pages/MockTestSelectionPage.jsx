@@ -9,6 +9,7 @@ import RecommendedTests from "../components/mock-test-selection/RecommendedTests
 import EmptyState from "../components/mock-test-selection/EmptyState";
 import LoadingSkeleton from "../components/mock-test-selection/LoadingSkeleton";
 import API_BASE from "../utils/api.js";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 
 const FULL_TESTS = [
     {
@@ -78,7 +79,7 @@ function mapAdminTest(t) {
 export default function MockTestSelectionPage() {
     const navigate = useNavigate();
     const [username, setUsername] = useState(localStorage.getItem("username") || "");
-    const [profile, setProfile] = useState(null);
+    const [profile, setProfile] = useState(() => getCachedProfile());
     const [loading, setLoading] = useState(true);
     const [adminTests, setAdminTests] = useState([]);
 
@@ -105,6 +106,7 @@ export default function MockTestSelectionPage() {
                     localStorage.setItem("avatarUrl", data.avatarUrl);
                 }
                 setProfile(data);
+                setCachedProfile(data);
                 setLoading(false);
             })
             .catch(() => setLoading(false));
@@ -161,7 +163,6 @@ export default function MockTestSelectionPage() {
                     username={username}
                     targetLabel={targetLabel}
                     experienceLabel={experienceLabel}
-                    daysLeft={daysLeft}
                 />
 
                 <div className="min-w-0 flex-1 space-y-5 pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:pb-0">

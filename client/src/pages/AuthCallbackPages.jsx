@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import API_BASE from "../utils/api.js";
+import { setCachedProfile } from "../utils/profileCache";
 
 function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -29,6 +30,7 @@ function AuthCallbackPage() {
       .then((me) => {
         if (me.username) localStorage.setItem("username", me.username);
         if (me.avatarUrl) localStorage.setItem("avatarUrl", me.avatarUrl);
+        setCachedProfile(me);
         window.dispatchEvent(new CustomEvent("user-profile-updated"));
         navigate(me.onboarded ? "/dashboard" : "/onboarding");
       })

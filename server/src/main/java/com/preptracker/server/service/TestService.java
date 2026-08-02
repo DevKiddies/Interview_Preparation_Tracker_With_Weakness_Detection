@@ -148,6 +148,7 @@ public class TestService {
             attempt.setTotal(total);
             attempt.setAccuracy(accuracy);
             attempt.setTimeTakenSeconds(request.timeTaken());
+            attempt.setType(request.type() != null && !request.type().isBlank() ? request.type() : "MOCK");
             // Dominant category = the one with the most questions in this attempt
             // (a test can mix categories, so this isn't necessarily the only one).
             catMap.entrySet().stream()

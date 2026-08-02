@@ -44,6 +44,11 @@ public class TestAttempt {
     @Column(name = "time_taken_seconds")
     private Integer timeTakenSeconds;
 
+    // Distinguishes a full mock test (MOCK) from a focused topic practice
+    // session (TOPIC), so history pages can group them.
+    @Column(nullable = false)
+    private String type = "MOCK";
+
     @CreationTimestamp
     @Column(name = "taken_at", nullable = false, updatable = false)
     private LocalDateTime takenAt;

@@ -195,6 +195,7 @@ export default function MockTestPage() {
         body: JSON.stringify({
           category: Array.isArray(filterList) ? filterList.join(", ") : (filterList ?? "Data Structures & Algorithms"),
           topic: null,
+          type: isTopicTest ? "TOPIC" : "MOCK",
           tabSwitches,
           timeTaken: initialTimeRef.current - tl,
           questionIds,

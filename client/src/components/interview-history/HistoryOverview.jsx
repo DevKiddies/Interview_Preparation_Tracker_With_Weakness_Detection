@@ -2,8 +2,9 @@ import { Brain, Target, Flame, Trophy } from "lucide-react";
 
 const STATS = [
   {
-    title: "Total Goals",
-    value: "12",
+    title: "Total Tracks",
+    key: "total",
+    suffix: "",
     icon: Brain,
     bg: "from-blue-600 to-cyan-500 dark:from-blue-700 dark:to-cyan-600",
     iconBg: "bg-white/20 text-white",
@@ -13,7 +14,8 @@ const STATS = [
   },
   {
     title: "Completed",
-    value: "9",
+    key: "completed",
+    suffix: "",
     icon: Target,
     bg: "from-emerald-500 to-teal-400 dark:from-emerald-600 dark:to-teal-500",
     iconBg: "bg-white/20 text-white",
@@ -22,8 +24,9 @@ const STATS = [
     glow: "ring-1 ring-emerald-400 shadow-[0_4px_20px_-2px_rgba(16,185,129,0.5)]"
   },
   {
-    title: "Active Track",
-    value: "1",
+    title: "Active Tracks",
+    key: "active",
+    suffix: "",
     icon: Flame,
     bg: "from-amber-500 to-orange-500 dark:from-amber-600 dark:to-orange-600",
     iconBg: "bg-white/20 text-white",
@@ -33,7 +36,8 @@ const STATS = [
   },
   {
     title: "Success Rate",
-    value: "78%",
+    key: "successRate",
+    suffix: "%",
     icon: Trophy,
     bg: "from-purple-600 to-fuchsia-500 dark:from-purple-700 dark:to-fuchsia-600",
     iconBg: "bg-white/20 text-white",
@@ -43,7 +47,9 @@ const STATS = [
   },
 ];
 
-function HistoryOverview() {
+function HistoryOverview({ total = 0, completed = 0, active = 0, successRate = 0 }) {
+  const values = { total, completed, active, successRate };
+
   return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {STATS.map((s) => {
@@ -61,7 +67,7 @@ function HistoryOverview() {
                     {s.title}
                   </p>
                   <p className={`text-base font-extrabold leading-tight ${s.textValue}`}>
-                    {s.value}
+                    {values[s.key]}{s.suffix}
                   </p>
                 </div>
               </div>

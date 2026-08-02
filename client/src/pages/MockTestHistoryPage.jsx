@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/mocktest-history/PageHeader";
 import InterviewSummaryCard from "../components/mocktest-history/InterviewSummaryCard";
 import HistoryOverview from "../components/mocktest-history/HistoryOverview";
@@ -7,13 +7,13 @@ import HistoryFilters from "../components/mocktest-history/HistoryFilters";
 import MockTestTimeline from "../components/mocktest-history/MockTestTimeline";
 import EmptyState from "../components/mocktest-history/EmptyState";
 import API_BASE from "../utils/api";
-import { MOCK_TESTS } from "../data/mockTestData";
 
 function MockTestHistoryPage() {
-  const { interviewId } = useParams();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
@@ -30,6 +30,20 @@ function MockTestHistoryPage() {
         .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/api/tests/history`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) setTests(data);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+  }, []);
+
   const daysLeft = useMemo(() => {
     if (!profile?.interviewDate) return null;
     const target = new Date(profile.interviewDate);
@@ -41,13 +55,13 @@ function MockTestHistoryPage() {
   }, [profile?.interviewDate]);
 
   const filtered = useMemo(() => {
-    let result = [...MOCK_TESTS];
+    let result = [...tests];
 
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((t) =>
           t.title.toLowerCase().includes(q) ||
-          t.weakTopics.some((w) => w.toLowerCase().includes(q))
+          (t.weakTopics || []).some((w) => w.toLowerCase().includes(q))
       );
     }
     if (statusFilter !== "All") result = result.filter((t) => t.status === statusFilter.toUpperCase());
@@ -63,21 +77,20 @@ function MockTestHistoryPage() {
     });
 
     return result;
-  }, [search, statusFilter, typeFilter, sort]);
+  }, [tests, search, statusFilter, typeFilter, sort]);
 
   const overview = useMemo(() => {
-    const completed = MOCK_TESTS.filter((t) => t.status === "COMPLETED");
-    const totalQ = completed.reduce((s, t) => s + (t.questionCount || 0), 0);
+    const completed = tests.filter((t) => t.status === "COMPLETED");
     const avgC = completed.length ? Math.round(completed.reduce((s, t) => s + (t.confidence || 0), 0) / completed.length) : 0;
     const avgA = completed.length ? Math.round(completed.reduce((s, t) => s + (t.accuracy || 0), 0) / completed.length) : 0;
-    return { total: MOCK_TESTS.length, questionsSolved: totalQ, avgConfidence: avgC, avgAccuracy: avgA };
-  }, []);
+    return { total: tests.length, completed: completed.length, avgConfidence: avgC, avgAccuracy: avgA };
+  }, [tests]);
 
   const handleViewAnalysis = (test) => {
     navigate("/practice/results", { state: { attemptId: test.id } });
   };
 
-  const hasData = MOCK_TESTS.length > 0;
+  const hasData = tests.length > 0;
 
   return (
       <div className="min-h-screen bg-indigo-50/40 transition-colors duration-200 dark:bg-slate-950">
@@ -92,7 +105,11 @@ function MockTestHistoryPage() {
               status={daysLeft === 0 ? "COMPLETED" : "ACTIVE"}
           />
 
-          {hasData && (
+          {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+              </div>
+          ) : hasData ? (
               <>
                 <HistoryOverview {...overview} />
                 <HistoryFilters
@@ -106,14 +123,15 @@ function MockTestHistoryPage() {
                     onSortChange={setSort}
                 />
               </>
-          )}
+          ) : null}
 
-          {filtered.length > 0
-              ? <MockTestTimeline tests={filtered} onViewAnalysis={handleViewAnalysis} />
-              : hasData
-                  ? <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-10">No tests match your filters.</p>
-                  : <EmptyState />
-          }
+          {!loading && (
+              filtered.length > 0
+                  ? <MockTestTimeline tests={filtered} onViewAnalysis={handleViewAnalysis} />
+                  : hasData
+                      ? <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-10">No tests match your filters.</p>
+                      : <EmptyState />
+          )}
         </div>
       </div>
   );

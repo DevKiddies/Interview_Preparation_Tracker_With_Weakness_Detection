@@ -9,11 +9,16 @@ import com.preptracker.server.dto.AvailableTestResponse;
 import com.preptracker.server.dto.LatestTestResponse;
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
+import com.preptracker.server.service.TestHistoryService;
 import com.preptracker.server.service.TestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +29,7 @@ import java.util.UUID;
 public class TestController {
 
     private final TestService testService;
+    private final TestHistoryService testHistoryService;
 
     @PostMapping("/submit")
     public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
