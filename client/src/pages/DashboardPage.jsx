@@ -18,7 +18,6 @@ import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
 import AccuracyHeatmap from "../components/dashboard/AccuracyHeatmap";
-import { accuracyHeatmap } from "../data/dashboardData";
 
 const TARGET_LABELS = {
   faang: "FAANG / Big Tech",
@@ -51,6 +50,7 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState(() => getCachedDashboard()?.categories ?? []);
   const [trend, setTrend] = useState(() => getCachedDashboard()?.trend ?? null);
   const [blindSpots, setBlindSpots] = useState(() => getCachedDashboard()?.blindSpots ?? []);
+  const [heatmap, setHeatmap] = useState(() => getCachedDashboard()?.heatmap ?? []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -115,6 +115,18 @@ export default function DashboardPage() {
           if (Array.isArray(data)) {
             setBlindSpots(data);
             setCachedDashboard({ ...getCachedDashboard(), blindSpots: data });
+          }
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/accuracy-heatmap`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setHeatmap(data);
+            setCachedDashboard({ ...getCachedDashboard(), heatmap: data });
           }
         })
         .catch(() => {});
@@ -250,7 +262,7 @@ export default function DashboardPage() {
             {/* Charts Row 2 — Side by Side Grid */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <BlindSpotAnalysis data={blindSpots} />
-              <AccuracyHeatmap data={accuracyHeatmap} />
+              <AccuracyHeatmap data={heatmap} />
             </div>
           </div>
         </div>

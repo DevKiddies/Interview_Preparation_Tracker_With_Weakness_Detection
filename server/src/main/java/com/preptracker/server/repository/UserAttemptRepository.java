@@ -87,6 +87,19 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             """, nativeQuery = true)
     List<Object[]> findTechniqueStats(@Param("userId") UUID userId);
 
+    // Rows of [topicId, difficulty, accuracy] — the user's per-topic accuracy
+    // split by question difficulty (easy/medium/hard), used by the Accuracy
+    // Heatmap widget. accuracy is 0-1 (scaled to 0-100 in Java).
+    @Query(value = """
+            SELECT ua.topic_id, q.difficulty,
+              AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS accuracy
+            FROM user_attempts ua
+            JOIN questions q ON q.id = ua.question_id
+            WHERE ua.user_id = :userId
+            GROUP BY ua.topic_id, q.difficulty
+            """, nativeQuery = true)
+    List<Object[]> findAccuracyByDifficulty(@Param("userId") UUID userId);
+
     // Rows of [topicName, blindSpotCount] — the top 7 topics ranked by how many
     // times the user was overconfident (BLIND_SPOT: high confidence + wrong) on
     // that topic. Backs the "Blind Spot Analysis" widget, which deliberately

@@ -7,6 +7,7 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
+import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
 import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
@@ -148,6 +149,13 @@ public class UserController {
     @GetMapping("/me/dashboard/blind-spots")
     public ResponseEntity<List<BlindSpotDTO>> getBlindSpots() {
         return ResponseEntity.ok(dashboardStatsService.getBlindSpots(authenticatedUserId()));
+    }
+
+    // Per-topic accuracy split by difficulty for the "Accuracy Heatmap" widget,
+    // covering the user's focus topics.
+    @GetMapping("/me/dashboard/accuracy-heatmap")
+    public ResponseEntity<List<AccuracyHeatmapRowDTO>> getAccuracyHeatmap() {
+        return ResponseEntity.ok(dashboardStatsService.getAccuracyHeatmap(authenticatedUserId()));
     }
 
     @GetMapping("/me")

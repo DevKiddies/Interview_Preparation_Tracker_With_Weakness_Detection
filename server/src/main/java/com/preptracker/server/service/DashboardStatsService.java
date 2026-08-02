@@ -6,6 +6,7 @@ package com.preptracker.server.service;
 // one small result row crosses the wire; the study streak is derived from the
 // distinct dates the user took any test.
 
+import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
 import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceNodeDTO;
@@ -13,11 +14,13 @@ import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
+import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TopicRepository;
 import com.preptracker.server.repository.UserAttemptRepository;
+import com.preptracker.server.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -44,6 +47,7 @@ public class DashboardStatsService {
     private final CategoryRepository categoryRepository;
     private final TopicRepository topicRepository;
     private final TechniqueTopicRepository techniqueTopicRepository;
+    private final UserProfileRepository userProfileRepository;
 
     public DashboardStatsDTO getStats(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
@@ -276,6 +280,61 @@ public class DashboardStatsService {
         List<BlindSpotDTO> out = new ArrayList<>();
         for (Object[] r : userAttemptRepository.findBlindSpots(userId)) {
             out.add(new BlindSpotDTO((String) r[0], ((Number) r[1]).intValue()));
+        }
+        return out;
+    }
+
+    // Accuracy per topic and difficulty (easy/medium/hard) for the Accuracy
+    // Heatmap widget. Rows are limited to the topics the user selected during
+    // onboarding (falling back to every topic if none were selected) so the
+    // heatmap reflects what the user actually cares about.
+    public List<AccuracyHeatmapRowDTO> getAccuracyHeatmap(UUID userId) {
+        // topicId -> accuracy per difficulty (0-100); only difficulties that
+        // actually appear in the user's attempts are present.
+        Map<Long, double[]> accByTopic = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findAccuracyByDifficulty(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            String difficulty = (String) r[1];
+            double accuracy = ((Number) r[2]).doubleValue() * 100;
+            double[] bucket = accByTopic.computeIfAbsent(topicId, k -> new double[]{-1, -1, -1});
+            switch (difficulty) {
+                case "easy" -> bucket[0] = accuracy;
+                case "medium" -> bucket[1] = accuracy;
+                case "hard" -> bucket[2] = accuracy;
+                default -> { }
+            }
+        }
+
+        // All topics, ordered by category then name (mirrors the heatmap layout).
+        Map<Long, String> topicName = new LinkedHashMap<>();
+        for (Object[] r : topicRepository.findAllWithCategory()) {
+            topicName.put(((Number) r[0]).longValue(), (String) r[1]);
+        }
+
+        // Keep only topics the user picked during onboarding, preserving the
+        // canonical category/name order.
+        java.util.Set<Long> focusIds = new java.util.LinkedHashSet<>();
+        userProfileRepository.findByUserId(userId).ifPresent(p -> {
+            String raw = p.getFocusTopics();
+            if (raw != null && !raw.isBlank()) {
+                for (String name : raw.split(",")) {
+                    String trimmed = name.trim();
+                    topicName.forEach((id, n) -> {
+                        if (n.equals(trimmed)) focusIds.add(id);
+                    });
+                }
+            }
+        });
+
+        List<AccuracyHeatmapRowDTO> out = new ArrayList<>();
+        for (Map.Entry<Long, String> e : topicName.entrySet()) {
+            if (!focusIds.isEmpty() && !focusIds.contains(e.getKey())) continue;
+            double[] bucket = accByTopic.get(e.getKey());
+            out.add(new AccuracyHeatmapRowDTO(
+                    e.getValue(),
+                    bucket == null || bucket[0] < 0 ? null : (int) Math.round(bucket[0]),
+                    bucket == null || bucket[1] < 0 ? null : (int) Math.round(bucket[1]),
+                    bucket == null || bucket[2] < 0 ? null : (int) Math.round(bucket[2])));
         }
         return out;
     }
