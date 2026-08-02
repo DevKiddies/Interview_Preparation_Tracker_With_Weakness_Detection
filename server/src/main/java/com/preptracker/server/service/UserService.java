@@ -30,6 +30,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserProfileRepository userProfileRepository;
+    private final NotificationService notificationService;
 
     public User getUserById(UUID id) {
         return userRepository.findById(id)
@@ -68,6 +69,10 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+
+        notificationService.create(user.getId(), "SECURITY", "Password changed",
+                "Your password was changed successfully. If this wasn't you, contact support immediately.",
+                "/profile/settings");
     }
 
     public User updateAvatarUrl(UUID id, UpdateAvatarRequest request) {
@@ -129,5 +134,9 @@ public class UserService {
         }
 
         userRepository.save(user);
+
+        notificationService.create(userId, "ONBOARDING", "You're all set!",
+                "Your profile is ready — dive into a mock test tailored to your focus areas.",
+                "/practice/mock-tests");
     }
 }

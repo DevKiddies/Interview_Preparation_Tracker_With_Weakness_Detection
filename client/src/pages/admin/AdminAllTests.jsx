@@ -81,15 +81,19 @@ const EMPTY_FORM = {
 
 async function fetchTestsData() {
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem("adminToken")}` };
-  const [testsRes, catRes, topRes] = await Promise.all([
+  const [testsRes, catRes, topRes, qRes] = await Promise.all([
     fetch(`${API_BASE}/api/admin/tests`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/categories`, { headers: authHeaders }),
     fetch(`${API_BASE}/api/admin/topics`, { headers: authHeaders }),
+    fetch(`${API_BASE}/api/admin/questions`, { headers: authHeaders }),
   ]);
-  if (![testsRes, catRes, topRes].every((r) => r.ok)) {
+  if (![testsRes, catRes, topRes, qRes].every((r) => r.ok)) {
     throw new Error("Failed to load test data");
   }
-  return Promise.all([testsRes.json(), catRes.json(), topRes.json()]);
+  const [tests, cats, tops, questions] = await Promise.all([testsRes.json(), catRes.json(), topRes.json(), qRes.json()]);
+  const questionCounts = {};
+  for (const q of questions) questionCounts[q.topicId] = (questionCounts[q.topicId] || 0) + 1;
+  return [tests, cats, tops, questionCounts];
 }
 
 export default function AdminAllTests() {
@@ -98,6 +102,7 @@ export default function AdminAllTests() {
   const [tests, setTests] = useState([]);
   const [categories, setCategories] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [questionCounts, setQuestionCounts] = useState({}); // topicId -> question count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,8 +130,8 @@ export default function AdminAllTests() {
       setLoading(true);
       setError(null);
       try {
-        const [t, cat, top] = await fetchTestsData();
-        setTests(t); setCategories(cat); setTopics(top);
+        const [t, cat, top, counts] = await fetchTestsData();
+        setTests(t); setCategories(cat); setTopics(top); setQuestionCounts(counts);
       } catch (err) {
         setError(err.message || "Failed to load test data");
       } finally {
@@ -140,8 +145,8 @@ export default function AdminAllTests() {
     setRefreshing(true);
     setError(null);
     try {
-      const [t, cat, top] = await fetchTestsData();
-      setTests(t); setCategories(cat); setTopics(top);
+      const [t, cat, top, counts] = await fetchTestsData();
+      setTests(t); setCategories(cat); setTopics(top); setQuestionCounts(counts);
     } catch (err) {
       setError(err.message || "Failed to load test data");
     } finally {
@@ -210,6 +215,10 @@ export default function AdminAllTests() {
 
   // Edit modal helpers
   const topicOptionsForEdit = editForm.categoryId ? topicsInCategory(Number(editForm.categoryId)) : [];
+  const availableCountForEdit = useMemo(
+    () => editForm.topicIds.reduce((sum, id) => sum + (questionCounts[id] || 0), 0),
+    [editForm.topicIds, questionCounts],
+  );
   const toggleTopic = (topicId) => {
     setEditForm(f => ({
       ...f,
@@ -223,6 +232,7 @@ export default function AdminAllTests() {
     if (!editForm.name.trim()) errs.name = "Name is required";
     if (!editForm.categoryId) errs.categoryId = "Category is required";
     if (editForm.topicIds.length === 0) errs.topicIds = "Select at least one topic";
+    else if (availableCountForEdit === 0) errs.topicIds = "None of the selected topics have any questions yet — add questions to the Question Bank first, or pick different topics.";
     if (!editForm.questionCount || editForm.questionCount < 5 || editForm.questionCount > 50) errs.questionCount = "5–50 questions";
     if (!editForm.timeLimitMinutes || editForm.timeLimitMinutes < 5 || editForm.timeLimitMinutes > 120) errs.timeLimit = "5–120 minutes";
     if (editForm.difficulty === "Mixed") {
@@ -614,6 +624,18 @@ export default function AdminAllTests() {
                     ))}
                   </div>
                   {editErrors.topicIds && <p className="text-xs text-rose-500 mt-1">{editErrors.topicIds}</p>}
+                  {!editErrors.topicIds && editForm.topicIds.length > 0 && availableCountForEdit === 0 && (
+                    <p className="text-xs text-rose-500 mt-1 flex items-center gap-1">
+                      <AlertTriangle size={11} />
+                      No questions exist for the selected topics yet — this test would be unplayable until questions are added.
+                    </p>
+                  )}
+                  {availableCountForEdit > 0 && availableCountForEdit < editForm.questionCount && (
+                    <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
+                      <AlertTriangle size={11} />
+                      Only {availableCountForEdit} question{availableCountForEdit !== 1 ? "s" : ""} available — fewer than the {editForm.questionCount} requested.
+                    </p>
+                  )}
                 </div>
               )}
               {/* Q count + Time */}

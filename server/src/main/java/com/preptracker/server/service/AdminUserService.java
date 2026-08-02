@@ -33,6 +33,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final TestAttemptRepository testAttemptRepository;
+    private final BannedUserService bannedUserService;
 
     public List<AdminUserDTO> getAllUsers() {
         List<User> users = userRepository.findAll();
@@ -67,6 +68,10 @@ public class AdminUserService {
                 ? null
                 : LocalDateTime.now().plusDays(Long.parseLong(request.duration())));
         userRepository.save(user);
+
+        // Makes the ban take effect on this user's very next request, even though
+        // their existing JWT is still cryptographically valid until it expires.
+        bannedUserService.ban(userId, user.getBanExpiresAt());
     }
 
     public void unbanUser(UUID userId) {
@@ -76,6 +81,8 @@ public class AdminUserService {
         user.setIsBanned(false);
         user.setBanExpiresAt(null);
         userRepository.save(user);
+
+        bannedUserService.unban(userId);
     }
 
     private Map<UUID, UserProfile> profilesByUserId() {

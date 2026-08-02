@@ -8,6 +8,25 @@ function TestCard({ test }) {
     const handleStart = (e) => {
         e.stopPropagation();
         if (!test.available) return;
+
+        // Admin-created tests (from /api/tests/available) carry a topicConfig and
+        // ride the same "topic practice" question-fetching path the custom topic
+        // builder already uses, instead of the fixed built-in test ids below.
+        if (test.topicConfig) {
+            navigate("/practice/instructions", {
+                state: {
+                    nextUrl: "/practice/mock-tests/topic",
+                    nextState: test.topicConfig,
+                    testTitle: test.title,
+                    questions: test.questions,
+                    timeMins: test.timeMins,
+                    difficulty: test.difficulty,
+                    description: test.description,
+                },
+            });
+            return;
+        }
+
         navigate("/practice/instructions", {
             state: {
                 nextUrl: `/practice/mock-tests/${test.id}`,

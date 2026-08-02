@@ -58,6 +58,10 @@ public class SecurityConfig {
                         // Auth endpoints are public (login, register, OTP, OAuth callbacks)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/auth/**").permitAll()
+                        // Contact Us form — public, no login required to reach out
+                        .requestMatchers("/api/contact/**").permitAll()
+                        // Landing page hero stats — public aggregate counts, no auth needed
+                        .requestMatchers("/api/public/**").permitAll()
                         // Admin panel routes require ROLE_ADMIN, which JwtFilter injects from the token's "role" claim
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

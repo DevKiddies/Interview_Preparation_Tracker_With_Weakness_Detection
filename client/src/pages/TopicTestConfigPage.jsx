@@ -110,7 +110,7 @@ export default function TopicTestConfigPage() {
     navigate("/practice/instructions", {
       state: {
         nextUrl:     "/practice/mock-tests/topic",
-        nextState:   { category: selectedTopics, limit: questionCount, duration },
+        nextState:   { topics: selectedTopics, limit: questionCount, duration },
         testTitle:   `${topicLabel} Practice Test`,
         questions:   questionCount,
         timeMins:    Math.round(duration / 60),

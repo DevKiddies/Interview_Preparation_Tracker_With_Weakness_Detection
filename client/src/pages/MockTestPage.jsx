@@ -14,18 +14,26 @@ export default function MockTestPage() {
 
   const isTopicTest    = testId === "topic";
   const topicConfig    = isTopicTest ? (location.state || {}) : {};
-  const category       = topicConfig.category ?? null;
+  // Two distinct filters, kept separate on purpose: topicNames are specific
+  // topic names (e.g. ["SQL"]) matched via /api/questions?topic=..., while
+  // categoryName is a whole-category fallback (e.g. "Databases") matched via
+  // ?category=... — these hit different lookups server-side (findByTopicName
+  // vs findByCategoryName), so sending a topic name through the category
+  // param silently returns zero questions.
+  const topicNames     = topicConfig.topics   ?? null;
+  const categoryName   = topicConfig.category ?? null;
+  const filterList     = topicNames ?? (categoryName ? [categoryName] : null);
   const questionLimit  = topicConfig.limit    ?? 20;
   const initialTime    = isTopicTest ? (topicConfig.duration ?? 1800) : 5400;
-  const categoryLabel  = Array.isArray(category)
-      ? (category.length === 1 ? category[0] : `${category.length} Topics`)
-      : (category ?? "Data Structures & Algorithms"); // Fallback for UI display
+  const categoryLabel  = Array.isArray(filterList)
+      ? (filterList.length === 1 ? filterList[0] : `${filterList.length} Topics`)
+      : (filterList ?? "Data Structures & Algorithms"); // Fallback for UI display
   const testTitle      = isTopicTest
       ? `${categoryLabel} Practice`
       : `Mock Assessment #${testId}`;
 
   const retakeUrl   = isTopicTest ? "/practice/mock-tests/topic" : `/practice/mock-tests/${testId}`;
-  const retakeState = isTopicTest ? { category, limit: questionLimit, duration: initialTime } : null;
+  const retakeState = isTopicTest ? { topics: topicNames, category: categoryName, limit: questionLimit, duration: initialTime } : null;
 
   const CACHE_KEY = `quiz-${testId}`;
 
@@ -78,7 +86,7 @@ export default function MockTestPage() {
     fetchedRef.current = true;
 
     // Topic tests: new navigation → clear stale cache so a fresh fetch happens
-    if (isTopicTest && category) {
+    if (isTopicTest && (topicNames || categoryName)) {
       sessionStorage.removeItem(CACHE_KEY);
     }
 
@@ -103,9 +111,10 @@ export default function MockTestPage() {
     const token = localStorage.getItem("token");
     const qs    = new URLSearchParams({ limit: questionLimit });
 
-    if (category) {
-      const cats = Array.isArray(category) ? category : [category];
-      cats.forEach((c) => qs.append("category", c));
+    if (topicNames && topicNames.length) {
+      topicNames.forEach((t) => qs.append("topic", t));
+    } else if (categoryName) {
+      qs.append("category", categoryName);
     }
 
     fetch(`${API_BASE}/api/questions?${qs.toString()}`, {
@@ -184,7 +193,7 @@ export default function MockTestPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          category: Array.isArray(category) ? category.join(", ") : (category ?? "Data Structures & Algorithms"),
+          category: Array.isArray(filterList) ? filterList.join(", ") : (filterList ?? "Data Structures & Algorithms"),
           topic: null,
           tabSwitches,
           timeTaken: initialTimeRef.current - tl,
@@ -202,7 +211,7 @@ export default function MockTestPage() {
     } catch {
       navigate("/practice/mock-tests");
     }
-  }, [submitting, navigate, category, initialTime, testTitle, retakeUrl, retakeState]);
+  }, [submitting, navigate, filterList, initialTime, testTitle, retakeUrl, retakeState]);
   doSubmitRef.current = doSubmit;
 
   const currentQuestion  = questions[currentIndex];

@@ -28,6 +28,7 @@ const features = [
     title: 'Peer Community',
     description: 'Live chatrooms with mentors from Google, Meta, Amazon. Get unstuck in real time.',
     gradient: 'from-pink-500 to-purple-600',
+    upcoming: true,
   },
   {
     icon: Sparkles,
@@ -72,14 +73,27 @@ export default function FeaturesSection() {
                   <Icon className="w-8 h-8 text-white" strokeWidth={1.5} />
                 </div>
                 <div className="p-5">
-                  <h3 className="text-gray-900 dark:text-slate-100 font-semibold text-sm mb-2">{feature.title}</h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-gray-900 dark:text-slate-100 font-semibold text-sm">{feature.title}</h3>
+                    {feature.upcoming && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-400">
+                        Upcoming
+                      </span>
+                    )}
+                  </div>
                   <p className="text-gray-500 dark:text-slate-400 text-xs leading-relaxed mb-4">{feature.description}</p>
-                  <a
-                    href="#"
-                    className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 text-xs font-medium hover:gap-2 transition-all"
-                  >
-                    Learn more <ArrowRight className="w-3 h-3" />
-                  </a>
+                  {feature.upcoming ? (
+                    <span className="inline-flex items-center gap-1 text-gray-400 dark:text-slate-500 text-xs font-medium cursor-not-allowed select-none">
+                      Coming soon
+                    </span>
+                  ) : (
+                    <a
+                      href="#"
+                      className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 text-xs font-medium hover:gap-2 transition-all"
+                    >
+                      Learn more <ArrowRight className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
             )

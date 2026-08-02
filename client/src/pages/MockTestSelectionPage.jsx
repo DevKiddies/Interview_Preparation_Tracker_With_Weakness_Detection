@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { SlidersHorizontal, ChevronRight, Code2, Database, Server, Globe } from "lucide-react";
+import { SlidersHorizontal, ChevronRight, Code2, Database, Server, Globe, ClipboardList } from "lucide-react";
 import Sidebar from "../components/dashboard/Sidebar";
 import PageHeader from "../components/mock-test-selection/PageHeader";
 import FilterBar from "../components/mock-test-selection/FilterBar";
@@ -26,58 +26,61 @@ const FULL_TESTS = [
         accent: "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20",
         available: true,
     },
-    {
-        id: "os",
-        title: "Operating Systems",
-        description: "Processes, Scheduling, Memory Management & Deadlocks",
-        icon: Server,
-        iconBg: "bg-teal-50 dark:bg-teal-500/10",
-        iconColor: "text-teal-600 dark:text-teal-400",
-        questions: 20,
-        timeMins: 60,
-        time: "60 min",
-        difficulty: "Medium",
-        difficultyColor: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
-        accent: "bg-teal-500 hover:bg-teal-600 shadow-teal-500/20",
-        available: false,
-    },
-    {
-        id: "dbms",
-        title: "Database Systems",
-        description: "SQL, Normalization, Transactions, Indexing & Optimization",
-        icon: Database,
-        iconBg: "bg-emerald-50 dark:bg-emerald-500/10",
-        iconColor: "text-emerald-600 dark:text-emerald-400",
-        questions: 25,
-        timeMins: 75,
-        time: "75 min",
-        difficulty: "Hard",
-        difficultyColor: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
-        accent: "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20",
-        available: false,
-    },
-    {
-        id: "networks",
-        title: "Computer Networks",
-        description: "OSI Model, TCP/IP, DNS, HTTP & Routing Protocols",
-        icon: Globe,
-        iconBg: "bg-purple-50 dark:bg-purple-500/10",
-        iconColor: "text-purple-600 dark:text-purple-400",
-        questions: 20,
-        timeMins: 60,
-        time: "60 min",
-        difficulty: "Medium",
-        difficultyColor: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
-        accent: "bg-purple-500 hover:bg-purple-600 shadow-purple-500/20",
-        available: false,
-    },
+    // Operating Systems / Database Systems / Computer Networks used to be
+    // hardcoded "Soon"-locked placeholders here. Removed — this grid now shows
+    // real admin-created tests (see adminTests below) alongside DSA Fundamentals.
 ];
+
+// Admin-created tests (from /api/tests/available) don't carry an icon/color —
+// pick something reasonable from the category name so the card doesn't look bare.
+const CATEGORY_ICONS = [
+    { match: /database|sql|dbms/i, icon: Database, bg: "bg-emerald-50 dark:bg-emerald-500/10", color: "text-emerald-600 dark:text-emerald-400" },
+    { match: /network/i, icon: Globe, bg: "bg-purple-50 dark:bg-purple-500/10", color: "text-purple-600 dark:text-purple-400" },
+    { match: /operating system|\bos\b/i, icon: Server, bg: "bg-teal-50 dark:bg-teal-500/10", color: "text-teal-600 dark:text-teal-400" },
+    { match: /data structures|algorithms|dsa/i, icon: Code2, bg: "bg-indigo-50 dark:bg-indigo-500/10", color: "text-indigo-600 dark:text-indigo-400" },
+];
+const DEFAULT_CATEGORY_ICON = { icon: ClipboardList, bg: "bg-slate-100 dark:bg-slate-500/10", color: "text-slate-600 dark:text-slate-400" };
+
+const DIFFICULTY_COLORS = {
+    Easy: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+    Medium: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
+    Hard: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
+    Mixed: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+};
+
+// Maps GET /api/tests/available entries into the same card shape FULL_TESTS uses.
+function mapAdminTest(t) {
+    const iconMeta = CATEGORY_ICONS.find((c) => c.match.test(t.categoryName ?? "")) ?? DEFAULT_CATEGORY_ICON;
+    return {
+        id: `admin-${t.id}`,
+        title: t.name,
+        description: t.description || `${t.categoryName ?? "Mixed"} questions covering the full breadth of the topic.`,
+        icon: iconMeta.icon,
+        iconBg: iconMeta.bg,
+        iconColor: iconMeta.color,
+        questions: t.questionCount,
+        timeMins: t.timeLimitMinutes,
+        time: `${t.timeLimitMinutes} min`,
+        difficulty: t.difficulty,
+        difficultyColor: DIFFICULTY_COLORS[t.difficulty] ?? DIFFICULTY_COLORS.Mixed,
+        available: true,
+        // Routes through the same question-fetching path the custom topic
+        // builder uses (see TestCard.jsx). `topics` (specific topic names) and
+        // `category` (whole-category fallback) hit different backend lookups
+        // (findByTopicName vs findByCategoryName) — mixing them up returns
+        // zero questions even when the topic has real ones.
+        topicConfig: t.topicNames?.length
+            ? { topics: t.topicNames, limit: t.questionCount, duration: t.timeLimitMinutes * 60 }
+            : { category: t.categoryName, limit: t.questionCount, duration: t.timeLimitMinutes * 60 },
+    };
+}
 
 export default function MockTestSelectionPage() {
     const navigate = useNavigate();
     const [username, setUsername] = useState(localStorage.getItem("username") || "");
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [adminTests, setAdminTests] = useState([]);
 
     const [searchQuery, setSearchQuery] = useState("");
     const [difficulty, setDifficulty] = useState("All");
@@ -107,6 +110,21 @@ export default function MockTestSelectionPage() {
             .catch(() => setLoading(false));
     }, []);
 
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        fetch(`${API_BASE}/api/tests/available`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data) => setAdminTests(Array.isArray(data) ? data.map(mapAdminTest) : []))
+            .catch(() => {
+                // silent — admin-created tests just won't appear this load; the
+                // built-in FULL_TESTS grid still renders fine either way
+            });
+    }, []);
+
     const daysLeft = useMemo(() => {
         if (!profile?.interviewDate) return null;
         const target = new Date(profile.interviewDate);
@@ -121,12 +139,12 @@ export default function MockTestSelectionPage() {
     const experienceLabel = EXPERIENCE_LABELS[profile?.experienceLevel] ?? null;
 
     const filteredTests = useMemo(() => {
-        return FULL_TESTS.filter((test) => {
+        return [...FULL_TESTS, ...adminTests].filter((test) => {
             const matchesSearch = test.title.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesDifficulty = difficulty === "All" || test.difficulty === difficulty;
             return matchesSearch && matchesDifficulty;
         });
-    }, [searchQuery, difficulty]);
+    }, [adminTests, searchQuery, difficulty]);
 
     const resetFilters = () => {
         setSearchQuery("");

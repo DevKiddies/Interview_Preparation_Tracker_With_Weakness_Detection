@@ -7,6 +7,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
+import BanGuard from "./components/BanGuard";
 
 // All pages are lazy-loaded — React only downloads the JS for a page when
 // the user navigates to it, keeping the initial bundle small.
@@ -28,7 +29,9 @@ const SupportPage = lazy(() => import("./pages/SupportPage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const NotesPage = lazy(() => import("./pages/NotesPage"));
+const CheatSheetsPage = lazy(() => import("./pages/CheatSheetsPage"));
 const CodingProblemsPage = lazy(() => import("./pages/CodingProblemsPage"));
+const InterviewExperiencesPage = lazy(() => import("./pages/InterviewExperiencesPage"));
 
 const MockTestPage = lazy(() => import("./pages/MockTestPage"));
 const MockTestSelectionPage = lazy(
@@ -99,6 +102,7 @@ const App = () => {
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-slate-950 transition-colors duration-200">
       <ScrollToTop />
+      {!isAdminRoute && <BanGuard />}
       {!hideLayout && <Navbar />}
       <main className="grow">
         <Suspense fallback={null}>
@@ -170,7 +174,7 @@ const App = () => {
               path="/resources/interview-experiences"
               element={
                 <ProtectedRoute>
-                  <WorkInProgress />
+                  <InterviewExperiencesPage />
                 </ProtectedRoute>
               }
             />
@@ -217,6 +221,7 @@ const App = () => {
               <Route path="settings" element={<AdminSettings />} />
             </Route>
             <Route path="/resources/notes" element={<NotesPage />} />
+            <Route path="/resources/cheat-sheets" element={<CheatSheetsPage />} />
             <Route path="/practice/coding-problems" element={<CodingProblemsPage />} />
             <Route path="/about/us" element={<AboutUsPage />} />
             <Route path="/about/team" element={<OurTeamPage />} />

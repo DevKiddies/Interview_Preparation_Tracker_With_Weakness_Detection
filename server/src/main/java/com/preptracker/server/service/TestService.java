@@ -16,14 +16,24 @@ package com.preptracker.server.service;
 // the children need its generated id. Both writes share one transaction so a
 // failure can't orphan user_attempts without a test_attempt.
 
+import com.preptracker.server.dto.AvailableTestResponse;
+import com.preptracker.server.dto.LatestTestResponse;
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
+import com.preptracker.server.model.Category;
+import com.preptracker.server.model.MockTest;
 import com.preptracker.server.model.Question;
 import com.preptracker.server.model.Technique;
 import com.preptracker.server.model.TestAttempt;
+import com.preptracker.server.model.TestTopic;
+import com.preptracker.server.model.Topic;
 import com.preptracker.server.model.UserAttempt;
+import com.preptracker.server.repository.CategoryRepository;
+import com.preptracker.server.repository.MockTestRepository;
 import com.preptracker.server.repository.QuestionRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
+import com.preptracker.server.repository.TestTopicRepository;
+import com.preptracker.server.repository.TopicRepository;
 import com.preptracker.server.repository.UserAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,7 +46,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +59,11 @@ public class TestService {
     private final TestAttemptRepository testAttemptRepository;
     private final UserAttemptRepository userAttemptRepository;
     private final ConfidenceService confidenceService;
+    private final NotificationService notificationService;
+    private final MockTestRepository mockTestRepository;
+    private final TestTopicRepository testTopicRepository;
+    private final CategoryRepository categoryRepository;
+    private final TopicRepository topicRepository;
 
     @Transactional
     public TestResultResponse submitTest(TestSubmissionRequest request) {
@@ -140,9 +158,53 @@ public class TestService {
             // Link children to the freshly-generated parent id, then persist them.
             userAttempts.forEach(ua -> ua.setTestAttemptId(saved.getId()));
             userAttemptRepository.saveAll(userAttempts);
+
+            notificationService.create(userId, "TEST_RESULT", "Test results are ready",
+                    "You scored " + score + "/" + total + " (" + accuracy + "%) — review your breakdown now.",
+                    "/practice/results");
         }
 
         return new TestResultResponse(score, total, request.timeTaken(), accuracy, results, breakdown);
+    }
+
+    public Optional<LatestTestResponse> getLatestAttempt(UUID userId) {
+        return testAttemptRepository.findFirstByUserIdOrderByTakenAtDesc(userId)
+                .map(a -> new LatestTestResponse(a.getScore(), a.getTotal(), a.getAccuracy(), a.getCategory()));
+    }
+
+    // Backs the "Full Assessments" grid on the mock test selection page — every
+    // admin-created test (Test Management > Create Mock Test) with status "Active".
+    // categoryId/topicIds are resolved to names here so the frontend can hand them
+    // straight to /api/questions?category=...&topic=..., the same params the
+    // existing topic-practice flow already uses to fetch real questions.
+    public List<AvailableTestResponse> getAvailableTests() {
+        List<MockTest> tests = mockTestRepository.findByStatus("Active");
+        if (tests.isEmpty()) return List.of();
+
+        Map<Long, List<Long>> topicIdsByTestId = testTopicRepository.findAll().stream()
+                .collect(Collectors.groupingBy(TestTopic::getTestId,
+                        Collectors.mapping(TestTopic::getTopicId, Collectors.toList())));
+
+        Map<Long, String> categoryNamesById = categoryRepository.findAll().stream()
+                .collect(Collectors.toMap(Category::getId, Category::getName));
+        Map<Long, String> topicNamesById = topicRepository.findAll().stream()
+                .collect(Collectors.toMap(Topic::getId, Topic::getName));
+
+        return tests.stream()
+                .map(t -> new AvailableTestResponse(
+                        t.getId(),
+                        t.getName(),
+                        t.getDescription(),
+                        categoryNamesById.get(t.getCategoryId()),
+                        topicIdsByTestId.getOrDefault(t.getId(), List.of()).stream()
+                                .map(topicNamesById::get)
+                                .filter(Objects::nonNull)
+                                .toList(),
+                        t.getQuestionCount(),
+                        t.getTimeLimitMinutes(),
+                        t.getDifficulty()
+                ))
+                .toList();
     }
 
     private String correctText(Question q) {

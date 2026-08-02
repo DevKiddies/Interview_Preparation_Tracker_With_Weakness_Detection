@@ -7,6 +7,7 @@ package com.preptracker.server.config;
 // Requests with no token or an invalid token are either rejected or passed through
 // as unauthenticated (SecurityConfig decides whether the endpoint requires auth).
 
+import com.preptracker.server.service.BannedUserService;
 import com.preptracker.server.service.TokenBlackListService;
 import com.preptracker.server.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -22,6 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Component
@@ -31,6 +33,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final TokenBlackListService tokenBlackListService;
+    private final BannedUserService bannedUserService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -54,6 +57,14 @@ public class JwtFilter extends OncePerRequestFilter {
 
             String userId = jwtUtil.extractUserId(token);
             String role = jwtUtil.extractRole(token);
+
+            // Regular-user tokens only — admin tokens carry ROLE_ADMIN and Admin
+            // ids live in a separate table, so this can never false-positive on them.
+            if (role == null && bannedUserService.isBanned(UUID.fromString(userId))) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("Your account has been banned. Please contact administration.");
+                return;
+            }
 
             // Regular users have no "role" claim; only admin tokens carry ROLE_ADMIN
             List<SimpleGrantedAuthority> authorities = (role != null)

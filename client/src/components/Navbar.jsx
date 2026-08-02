@@ -3,12 +3,13 @@
 // so this only has guest (not logged in) and student (logged-in user) nav structures.
 // Avatar and username stay in sync with the profile settings page via a custom DOM event.
 
-import { Menu, X, ChevronDown, Moon, Sun, Bell } from "lucide-react";
+import { Menu, X, ChevronDown, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import Logo from "./ui/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import API_BASE from "../utils/api.js";
+import NotificationsBell from "./NotificationsBell.jsx";
 
 // ---- Guest (Public) Nav Structure ----
 const guestNavItems = [
@@ -287,18 +288,35 @@ function MobileNavSection({
   );
 }
 
+// ---- Small hover tooltip, positioned below the trigger it wraps ----
+function Tooltip({ label, children }) {
+  return (
+    <div className="relative inline-flex group">
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-700 px-2.5 py-1 text-xs font-medium text-white opacity-0 scale-95 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-50"
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 // ---- Theme toggle button ----
 function ThemeToggle({ className = "" }) {
   const { isDark, toggle } = useTheme();
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label="Toggle dark mode"
-      className={`w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200 ${className}`}
-    >
-      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-    </button>
+    <Tooltip label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label="Toggle dark mode"
+        className={`w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200 ${className}`}
+      >
+        {isDark ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -413,16 +431,7 @@ export default function Navbar() {
 
         {/* Desktop Action Area */}
         <div className="hidden md:flex items-center gap-3 text-sm font-semibold">
-          {token && (
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200"
-            >
-              <Bell size={16} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-800" />
-            </button>
-          )}
+          {token && <NotificationsBell />}
           <ThemeToggle />
           {token ? (
             <NavDropdown {...profileItem} align="right" />
