@@ -29,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -95,10 +96,14 @@ public class DashboardStatsService {
         // confidence here is already evidence-weighted so the category mean
         // matches what the Confidence Explorer tree shows.
         Map<Long, Integer> topicConfidence = new HashMap<>();
+        Map<Long, Integer> topicAccuracy = new HashMap<>();
+        Map<Long, Integer> topicQuestions = new HashMap<>();
         for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
             Long topicId = ((Number) r[0]).longValue();
             int distinct = ((Number) r[4]).intValue();
             topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
+            topicAccuracy.put(topicId, round100(r[2]));
+            topicQuestions.put(topicId, ((Number) r[3]).intValue());
         }
         Map<Long, List<Long>> topicsByCategory = new HashMap<>();
         for (Object[] r : topicRepository.findAllWithCategory()) {
@@ -107,18 +112,47 @@ public class DashboardStatsService {
         }
 
         List<Object[]> rows = userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart);
-        List<CategoryConfidenceDTO> out = new ArrayList<>();
+
+        // Aggregate rows only cover categories the user has attempts in, but the
+        // chart shows EVERY category, so merge per-category aggregates into a map
+        // and fall back to zeros for categories with no activity yet.
+        Map<Long, Object[]> aggregateById = new HashMap<>();
         for (Object[] r : rows) {
-            Long id = ((Number) r[0]).longValue();
-            String name = (String) r[1];
-            int weakTopics = ((Number) r[3]).intValue();
-            int questionCount = ((Number) r[4]).intValue();
-            Integer recentConf = round(r[5]);
-            Integer prevConf = round(r[6]);
-            out.add(new CategoryConfidenceDTO(id, name,
+            aggregateById.put(((Number) r[0]).longValue(), r);
+        }
+
+        List<CategoryConfidenceDTO> out = new ArrayList<>();
+        for (Category category : categoryRepository.findAll()) {
+            Long id = category.getId();
+            Object[] r = aggregateById.get(id);
+            int weakTopics = r == null ? 0 : ((Number) r[3]).intValue();
+            int questionCount = r == null ? 0 : ((Number) r[4]).intValue();
+            Integer recentConf = r == null ? null : round(r[5]);
+            Integer prevConf = r == null ? null : round(r[6]);
+
+            // Category accuracy mirrors the Confidence Explorer tree: weighted by
+            // attempts across EVERY topic in the category (attempted or not), null
+            // when the category has no attempts yet.
+            double accWeighted = 0;
+            int accCount = 0;
+            for (Long topicId : topicsByCategory.getOrDefault(id, List.of())) {
+                Integer acc = topicAccuracy.get(topicId);
+                int q = topicQuestions.getOrDefault(topicId, 0);
+                if (acc != null) {
+                    accWeighted += acc * q;
+                    accCount += q;
+                }
+            }
+            Integer accuracy = accCount == 0 ? null : (int) Math.round(accWeighted / accCount);
+
+            out.add(new CategoryConfidenceDTO(id, category.getName(),
                     coverageConfidence(topicsByCategory.getOrDefault(id, List.of()), topicConfidence),
+                    accuracy,
                     weakTopics, trendOf(recentConf, prevConf), questionCount));
         }
+        // Keep the data-first ordering the SQL used to provide (most questions
+        // attempted at the top) now that empty categories are included too.
+        out.sort(Comparator.comparingInt(CategoryConfidenceDTO::questionCount).reversed());
         return out;
     }
 

@@ -88,7 +88,7 @@ export default function AccuracyHeatmap({ data = [] }) {
                 </div>
 
                 {/* Matrix Rows — vertical only; tooltip no longer affects layout */}
-                <div className="max-h-56 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
+                <div className="max-h-56 scrollbar-hidden space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
                     {data.map((row, i) => (
                         <div
                             key={row.topic}
