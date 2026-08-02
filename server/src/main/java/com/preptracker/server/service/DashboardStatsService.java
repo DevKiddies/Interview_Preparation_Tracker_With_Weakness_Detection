@@ -7,6 +7,8 @@ package com.preptracker.server.service;
 // distinct dates the user took any test.
 
 import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
+import com.preptracker.server.dto.ActivityDayDTO;
+import com.preptracker.server.dto.ActivityHeatmapDTO;
 import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceNodeDTO;
@@ -31,10 +33,12 @@ import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -517,6 +521,65 @@ public class DashboardStatsService {
                     bucket == null || bucket[2] < 0 ? null : (int) Math.round(bucket[2])));
         }
         return out;
+    }
+
+    // Per-day study activity for the profile "Study Consistency" heatmap. Merges
+    // per-day attempt stats with per-day test time (test_attempts), then derives
+    // current + longest streaks from the days that actually have activity. No
+    // synthesized/fabricated data — every number comes from real attempts.
+    public ActivityHeatmapDTO getActivityHeatmap(UUID userId) {
+        LocalDateTime start = LocalDate.now().minusYears(3).atStartOfDay();
+
+        Map<LocalDate, ActivityDayDTO> byDay = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findDailyActivity(userId, start)) {
+            LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
+            int attempts = ((Number) r[1]).intValue();
+            int answered = ((Number) r[2]).intValue();
+            Integer confidence = r[3] == null ? null : (int) Math.round(((Number) r[3]).doubleValue());
+            Integer accuracy = r[4] == null ? null : (int) Math.round(((Number) r[4]).doubleValue() * 100);
+            byDay.put(day, new ActivityDayDTO(day.toString(), attempts, answered, confidence, accuracy, 0));
+        }
+        for (Object[] r : testAttemptRepository.findDailyStudyTime(userId, start)) {
+            LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
+            int studySeconds = ((Number) r[1]).intValue();
+            ActivityDayDTO dto = byDay.get(day);
+            if (dto != null) {
+                byDay.put(day, new ActivityDayDTO(dto.date(), dto.attempts(), dto.questions(),
+                        dto.confidence(), dto.accuracy(), studySeconds / 60));
+            }
+        }
+
+        List<ActivityDayDTO> days = new ArrayList<>(byDay.values());
+        days.sort(Comparator.comparing(ActivityDayDTO::date));
+
+        List<LocalDate> active = new ArrayList<>();
+        for (ActivityDayDTO d : days) {
+            if (d.attempts() > 0) active.add(LocalDate.parse(d.date()));
+        }
+        Set<LocalDate> activeSet = new HashSet<>(active);
+
+        int current = 0;
+        if (!activeSet.isEmpty()) {
+            // A streak stays alive if the user practiced yesterday but not yet today.
+            LocalDate cursor = LocalDate.now();
+            if (!activeSet.contains(cursor)) cursor = cursor.minusDays(1);
+            while (activeSet.contains(cursor)) {
+                current++;
+                cursor = cursor.minusDays(1);
+            }
+        }
+
+        int longest = 0;
+        LocalDate prev = null;
+        int run = 0;
+        for (LocalDate d : active) {
+            if (prev != null && d.equals(prev.plusDays(1))) run++;
+            else run = 1;
+            if (run > longest) longest = run;
+            prev = d;
+        }
+
+        return new ActivityHeatmapDTO(days, current, longest);
     }
 
     private String trendOf(Integer recent, Integer prev) {

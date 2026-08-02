@@ -41,14 +41,19 @@ export default function ProfilePage() {
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState("");
+  const [loadError, setLoadError]     = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { navigate("/login"); return; }
+    setLoadError(false);
     fetch(`${API_BASE}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("profile load failed");
+          return r.json();
+        })
         .then((data) => {
           setProfile(data);
           setCachedProfile(data);
@@ -58,7 +63,7 @@ export default function ProfilePage() {
           }
           if (data.avatarUrl) localStorage.setItem("avatarUrl", data.avatarUrl);
         })
-        .catch(() => {});
+        .catch(() => setLoadError(true));
   }, [navigate]);
 
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
@@ -212,6 +217,18 @@ export default function ProfilePage() {
         />
 
         <div className="min-w-0 flex-1 space-y-6">
+          {loadError && (
+            <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">
+              <span>Couldn't load your profile from the server.</span>
+              <button
+                onClick={() => window.location.reload()}
+                className="shrink-0 rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-rose-700"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           <ProfileHeader />
 
           <div className="w-full space-y-6">

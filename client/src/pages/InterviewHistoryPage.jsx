@@ -71,21 +71,17 @@ function InterviewHistoryPage() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch(`${API_BASE}/api/interviews`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data)) setInterviews(data);
-        })
-        .catch(() => {});
-
-    fetch(`${API_BASE}/api/tests/history`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data)) setTests(data);
+    Promise.all([
+      fetch(`${API_BASE}/api/interviews`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((res) => res.json()),
+      fetch(`${API_BASE}/api/tests/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((res) => res.json()),
+    ])
+        .then(([interviewData, testData]) => {
+          if (Array.isArray(interviewData)) setInterviews(interviewData);
+          if (Array.isArray(testData)) setTests(testData);
         })
         .catch(() => {})
         .finally(() => setLoading(false));

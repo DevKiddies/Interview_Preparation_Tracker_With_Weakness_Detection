@@ -8,6 +8,7 @@ package com.preptracker.server.controller;
 // without needing to know their UUID.
 
 import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
+import com.preptracker.server.dto.ActivityHeatmapDTO;
 import com.preptracker.server.dto.BlindSpotDTO;
 import com.preptracker.server.dto.CategoryConfidenceDTO;
 import com.preptracker.server.dto.ConfidenceTreeDTO;
@@ -156,6 +157,13 @@ public class UserController {
     @GetMapping("/me/dashboard/accuracy-heatmap")
     public ResponseEntity<List<AccuracyHeatmapRowDTO>> getAccuracyHeatmap() {
         return ResponseEntity.ok(dashboardStatsService.getAccuracyHeatmap(authenticatedUserId()));
+    }
+
+    // Per-day study activity (questions, confidence, accuracy, study time) plus
+    // streak summary, for the profile "Study Consistency" heatmap. All real data.
+    @GetMapping("/me/dashboard/activity-heatmap")
+    public ResponseEntity<ActivityHeatmapDTO> getActivityHeatmap() {
+        return ResponseEntity.ok(dashboardStatsService.getActivityHeatmap(authenticatedUserId()));
     }
 
     @GetMapping("/me")
