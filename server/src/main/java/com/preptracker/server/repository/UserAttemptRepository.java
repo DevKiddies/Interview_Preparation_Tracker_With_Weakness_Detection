@@ -36,4 +36,54 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
     List<Object[]> findDashboardStats(@Param("userId") UUID userId,
                                       @Param("thisStart") LocalDateTime thisStart,
                                       @Param("prevStart") LocalDateTime prevStart);
+
+    // Rows of [categoryId, categoryName, confidence, weakCount, questionCount,
+    // recentConf, prevConf] for the "Confidence by Category" widget. Trend is
+    // computed in Java from recentConf vs prevConf (last 7 days vs the 7 before).
+    @Query(value = """
+            SELECT c.id, c.name,
+              AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              COALESCE(SUM(CASE WHEN ua.confidence_state IN ('BLIND_SPOT','CLEAR_WEAKNESS') THEN 1 ELSE 0 END), 0) AS weak_count,
+              COUNT(*) AS q_count,
+              AVG(CASE WHEN ua.created_at >= :thisStart AND ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS recent_conf,
+              AVG(CASE WHEN ua.created_at >= :prevStart AND ua.created_at < :thisStart AND ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS prev_conf
+            FROM user_attempts ua
+            JOIN topics t ON t.id = ua.topic_id
+            JOIN categories c ON c.id = t.category_id
+            WHERE ua.user_id = :userId
+            GROUP BY c.id, c.name
+            ORDER BY q_count DESC
+            """, nativeQuery = true)
+    List<Object[]> findCategoryConfidence(@Param("userId") UUID userId,
+                                          @Param("thisStart") LocalDateTime thisStart,
+                                          @Param("prevStart") LocalDateTime prevStart);
+
+    // Rows of [topicId, confidence, questionCount] — used by the Confidence
+    // Explorer's topic-level table. questionCount counts every attempt, while
+    // confidence only averages answered (non-NOT_ATTEMPTED) scores.
+    @Query(value = """
+            SELECT t.id,
+              AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              COUNT(*) AS q_count
+            FROM user_attempts ua
+            JOIN topics t ON t.id = ua.topic_id
+            WHERE ua.user_id = :userId
+            GROUP BY t.id
+            """, nativeQuery = true)
+    List<Object[]> findTopicStats(@Param("userId") UUID userId);
+
+    // Rows of [techniqueId, confidence, questionCount] — used by the Confidence
+    // Explorer's technique-level table. Techniques are reached through the
+    // question's technique_id (attempts where the question wasn't tagged with a
+    // technique are simply not counted here).
+    @Query(value = """
+            SELECT q.technique_id,
+              AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS confidence,
+              COUNT(*) AS q_count
+            FROM user_attempts ua
+            JOIN questions q ON q.id = ua.question_id
+            WHERE ua.user_id = :userId AND q.technique_id IS NOT NULL
+            GROUP BY q.technique_id
+            """, nativeQuery = true)
+    List<Object[]> findTechniqueStats(@Param("userId") UUID userId);
 }

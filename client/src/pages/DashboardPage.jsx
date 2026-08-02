@@ -15,7 +15,6 @@ import { getInterviewClosed } from "../utils/interviewState";
 import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache";
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
-import { topicConfidence } from "../data/dashboardData";
 import { confidenceTrend } from "../data/dashboardData";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
@@ -51,6 +50,7 @@ export default function DashboardPage() {
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
   const [profile, setProfile] = useState(() => getCachedProfile());
   const [stats, setStats] = useState(() => getCachedDashboard()?.stats ?? null);
+  const [categories, setCategories] = useState(() => getCachedDashboard()?.categories ?? []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -82,6 +82,18 @@ export default function DashboardPage() {
         .then((data) => {
           setStats(data);
           setCachedDashboard({ ...getCachedDashboard(), stats: data });
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/categories`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setCategories(data);
+            setCachedDashboard({ ...getCachedDashboard(), categories: data });
+          }
         })
         .catch(() => {});
   }, []);
@@ -209,7 +221,7 @@ export default function DashboardPage() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ConfidenceByCategory topics={topicConfidence} />
+              <ConfidenceByCategory topics={categories} />
               <ConfidenceTrend data={confidenceTrend} />
             </div>
 

@@ -7,6 +7,8 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
+import com.preptracker.server.dto.CategoryConfidenceDTO;
+import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.OnboardingRequest;
 import com.preptracker.server.dto.UpdateAvatarRequest;
@@ -116,6 +118,20 @@ public class UserController {
     @GetMapping("/me/dashboard/stats")
     public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
         return ResponseEntity.ok(dashboardStatsService.getStats(authenticatedUserId()));
+    }
+
+    // Per-category confidence/weak-topic data for the "Confidence by Category"
+    // widget on the dashboard.
+    @GetMapping("/me/dashboard/categories")
+    public ResponseEntity<List<CategoryConfidenceDTO>> getCategoryConfidence() {
+        return ResponseEntity.ok(dashboardStatsService.getCategoryConfidence(authenticatedUserId()));
+    }
+
+    // Full category → topic → technique confidence tree for the Confidence
+    // Explorer page (drill-down from the dashboard chart).
+    @GetMapping("/me/dashboard/confidence-tree")
+    public ResponseEntity<ConfidenceTreeDTO> getConfidenceTree() {
+        return ResponseEntity.ok(dashboardStatsService.getConfidenceTree(authenticatedUserId()));
     }
 
     @GetMapping("/me")
