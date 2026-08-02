@@ -42,6 +42,14 @@ public class DashboardStatsService {
 
     private static final int WEEK_DAYS = 7;
 
+    // How many distinct answered questions it takes before a topic's behavioral
+    // confidence is treated as fully credible. A user who answered 1 question
+    // gets only ~10% of that confidence displayed; someone who answered 10+
+    // distinct questions gets the full amount. This is deliberately based on
+    // EVIDENCE COLLECTED, not on the question bank size, so adding more
+    // questions to a topic never lowers a user's displayed confidence.
+    private static final int EVIDENCE_TARGET = 10;
+
     private final UserAttemptRepository userAttemptRepository;
     private final TestAttemptRepository testAttemptRepository;
     private final CategoryRepository categoryRepository;
@@ -81,20 +89,63 @@ public class DashboardStatsService {
         LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
         LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
+        // Per-topic confidence across all attempts, plus the full topic→category
+        // mapping, so a category's confidence can reflect how much of the
+        // category the user has actually covered (see coverageConfidence). Topic
+        // confidence here is already evidence-weighted so the category mean
+        // matches what the Confidence Explorer tree shows.
+        Map<Long, Integer> topicConfidence = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            int distinct = ((Number) r[4]).intValue();
+            topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
+        }
+        Map<Long, List<Long>> topicsByCategory = new HashMap<>();
+        for (Object[] r : topicRepository.findAllWithCategory()) {
+            topicsByCategory.computeIfAbsent(((Number) r[2]).longValue(), k -> new ArrayList<>())
+                    .add(((Number) r[0]).longValue());
+        }
+
         List<Object[]> rows = userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart);
         List<CategoryConfidenceDTO> out = new ArrayList<>();
         for (Object[] r : rows) {
             Long id = ((Number) r[0]).longValue();
             String name = (String) r[1];
-            Integer confidence = round(r[2]);
             int weakTopics = ((Number) r[3]).intValue();
             int questionCount = ((Number) r[4]).intValue();
             Integer recentConf = round(r[5]);
             Integer prevConf = round(r[6]);
-            out.add(new CategoryConfidenceDTO(id, name, confidence, weakTopics,
-                    trendOf(recentConf, prevConf), questionCount));
+            out.add(new CategoryConfidenceDTO(id, name,
+                    coverageConfidence(topicsByCategory.getOrDefault(id, List.of()), topicConfidence),
+                    weakTopics, trendOf(recentConf, prevConf), questionCount));
         }
         return out;
+    }
+
+    // Mean confidence across EVERY topic in the category, counting topics the
+    // user has never attempted (or has no answered confidence for) as 0%.
+    // Claiming 90% confidence in a category should require ~90% topic coverage,
+    // not just high scores on the handful of topics that were attempted.
+    private Integer coverageConfidence(List<Long> topicIds, Map<Long, Integer> topicConfidence) {
+        if (topicIds.isEmpty()) return null;
+        double sum = 0;
+        for (Long topicId : topicIds) {
+            Integer conf = topicConfidence.get(topicId);
+            sum += conf == null ? 0 : conf;
+        }
+        return (int) Math.round(sum / topicIds.size());
+    }
+
+    // Scales a raw behavioral confidence down until the user has enough evidence
+    // (distinct answered questions) to back it up. A single answered question is
+    // not enough to claim "100% confident" — the original bug — so a topic with
+    // 1 answer shows ~10% until more questions are answered. Uses a linear ramp
+    // to EVIDENCE_TARGET: smooth, no arbitrary bands, never above the raw value,
+    // and independent of how many questions exist in the topic's bank.
+    private Integer weightConfidence(Integer rawConfidence, int distinctAnswered) {
+        if (rawConfidence == null) return null;
+        double weight = Math.min(1.0, distinctAnswered / (double) EVIDENCE_TARGET);
+        return (int) Math.round(rawConfidence * weight);
     }
 
     // Full category → topic → technique tree with per-node confidence, accuracy
@@ -104,15 +155,17 @@ public class DashboardStatsService {
         Map<Long, Integer> topicConfidence = new HashMap<>();
         Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
+        Map<Long, Integer> topicDistinctAnswered = new HashMap<>();
         for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
             Long topicId = ((Number) r[0]).longValue();
             topicConfidence.put(topicId, round(r[1]));
             topicAccuracy.put(topicId, round100(r[2]));
             topicQuestions.put(topicId, ((Number) r[3]).intValue());
+            topicDistinctAnswered.put(topicId, ((Number) r[4]).intValue());
         }
 
-        // topicId -> (techniqueId -> [confidence, accuracy, questionCount])
-        // scoped to the topic the attempt actually happened in.
+        // topicId -> (techniqueId -> [confidence, accuracy, questionCount,
+        // distinctAnswered]) scoped to the topic the attempt actually happened in.
         Map<Long, Map<Long, double[]>> techniqueStatsByTopic = new HashMap<>();
         for (Object[] r : userAttemptRepository.findTechniqueStatsByTopic(userId)) {
             Long topicId = ((Number) r[0]).longValue();
@@ -120,8 +173,9 @@ public class DashboardStatsService {
             double conf = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue();
             double acc = r[3] == null ? Double.NaN : ((Number) r[3]).doubleValue();
             int count = ((Number) r[4]).intValue();
+            int distinct = ((Number) r[5]).intValue();
             techniqueStatsByTopic.computeIfAbsent(topicId, k -> new HashMap<>())
-                    .put(techniqueId, new double[]{conf, acc, count});
+                    .put(techniqueId, new double[]{conf, acc, count, distinct});
         }
 
         // technique_id -> topic_id (a technique can hang under several topics,
@@ -142,26 +196,41 @@ public class DashboardStatsService {
             Long categoryId = ((Number) r[2]).longValue();
 
             List<ConfidenceNodeDTO> techniques = new ArrayList<>();
+            int topicDistinct = topicDistinctAnswered.getOrDefault(topicId, 0);
             topicsByCategory.computeIfAbsent(categoryId, k -> new ArrayList<>()).add(new ConfidenceNodeDTO(
                     topicId, topicName, "topic",
-                    topicConfidence.get(topicId),
+                    weightConfidence(topicConfidence.get(topicId), topicDistinct),
                     topicAccuracy.get(topicId),
                     topicQuestions.getOrDefault(topicId, 0),
                     techniques));
 
-            // Attach techniques to this topic (as their canonical parent) using
-            // stats scoped to THIS topic's attempts.
+            // Collect this topic's attached techniques first, accumulating the
+            // RAW (unweighted) stats so the "General Questions" remainder can be
+            // computed exactly as before and still reconcile the topic's totals.
             Map<Long, double[]> topicTechniqueStats = techniqueStatsByTopic.getOrDefault(topicId, Map.of());
+            List<Long> attachedTechniques = new ArrayList<>();
             for (Map.Entry<Long, Long> e : techniqueParent.entrySet()) {
-                if (e.getValue().equals(topicId)) {
-                    Long techniqueId = e.getKey();
-                    double[] s = topicTechniqueStats.get(techniqueId);
-                    techniques.add(new ConfidenceNodeDTO(
-                            techniqueId, techniqueNames.getOrDefault(techniqueId, "Technique"), "technique",
-                            s == null || Double.isNaN(s[0]) ? null : (int) Math.round(s[0]),
-                            s == null || Double.isNaN(s[1]) ? null : (int) Math.round(s[1] * 100),
-                            s == null ? 0 : (int) s[2],
-                            null));
+                if (e.getValue().equals(topicId)) attachedTechniques.add(e.getKey());
+            }
+
+            int techniqueQuestions = 0;
+            int techniqueDistinct = 0;
+            double techniqueConfWeighted = 0;
+            int techniqueConfCount = 0;
+            double techniqueAccWeighted = 0;
+            int techniqueAccCount = 0;
+            for (Long techniqueId : attachedTechniques) {
+                double[] s = topicTechniqueStats.get(techniqueId);
+                int q = s == null ? 0 : (int) s[2];
+                techniqueQuestions += q;
+                techniqueDistinct += s == null ? 0 : (int) s[3];
+                if (s != null && !Double.isNaN(s[0])) {
+                    techniqueConfWeighted += s[0] * q;
+                    techniqueConfCount += q;
+                }
+                if (s != null && !Double.isNaN(s[1])) {
+                    techniqueAccWeighted += s[1] * 100 * q;
+                    techniqueAccCount += q;
                 }
             }
 
@@ -169,34 +238,18 @@ public class DashboardStatsService {
             // above don't, so the topic's totals reconcile exactly. Computed as
             // the remainder in Java (never trusting SQL membership) because a
             // technique's canonical parent may live in another topic.
-            int techniqueQuestions = 0;
-            double techniqueConfWeighted = 0;
-            int techniqueConfCount = 0;
-            double techniqueAccWeighted = 0;
-            int techniqueAccCount = 0;
-            for (ConfidenceNodeDTO t : techniques) {
-                techniqueQuestions += t.questionCount();
-                if (t.confidence() != null) {
-                    techniqueConfWeighted += (double) t.confidence() * t.questionCount();
-                    techniqueConfCount += t.questionCount();
-                }
-                if (t.accuracy() != null) {
-                    techniqueAccWeighted += (double) t.accuracy() * t.questionCount();
-                    techniqueAccCount += t.questionCount();
-                }
-            }
             int topicTotal = topicQuestions.getOrDefault(topicId, 0);
             int generalQuestions = topicTotal - techniqueQuestions;
+            Integer generalRawConf = null;
+            Integer generalAcc = null;
             if (generalQuestions > 0) {
                 Integer topicConf = topicConfidence.get(topicId);
                 Integer topicAcc = topicAccuracy.get(topicId);
-                Integer generalConf = null;
-                Integer generalAcc = null;
                 if (topicConf != null) {
                     if (techniqueConfCount == topicTotal) {
-                        generalConf = topicConf; // degenerate: only listed techniques
+                        generalRawConf = topicConf; // degenerate: only listed techniques
                     } else {
-                        generalConf = (int) Math.round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
+                        generalRawConf = (int) Math.round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
                     }
                 }
                 if (topicAcc != null) {
@@ -206,24 +259,42 @@ public class DashboardStatsService {
                         generalAcc = (int) Math.round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
                     }
                 }
+            }
+            // Evidence left over for the general bucket once the attached
+            // techniques have claimed theirs (per-technique distinct counts).
+            int generalEvidence = Math.max(0, topicDistinct - techniqueDistinct);
+
+            // Attach the techniques (as their canonical parent) using stats
+            // scoped to THIS topic's attempts, each weighted by its own evidence.
+            for (Long techniqueId : attachedTechniques) {
+                double[] s = topicTechniqueStats.get(techniqueId);
+                Integer rawConf = s == null || Double.isNaN(s[0]) ? null : (int) Math.round(s[0]);
+                techniques.add(new ConfidenceNodeDTO(
+                        techniqueId, techniqueNames.getOrDefault(techniqueId, "Technique"), "technique",
+                        weightConfidence(rawConf, s == null ? 0 : (int) s[3]),
+                        s == null || Double.isNaN(s[1]) ? null : (int) Math.round(s[1] * 100),
+                        s == null ? 0 : (int) s[2],
+                        null));
+            }
+
+            if (generalQuestions > 0) {
                 techniques.add(new ConfidenceNodeDTO(
                         -1L, "General Questions", "general",
-                        generalConf, generalAcc, generalQuestions, null));
+                        weightConfidence(generalRawConf, generalEvidence),
+                        generalAcc, generalQuestions, null));
             }
         }
 
-        // Aggregate category-level confidence from topic stats (simple mean for
-        // consistency with the category confidence) and accuracy weighted by
-        // question count (reflects actual progress).
-        Map<Long, List<Integer>> categoryConfidences = new HashMap<>();
+        // Aggregate category-level confidence from the topic rows (which include
+        // every topic, attempted or not). Confidence is coverage-aware: topics
+        // the user has never attempted count as 0%, so a category reads ~90%
+        // only when ~90% of its topics are actually covered. Accuracy stays
+        // question-weighted over attempted questions (reflects actual progress).
         Map<Long, Integer> categoryQuestions = new HashMap<>();
         Map<Long, Double> categoryAccuracy = new HashMap<>();
         for (Map.Entry<Long, List<ConfidenceNodeDTO>> e : topicsByCategory.entrySet()) {
             for (ConfidenceNodeDTO t : e.getValue()) {
                 categoryQuestions.merge(e.getKey(), t.questionCount(), Integer::sum);
-                if (t.confidence() != null) {
-                    categoryConfidences.computeIfAbsent(e.getKey(), k -> new ArrayList<>()).add(t.confidence());
-                }
                 if (t.accuracy() != null) {
                     categoryAccuracy.merge(e.getKey(), (double) t.accuracy() * t.questionCount(), Double::sum);
                 }
@@ -233,9 +304,14 @@ public class DashboardStatsService {
         List<ConfidenceNodeDTO> categories = new ArrayList<>();
         for (Category c : categoryRepository.findAll()) {
             List<ConfidenceNodeDTO> topics = topicsByCategory.getOrDefault(c.getId(), new ArrayList<>());
-            List<Integer> confs = categoryConfidences.get(c.getId());
-            Integer confidence = (confs == null || confs.isEmpty()) ? null
-                    : (int) Math.round(confs.stream().mapToInt(Integer::intValue).average().orElse(0));
+            Integer confidence = null;
+            if (!topics.isEmpty()) {
+                double sum = 0;
+                for (ConfidenceNodeDTO t : topics) {
+                    sum += t.confidence() == null ? 0 : t.confidence();
+                }
+                confidence = (int) Math.round(sum / topics.size());
+            }
             int catQuestions = categoryQuestions.getOrDefault(c.getId(), 0);
             Double accWeighted = categoryAccuracy.get(c.getId());
             Integer accuracy = (accWeighted == null || catQuestions == 0) ? null
