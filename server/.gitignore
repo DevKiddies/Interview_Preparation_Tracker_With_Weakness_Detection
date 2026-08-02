@@ -35,3 +35,8 @@ build/
 # For password not to push to GitHub
 application.properties
 target/
+
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
