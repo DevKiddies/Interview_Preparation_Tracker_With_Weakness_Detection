@@ -7,6 +7,7 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
+import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.OnboardingRequest;
 import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
@@ -16,6 +17,7 @@ import com.preptracker.server.exception.NotFoundException;
 import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.UserProfile;
+import com.preptracker.server.service.DashboardStatsService;
 import com.preptracker.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final DashboardStatsService dashboardStatsService;
 
     private UUID authenticatedUserId() {
         String principal = (String) SecurityContextHolder.getContext()
@@ -107,6 +110,12 @@ public class UserController {
                 .getAuthentication().getPrincipal();
         userService.completeOnboarding(UUID.fromString(userId), request);
         return ResponseEntity.ok("Onboarding complete!");
+    }
+    // Aggregate numbers for the four dashboard stat cards (confidence, accuracy,
+    // questions solved, study streak) plus week-over-week deltas.
+    @GetMapping("/me/dashboard/stats")
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
+        return ResponseEntity.ok(dashboardStatsService.getStats(authenticatedUserId()));
     }
 
     @GetMapping("/me")

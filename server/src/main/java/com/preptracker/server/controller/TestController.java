@@ -7,6 +7,7 @@ package com.preptracker.server.controller;
 
 import com.preptracker.server.dto.AvailableTestResponse;
 import com.preptracker.server.dto.LatestTestResponse;
+import com.preptracker.server.dto.TestHistoryDTO;
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
 import com.preptracker.server.service.TestHistoryService;
@@ -14,11 +15,7 @@ import com.preptracker.server.service.TestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,6 +31,16 @@ public class TestController {
     @PostMapping("/submit")
     public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
         return ResponseEntity.ok(testService.submitTest(request));
+    }
+
+    // Backs the Mock Test History page — the current user's persisted test
+    // attempts (mock + topic), newest first. The aggregation of confidence and
+    // weak topics lives in TestHistoryService.
+    @GetMapping("/history")
+    public ResponseEntity<List<TestHistoryDTO>> getHistory() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ResponseEntity.ok(testHistoryService.getHistory(UUID.fromString(principal)));
     }
 
     // Backs the landing page hero's "Test Passed" card — the user's real most
