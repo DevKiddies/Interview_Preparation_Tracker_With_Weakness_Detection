@@ -12,8 +12,6 @@ import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
 import com.preptracker.server.service.TestHistoryService;
 import com.preptracker.server.service.TestService;
-import com.preptracker.server.service.TestSessionService;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,89 +28,39 @@ public class TestController {
     private final TestService testService;
     private final TestHistoryService testHistoryService;
 
-    private final TestSessionService testSessionService;
-
-    @PostMapping("/start/{testId}")
-    public ResponseEntity<UUID> startTest(@PathVariable Long testId) {
-
-        UUID sessionId = testSessionService.startSession(
-                authenticatedUserId(),
-                testId);
-
-        return ResponseEntity.ok(sessionId);
-    }
-
     @PostMapping("/submit")
     public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
-        List<Question> fetched = questionRepository.findAllById(request.questionIds());
-
-        Map<Long, Question> byId = new HashMap<>();
-        for (Question q : fetched)
-            byId.put(q.getId(), q);
-
-        int score = 0;
-        List<TestResultResponse.QuestionResult> results = new ArrayList<>();
-        Map<String, int[]> catMap = new LinkedHashMap<>();
-
-        // Iterate in the original question order (not the DB fetch order) to build
-        // the results list in the same sequence the user saw during the test.
-        for (Long id : request.questionIds()) {
-            Question q = byId.get(id);
-            if (q == null)
-                continue;
-
-            String correctText = switch (q.getCorrectAnswer()) {
-                case "A" -> q.getOptionA();
-                case "B" -> q.getOptionB();
-                case "C" -> q.getOptionC();
-                case "D" -> q.getOptionD();
-                default -> "";
-            };
-
-            String submitted = request.answers().get(id);
-            boolean correct = submitted != null && submitted.equals(correctText);
-            if (correct)
-                score++;
-
-            String catName = q.getCategory().getName();
-            int[] counts = catMap.computeIfAbsent(catName, k -> new int[] { 0, 0 });
-            counts[1]++;
-            if (correct)
-                counts[0]++;
-
-            results.add(new TestResultResponse.QuestionResult(
-                    q.getId(), q.getQuestion(),
-                    List.of(q.getOptionA(), q.getOptionB(), q.getOptionC(), q.getOptionD()),
-                    submitted, correctText, correct,
-                    catName, q.getDifficulty()));
-        }
-
-        Map<String, TestResultResponse.CategoryStats> breakdown = new LinkedHashMap<>();
-        catMap.forEach((cat, c) -> breakdown.put(cat, new TestResultResponse.CategoryStats(c[0], c[1])));
-
-        int total = results.size();
-        double accuracy = total == 0 ? 0.0 : Math.round((score * 100.0 / total) * 10.0) / 10.0;
-
-        if (total > 0) {
-            TestAttempt attempt = new TestAttempt();
-            attempt.setUserId(authenticatedUserId());
-            attempt.setScore(score);
-            attempt.setTotal(total);
-            attempt.setAccuracy(accuracy);
-            attempt.setTimeTakenSeconds(request.timeTaken());
-            // Dominant category = the one with the most questions in this attempt
-            // (a test can mix categories, so this isn't necessarily the only one).
-            catMap.entrySet().stream()
-                    .max(Comparator.comparingInt(e -> e.getValue()[1]))
-                    .ifPresent(e -> attempt.setCategory(e.getKey()));
-            testAttemptRepository.save(attempt);
-        }
-
-        return ResponseEntity
-                .ok(new TestResultResponse(score, total, request.timeTaken(), accuracy, results, breakdown));
+        return ResponseEntity.ok(testService.submitTest(request));
     }
 
-    private UUID authenticatedUserId() {
+    // Backs the Mock Test History page — the current user's persisted test
+    // attempts (mock + topic), newest first. The aggregation of confidence and
+    // weak topics lives in TestHistoryService.
+    @GetMapping("/history")
+    public ResponseEntity<List<TestHistoryDTO>> getHistory() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ResponseEntity.ok(testHistoryService.getHistory(UUID.fromString(principal)));
+    }
+
+    // Backs the landing page hero's "Test Passed" card — the user's real most
+    // recent result instead of a hardcoded placeholder. 204 when they haven't
+    // taken a test yet, so the frontend can fall back to a "take your first test" prompt.
+    @GetMapping("/latest")
+    public ResponseEntity<LatestTestResponse> latestTest() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        UUID userId = UUID.fromString(principal);
+        return testService.getLatestAttempt(userId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    // Reconstructs the full per-question result for one of the current user's
+    // attempts. Backs the results page when deep-linked from mock-test history
+    // or a TEST_RESULT notification, where only the attempt id is known.
+    @GetMapping("/attempts/{attemptId}")
+    public ResponseEntity<TestResultResponse> getAttemptResult(@PathVariable Long attemptId) {
         String principal = (String) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
         return testService.getAttemptResult(UUID.fromString(principal), attemptId)

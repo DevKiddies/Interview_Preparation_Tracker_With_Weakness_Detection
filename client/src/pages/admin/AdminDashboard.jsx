@@ -3,44 +3,21 @@
 // platform health metrics, and quick-action shortcuts.
 // All data is currently mocked in adminDashboardData.js — swap for API calls when ready.
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import {
-  Users,
-  UserCheck,
-  BookOpen,
-  ClipboardList,
-  TrendingUp,
-  UserX,
-  PlusCircle,
-  FilePlus,
-  ArrowUpRight,
-  ArrowDownRight,
-  Activity,
-  CheckCircle,
-  AlertCircle,
-  Eye,
-  Clock,
-  Target,
+  Users, UserCheck, BookOpen, ClipboardList, TrendingUp, UserX,
+  PlusCircle, FilePlus, ArrowUpRight, ArrowDownRight,
+  Activity, CheckCircle, AlertCircle, Eye, Clock, Target,
   RefreshCw,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import {
+  platformStats,
   userGrowthData,
   dailyActiveUsers,
   questionsByCategory,
@@ -49,81 +26,36 @@ import {
   platformHealthMetrics,
 } from "../../data/adminDashboardData";
 
-import API_BASE from "../../utils/api";
-
 // ─── icon & color maps ────────────────────────────────────────────────────────
 
 const ICON_MAP = {
-  users: Users,
-  "user-check": UserCheck,
-  "book-open": BookOpen,
+  users:          Users,
+  "user-check":   UserCheck,
+  "book-open":    BookOpen,
   "clipboard-list": ClipboardList,
-  "trending-up": TrendingUp,
-  "user-x": UserX,
-  clock: Clock,
-  check: CheckCircle,
-  target: Target,
-  repeat: RefreshCw,
+  "trending-up":  TrendingUp,
+  "user-x":       UserX,
+  clock:          Clock,
+  check:          CheckCircle,
+  target:         Target,
+  repeat:         RefreshCw,
 };
 
 const COLOR = {
-  blue: {
-    bg: "bg-blue-50 dark:bg-blue-900/20",
-    icon: "text-blue-600 dark:text-blue-400",
-    badge: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
-    border: "border-blue-100 dark:border-blue-800/40",
-  },
-  emerald: {
-    bg: "bg-emerald-50 dark:bg-emerald-900/20",
-    icon: "text-emerald-600 dark:text-emerald-400",
-    badge:
-      "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
-    border: "border-emerald-100 dark:border-emerald-800/40",
-  },
-  indigo: {
-    bg: "bg-indigo-50 dark:bg-indigo-900/20",
-    icon: "text-indigo-600 dark:text-indigo-400",
-    badge:
-      "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300",
-    border: "border-indigo-100 dark:border-indigo-800/40",
-  },
-  teal: {
-    bg: "bg-teal-50 dark:bg-teal-900/20",
-    icon: "text-teal-600 dark:text-teal-400",
-    badge: "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300",
-    border: "border-teal-100 dark:border-teal-800/40",
-  },
-  amber: {
-    bg: "bg-amber-50 dark:bg-amber-900/20",
-    icon: "text-amber-600 dark:text-amber-400",
-    badge:
-      "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
-    border: "border-amber-100 dark:border-amber-800/40",
-  },
-  rose: {
-    bg: "bg-rose-50 dark:bg-rose-900/20",
-    icon: "text-rose-600 dark:text-rose-400",
-    badge: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300",
-    border: "border-rose-100 dark:border-rose-800/40",
-  },
-  purple: {
-    bg: "bg-purple-50 dark:bg-purple-900/20",
-    icon: "text-purple-600 dark:text-purple-400",
-    badge:
-      "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-    border: "border-purple-100 dark:border-purple-800/40",
-  },
+  blue:    { bg: "bg-blue-50 dark:bg-blue-900/20",    icon: "text-blue-600 dark:text-blue-400",    badge: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",    border: "border-blue-100 dark:border-blue-800/40"    },
+  emerald: { bg: "bg-emerald-50 dark:bg-emerald-900/20", icon: "text-emerald-600 dark:text-emerald-400", badge: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300", border: "border-emerald-100 dark:border-emerald-800/40" },
+  indigo:  { bg: "bg-indigo-50 dark:bg-indigo-900/20",  icon: "text-indigo-600 dark:text-indigo-400",  badge: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300",  border: "border-indigo-100 dark:border-indigo-800/40"  },
+  teal:    { bg: "bg-teal-50 dark:bg-teal-900/20",    icon: "text-teal-600 dark:text-teal-400",    badge: "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300",    border: "border-teal-100 dark:border-teal-800/40"    },
+  amber:   { bg: "bg-amber-50 dark:bg-amber-900/20",   icon: "text-amber-600 dark:text-amber-400",   badge: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",   border: "border-amber-100 dark:border-amber-800/40"   },
+  rose:    { bg: "bg-rose-50 dark:bg-rose-900/20",    icon: "text-rose-600 dark:text-rose-400",    badge: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300",    border: "border-rose-100 dark:border-rose-800/40"    },
+  purple:  { bg: "bg-purple-50 dark:bg-purple-900/20",  icon: "text-purple-600 dark:text-purple-400",  badge: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",  border: "border-purple-100 dark:border-purple-800/40"  },
 };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function ActivityStatusIcon({ status }) {
-  if (status === "success")
-    return (
-      <CheckCircle size={14} className="text-emerald-500 mt-0.5 shrink-0" />
-    );
-  if (status === "warning")
-    return <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />;
+  if (status === "success") return <CheckCircle size={14} className="text-emerald-500 mt-0.5 shrink-0" />;
+  if (status === "warning") return <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />;
   return <Activity size={14} className="text-blue-500 mt-0.5 shrink-0" />;
 }
 
@@ -131,16 +63,11 @@ function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shadow-lg text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">
-        {label}
-      </p>
+      <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">{label}</p>
       {payload.map((p) => (
-        <p
-          key={p.name}
-          style={{ color: p.color }}
-          className="font-medium leading-5"
-        >
-          {p.name}: <span className="font-bold">{p.value}</span>
+        <p key={p.name} style={{ color: p.color }} className="font-medium leading-5">
+          {p.name}:{" "}
+          <span className="font-bold">{p.value}</span>
         </p>
       ))}
     </div>
@@ -189,14 +116,10 @@ function StatCard({ stat }) {
         <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
           {stat.value}
         </p>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          {stat.label}
-        </p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{stat.label}</p>
       </div>
 
-      <p className="text-[11px] text-slate-400 dark:text-slate-500">
-        {stat.sublabel}
-      </p>
+      <p className="text-[11px] text-slate-400 dark:text-slate-500">{stat.sublabel}</p>
     </div>
   );
 }
@@ -206,13 +129,9 @@ function SectionCard({ title, subtitle, action, children }) {
     <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between mb-5 gap-2">
         <div>
-          <p className="text-[15px] font-bold text-slate-900 dark:text-white">
-            {title}
-          </p>
+          <p className="text-[15px] font-bold text-slate-900 dark:text-white">{title}</p>
           {subtitle && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {subtitle}
-            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
           )}
         </div>
         {action}
@@ -240,8 +159,8 @@ export default function AdminDashboard() {
   const { isDark } = useTheme();
   const [activityTab, setActivityTab] = useState("growth"); // "growth" | "dau"
 
-  const axisColor = isDark ? "#64748b" : "#94a3b8";
-  const gridColor = isDark ? "#1e293b" : "#f1f5f9";
+  const axisColor  = isDark ? "#64748b" : "#94a3b8";
+  const gridColor  = isDark ? "#1e293b" : "#f1f5f9";
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -250,123 +169,16 @@ export default function AdminDashboard() {
     day: "numeric",
   });
 
-  const [dashboardStats, setDashboardStats] = useState(null);
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/dashboard`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to load dashboard");
-
-        const data = await res.json();
-        setDashboardStats(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    loadDashboard();
-  }, []);
-  const platformStats = dashboardStats
-    ? [
-        {
-          id: "users",
-          label: "Total Users",
-          value: dashboardStats.totalUsers,
-          icon: "users",
-          color: "blue",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "questions",
-          label: "Questions",
-          value: dashboardStats.totalQuestions,
-          icon: "book-open",
-          color: "indigo",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "active-users",
-          label: "Active Today",
-          value: dashboardStats.totalUsersActiveToday,
-          icon: "user-check",
-          color: "emerald",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "tests",
-          label: "Tests Taken",
-          value: dashboardStats.totalTestsTaken,
-          icon: "clipboard-list",
-          color: "teal",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "avg-score",
-          label: "Average Score",
-          value: dashboardStats.averageScore.toFixed(1) + "%",
-          icon: "trending-up",
-          color: "amber",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "banned-users",
-          label: "Banned Users",
-          value: dashboardStats.bannedUsers,
-          icon: "user-x",
-          color: "rose",
-          change: "",
-          changeDir: "down",
-          sublabel: "",
-        },
-        {
-          id: "avg-session",
-          label: "Avg Session",
-          value: `${dashboardStats.averageSessionDuration.toFixed(2)} min`,
-          icon: "clock",
-          color: "purple",
-          change: "",
-          changeDir: "up",
-          sublabel: "",
-        },
-        {
-          id: "question-pass-rate",
-          label: "Question Pass Rate",
-          value: dashboardStats.questionPassRate.toFixed(2) + "%",
-          icon: "check",
-          color: "emerald",
-          change: "",
-          changeDir: "up",
-          sublabel: "Correct answers across all attempted questions",
-        },
-      ]
-    : [];
-
   return (
     <div className="space-y-5 pb-6">
+
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="text-[22px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
             Admin Dashboard
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {today}
-          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{today}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link
@@ -394,7 +206,6 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Platform Health ─────────────────────────────────────────────────── */}
-      {/*
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {platformHealthMetrics.map((metric) => {
           const Icon = ICON_MAP[metric.icon];
@@ -408,36 +219,29 @@ export default function AdminDashboard() {
                 <Icon size={15} className={c.icon} />
               </div>
               <div className="min-w-0">
-                <p className="text-base font-extrabold text-slate-900 dark:text-white leading-none">
-                  {metric.value}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                  {metric.label}
-                </p>
+                <p className="text-base font-extrabold text-slate-900 dark:text-white leading-none">{metric.value}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">{metric.label}</p>
               </div>
             </div>
           );
         })}
-      </div>*/}
+      </div>
 
       {/* ── Charts Row 1: User Activity + Question Distribution ─────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
         {/* User Activity Chart (2/3 width) */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
           <div className="flex items-start justify-between mb-5 gap-2">
             <div>
-              <p className="text-[15px] font-bold text-slate-900 dark:text-white">
-                User Activity
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Platform engagement overview
-              </p>
+              <p className="text-[15px] font-bold text-slate-900 dark:text-white">User Activity</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Platform engagement overview</p>
             </div>
             {/* Toggle */}
             <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 shrink-0">
               {[
                 { key: "growth", label: "Growth" },
-                { key: "dau", label: "Daily Active" },
+                { key: "dau",    label: "Daily Active" },
               ].map(({ key, label }) => (
                 <button
                   key={key}
@@ -456,32 +260,20 @@ export default function AdminDashboard() {
 
           <ResponsiveContainer width="100%" height={230}>
             {activityTab === "growth" ? (
-              <AreaChart
-                data={userGrowthData}
-                margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
-              >
+              <AreaChart data={userGrowthData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.22} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.22} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}    />
                   </linearGradient>
                   <linearGradient id="gNew" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.22} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.22} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+                <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
                 <Area
@@ -506,30 +298,12 @@ export default function AdminDashboard() {
                 />
               </AreaChart>
             ) : (
-              <BarChart
-                data={dailyActiveUsers}
-                margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
-              >
+              <BarChart data={dailyActiveUsers} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+                <XAxis dataKey="day" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar
-                  dataKey="dau"
-                  name="Active Users"
-                  fill="#3b82f6"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={44}
-                />
+                <Bar dataKey="dau" name="Active Users" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={44} />
               </BarChart>
             )}
           </ResponsiveContainer>
@@ -538,12 +312,8 @@ export default function AdminDashboard() {
         {/* Question Distribution Pie (1/3 width) */}
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
           <div className="mb-4">
-            <p className="text-[15px] font-bold text-slate-900 dark:text-white">
-              Questions by Category
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              2,156 total questions
-            </p>
+            <p className="text-[15px] font-bold text-slate-900 dark:text-white">Questions by Category</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">2,156 total questions</p>
           </div>
           <ResponsiveContainer width="100%" height={170}>
             <PieChart>
@@ -570,9 +340,7 @@ export default function AdminDashboard() {
                   className="w-2 h-2 rounded-full shrink-0"
                   style={{ background: cat.color }}
                 />
-                <span className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
-                  {cat.name}
-                </span>
+                <span className="text-[10px] text-slate-600 dark:text-slate-400 truncate">{cat.name}</span>
               </div>
             ))}
           </div>
@@ -585,38 +353,14 @@ export default function AdminDashboard() {
         subtitle="Total tests completed & average score per subject"
       >
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart
-            data={weeklyTestCompletion}
-            margin={{ top: 4, right: 4, left: -15, bottom: 0 }}
-          >
+          <BarChart data={weeklyTestCompletion} margin={{ top: 4, right: 4, left: -15, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis
-              dataKey="topic"
-              tick={{ fill: axisColor, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: axisColor, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
+            <XAxis dataKey="topic" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<ChartTooltip />} />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-            <Bar
-              dataKey="completed"
-              name="Tests Completed"
-              fill="#3b82f6"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={36}
-            />
-            <Bar
-              dataKey="avgScore"
-              name="Avg Score (%)"
-              fill="#10b981"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={36}
-            />
+            <Bar dataKey="completed" name="Tests Completed" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+            <Bar dataKey="avgScore"  name="Avg Score (%)"   fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={36} />
           </BarChart>
         </ResponsiveContainer>
       </SectionCard>
@@ -629,10 +373,7 @@ export default function AdminDashboard() {
       >
         <div className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800/70">
           {recentActivity.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-            >
+            <div key={item.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
               <ActivityStatusIcon status={item.status} />
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug truncate">
@@ -649,6 +390,7 @@ export default function AdminDashboard() {
           ))}
         </div>
       </SectionCard>
+
     </div>
   );
 }
