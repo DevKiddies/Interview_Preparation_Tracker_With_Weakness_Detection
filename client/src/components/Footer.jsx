@@ -18,8 +18,8 @@ const footerLinks = [
     links: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
-      { label: "AI Interview", to: "/ai-interview" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude", upcoming: true },
+      { label: "AI Interview", to: "/ai-interview", upcoming: true },
     ],
   },
   {
@@ -44,7 +44,7 @@ const footerLinks = [
 const socialLinks = [
   {
     label: "LinkedIn",
-    to: "/",
+    href: "https://www.linkedin.com/in/prepedge-co-7b651b426/",
     svg: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
         <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
@@ -55,7 +55,7 @@ const socialLinks = [
   },
   {
     label: "Instagram",
-    to: "/",
+    href: "#",
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
         <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
@@ -66,7 +66,7 @@ const socialLinks = [
   },
   {
     label: "Twitter / X",
-    to: "/",
+    href: "https://x.com/PrepEdge007",
     svg: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -75,7 +75,7 @@ const socialLinks = [
   },
   {
     label: "Facebook",
-    to: "/",
+    href: "#",
     svg: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
         <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
@@ -84,7 +84,7 @@ const socialLinks = [
   },
   {
     label: "YouTube",
-    to: "/",
+    href: "https://www.youtube.com/channel/UCu-Jvzona4bw7BNx5_ZgM5w",
     svg: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
         <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.96-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
@@ -121,15 +121,24 @@ export default function Footer() {
             </p>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {socialLinks.map(({ label, to, svg }) => (
-                <Link
-                  key={label}
-                  to={to}
-                  aria-label={label}
-                  className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-blue-600 hover:border-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:border-blue-600 dark:hover:text-white transition-all duration-200"
-                >
-                  {svg}
-                </Link>
+              {socialLinks.map(({ label, href, svg }) => (
+                <div key={label} className="relative group">
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-blue-600 hover:border-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:border-blue-600 dark:hover:text-white transition-all duration-200"
+                  >
+                    {svg}
+                  </a>
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-700 px-2.5 py-1 text-xs font-medium text-white opacity-0 scale-95 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-10"
+                  >
+                    {label}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
@@ -140,14 +149,26 @@ export default function Footer() {
                 {heading}
               </h4>
               <ul className="flex flex-col gap-2.5">
-                {links.map(({ label, to }) => (
+                {links.map(({ label, to, upcoming }) => (
                   <li key={label}>
-                    <Link
-                      to={to}
-                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
-                    >
-                      {label}
-                    </Link>
+                    {upcoming ? (
+                      <span
+                        title="Coming soon"
+                        className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-600 cursor-not-allowed select-none"
+                      >
+                        {label}
+                        <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                          Upcoming
+                        </span>
+                      </span>
+                    ) : (
+                      <Link
+                        to={to}
+                        className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
+                      >
+                        {label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

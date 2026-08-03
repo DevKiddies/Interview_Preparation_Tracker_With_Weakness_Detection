@@ -13,6 +13,7 @@ import InterviewResultStep from "../components/interview/InterviewResultStep";
 import DangerZone from "../components/interview/DangerZone";
 import API_BASE from "../utils/api";
 import { getInterviewClosed, setInterviewClosed, clearInterviewClosed } from "../utils/interviewState";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 
 const TOTAL_STEPS = 5;
 
@@ -36,6 +37,8 @@ function InterviewPage() {
     const [focusTopics, setFocusTopics] = useState([]);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [archiving, setArchiving] = useState(false);
+    const [interviews, setInterviews] = useState([]);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -43,6 +46,15 @@ function InterviewPage() {
             navigate("/login");
             return;
         }
+
+        fetch(`${API_BASE}/api/interviews`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => r.json())
+            .then((data) => {
+                if (Array.isArray(data)) setInterviews(data);
+            })
+            .catch(() => {});
 
         fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -55,6 +67,7 @@ function InterviewPage() {
                 if (Array.isArray(data.focusTopics) && data.focusTopics.length) {
                     setFocusTopics(data.focusTopics);
                 }
+                setCachedProfile(data);
 
                 const closed = getInterviewClosed();
                 let completed = false;
@@ -99,7 +112,16 @@ function InterviewPage() {
                     focusTopics,
                 }),
             });
-            if (res.ok) navigate("/dashboard");
+            if (res.ok) {
+                setCachedProfile({
+                    ...getCachedProfile(),
+                    targetCompany,
+                    experienceLevel,
+                    interviewDate,
+                    focusTopics,
+                });
+                navigate("/dashboard");
+            }
         } catch {
             /* ignore */
         }
@@ -129,6 +151,13 @@ function InterviewPage() {
                 setExperienceLevel("");
                 setInterviewDate("");
                 setFocusTopics([]);
+                setCachedProfile({
+                    ...getCachedProfile(),
+                    targetCompany: "",
+                    experienceLevel: "",
+                    interviewDate: "",
+                    focusTopics: [],
+                });
                 setStep(1);
             }
         } catch {
@@ -138,17 +167,85 @@ function InterviewPage() {
         clearInterviewClosed();
     }, []);
 
+    // Archive the current interview: closes the active track (kept in history
+    // as ARCHIVED), clears the current goal so the preparation card reads
+    // empty, and drops the settings page back to step 1 so a new goal can be
+    // set for the next interview.
+    const handleArchive = useCallback(async () => {
+        setArchiving(true);
+        const token = localStorage.getItem("token");
+        try {
+            const active = interviews.find((i) => i.status === "ACTIVE");
+            if (token && active) {
+                await fetch(`${API_BASE}/api/interviews/${active.id}/result`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ result: "ARCHIVED" }),
+                }).catch(() => {});
+                setInterviews((prev) =>
+                    prev.map((i) => (i.id === active.id ? { ...i, status: "ARCHIVED" } : i))
+                );
+            }
+            const res = await fetch(`${API_BASE}/api/users/onboarding`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    targetCompany: "",
+                    experienceLevel: "",
+                    interviewDate: "",
+                    focusTopics: [],
+                }),
+            });
+            if (res.ok) {
+                setTargetCompany("");
+                setExperienceLevel("");
+                setInterviewDate("");
+                setFocusTopics([]);
+                setCachedProfile({
+                    ...getCachedProfile(),
+                    targetCompany: "",
+                    experienceLevel: "",
+                    interviewDate: "",
+                    focusTopics: [],
+                });
+                setStep(1);
+            }
+        } catch {
+            /* ignore */
+        }
+        setArchiving(false);
+        clearInterviewClosed();
+    }, [interviews]);
+
     const goNext = () => {
         if (!canAdvance) return;
         if (step === 0) {
             setInterviewClosed(selectedResult);
             setResultApplied(true);
             setIsCompleted(false);
+            markResult(selectedResult);
             return;
         }
         if (step < TOTAL_STEPS) setStep((s) => s + 1);
         else handleSave();
     };
+
+    // Persist the outcome (SELECTED / NOT_SELECTED / ARCHIVED / DELETED) to the
+    // active interview track so it shows up in interview history. Fire-and-forget
+    // — localStorage still drives the current-page UX.
+    const markResult = useCallback((result) => {
+        const token = localStorage.getItem("token");
+        const active = interviews.find((i) => i.status === "ACTIVE");
+        if (!token || !active) return;
+        fetch(`${API_BASE}/api/interviews/${active.id}/result`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ result }),
+        }).catch(() => {});
+    }, [interviews]);
 
     const goBack = () => {
         if (step === 0) {
@@ -278,7 +375,7 @@ function InterviewPage() {
                     )}
                 </section>
 
-                <DangerZone onDelete={handleDelete} loading={deleting} />
+                <DangerZone onDelete={handleDelete} loading={deleting} onArchive={handleArchive} archiving={archiving} />
             </div>
         </div>
     );

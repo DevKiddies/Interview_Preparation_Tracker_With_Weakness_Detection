@@ -1,15 +1,15 @@
 // ContactPage.jsx — contact form page where users can reach out to the PrepEdge team.
-// Form submission is handled client-side with a success state — wire up a real
-// email/backend endpoint when ready to send messages.
+// Submits to POST /api/contact, which emails the message to the team inbox via Brevo.
 
 import { useState } from "react";
-import { Mail, MapPin, Clock, Send, CheckCircle2 } from "lucide-react";
+import { Mail, MapPin, Clock, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import API_BASE from "../utils/api.js";
 
 const contactInfo = [
   {
     icon: Mail,
     label: "Email Us",
-    value: "prepedge@gmail.com",
+    value: "team.prepedge@gmail.com",
     sub: "We reply within 24 hours",
     color: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
   },
@@ -33,16 +33,30 @@ export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${API_BASE}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError(await res.text() || "Failed to send your message. Please try again.");
+      }
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
+    } finally {
       setLoading(false);
-      setSubmitted(true);
-    }, 1200);
+    }
   };
 
   return (
@@ -98,7 +112,7 @@ export default function ContactPage() {
                 Thanks for reaching out. We'll get back to you within 24 hours.
               </p>
               <button
-                onClick={() => { setSubmitted(false); setForm({ name: "", email: "", subject: "", message: "" }); }}
+                onClick={() => { setSubmitted(false); setError(""); setForm({ name: "", email: "", subject: "", message: "" }); }}
                 className="mt-6 text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline"
               >
                 Send another message
@@ -116,6 +130,12 @@ export default function ContactPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                {error && (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 text-sm text-rose-600 dark:text-rose-400">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    {error}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">

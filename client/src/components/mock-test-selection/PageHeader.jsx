@@ -8,7 +8,7 @@ function PageHeader() {
                 <h1 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
                     Mock Tests
                 </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-[10px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                     Practice tests tailored for your interview preparation.
                 </p>
             </div>

@@ -7,7 +7,14 @@ package com.preptracker.server.controller;
 // The /me endpoint is a convenience shortcut to get the current user's full profile
 // without needing to know their UUID.
 
+import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
+import com.preptracker.server.dto.ActivityHeatmapDTO;
+import com.preptracker.server.dto.BlindSpotDTO;
+import com.preptracker.server.dto.CategoryConfidenceDTO;
+import com.preptracker.server.dto.ConfidenceTreeDTO;
+import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.OnboardingRequest;
+import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.dto.UpdateAvatarRequest;
 import com.preptracker.server.dto.UpdateInterviewDateRequest;
 import com.preptracker.server.dto.UpdatePasswordRequest;
@@ -16,6 +23,7 @@ import com.preptracker.server.exception.NotFoundException;
 import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.model.User;
 import com.preptracker.server.model.UserProfile;
+import com.preptracker.server.service.DashboardStatsService;
 import com.preptracker.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +42,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final DashboardStatsService dashboardStatsService;
 
     private UUID authenticatedUserId() {
         String principal = (String) SecurityContextHolder.getContext()
@@ -107,6 +116,54 @@ public class UserController {
                 .getAuthentication().getPrincipal();
         userService.completeOnboarding(UUID.fromString(userId), request);
         return ResponseEntity.ok("Onboarding complete!");
+    }
+    // Aggregate numbers for the four dashboard stat cards (confidence, accuracy,
+    // questions solved, study streak) plus week-over-week deltas.
+    @GetMapping("/me/dashboard/stats")
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
+        return ResponseEntity.ok(dashboardStatsService.getStats(authenticatedUserId()));
+    }
+
+    // Per-category confidence/weak-topic data for the "Confidence by Category"
+    // widget on the dashboard.
+    @GetMapping("/me/dashboard/categories")
+    public ResponseEntity<List<CategoryConfidenceDTO>> getCategoryConfidence() {
+        return ResponseEntity.ok(dashboardStatsService.getCategoryConfidence(authenticatedUserId()));
+    }
+
+    // Full category → topic → technique confidence tree for the Confidence
+    // Explorer page (drill-down from the dashboard chart).
+    @GetMapping("/me/dashboard/confidence-tree")
+    public ResponseEntity<ConfidenceTreeDTO> getConfidenceTree() {
+        return ResponseEntity.ok(dashboardStatsService.getConfidenceTree(authenticatedUserId()));
+    }
+
+    // Confidence & accuracy series for the trend chart, bucketed as "7D" (daily),
+    // "30D" (weekly) and "90D" (monthly) points.
+    @GetMapping("/me/dashboard/trend")
+    public ResponseEntity<Map<String, List<TrendPointDTO>>> getConfidenceTrend() {
+        return ResponseEntity.ok(dashboardStatsService.getConfidenceTrend(authenticatedUserId()));
+    }
+
+    // Top 7 topics ranked by overconfidence events for the "Blind Spot Analysis"
+    // widget.
+    @GetMapping("/me/dashboard/blind-spots")
+    public ResponseEntity<List<BlindSpotDTO>> getBlindSpots() {
+        return ResponseEntity.ok(dashboardStatsService.getBlindSpots(authenticatedUserId()));
+    }
+
+    // Per-topic accuracy split by difficulty for the "Accuracy Heatmap" widget,
+    // covering the user's focus topics.
+    @GetMapping("/me/dashboard/accuracy-heatmap")
+    public ResponseEntity<List<AccuracyHeatmapRowDTO>> getAccuracyHeatmap() {
+        return ResponseEntity.ok(dashboardStatsService.getAccuracyHeatmap(authenticatedUserId()));
+    }
+
+    // Per-day study activity (questions, confidence, accuracy, study time) plus
+    // streak summary, for the profile "Study Consistency" heatmap. All real data.
+    @GetMapping("/me/dashboard/activity-heatmap")
+    public ResponseEntity<ActivityHeatmapDTO> getActivityHeatmap() {
+        return ResponseEntity.ok(dashboardStatsService.getActivityHeatmap(authenticatedUserId()));
     }
 
     @GetMapping("/me")

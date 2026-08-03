@@ -1,4 +1,4 @@
-import React from "react";
+import { useState } from "react";
 
 // Expanded 10-Tier Vibrant Color Palette (10% increments from 0 to 100)
 const getColor = (accuracy) => {
@@ -28,39 +28,40 @@ const getColor = (accuracy) => {
     return "bg-gradient-to-br from-rose-600 via-pink-600 to-red-700 text-white font-black shadow-md shadow-rose-700/40 ring-1 ring-inset ring-white/30";
 };
 
-function Cell({ topic, difficulty, accuracy }) {
+function Cell({ topic, difficulty, accuracy, onHover, onLeave }) {
     const hasData = accuracy !== undefined && accuracy !== null;
 
     return (
-        <div className="group relative flex-1">
+        <div
+            className="group relative flex-1"
+            onMouseEnter={(e) => onHover?.(topic, difficulty, accuracy, e)}
+            onMouseMove={(e) => onHover?.(topic, difficulty, accuracy, e)}
+            onMouseLeave={onLeave}
+        >
             {/* Responsive Capsule Block */}
             <div
-                className={`h-8 w-full rounded-md flex items-center justify-center text-[10px] tracking-tight transition-all duration-200 ease-out cursor-pointer hover:scale-[1.08] hover:z-20 hover:shadow-lg ${getColor(
+                className={`h-9 w-full rounded-md flex items-center justify-center text-[10px] tracking-tight transition-all duration-200 ease-out cursor-pointer hover:scale-[1.08] hover:z-20 hover:shadow-lg ${getColor(
                     accuracy
                 )}`}
             >
                 {hasData ? `${accuracy}%` : "—"}
-            </div>
-
-            {/* Hover Tooltip */}
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 rounded-lg border border-slate-100 bg-white/95 p-2 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 backdrop-blur-sm group-hover:block dark:border-slate-800 dark:bg-slate-950/95 min-w-32 text-left animate-in fade-in zoom-in-95 duration-150">
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-35 mb-0.5">
-                    {topic}
-                </p>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                    <span>{difficulty} Sector</span>
-                    <span className="font-semibold text-slate-600 dark:text-slate-400">
-                        {hasData ? `${accuracy}%` : "No data"}
-                    </span>
-                </div>
-                {/* Tooltip Caret */}
-                <div className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950" />
             </div>
         </div>
     );
 }
 
 export default function AccuracyHeatmap({ data = [] }) {
+    const [tip, setTip] = useState(null);
+
+    // Render the tooltip on top of everything (fixed, not clipped by the
+    // scroll container) and keep it inside the viewport horizontally.
+    const showTip = (topic, difficulty, accuracy, e) => {
+        const hasData = accuracy !== undefined && accuracy !== null;
+        const margin = 90;
+        const left = Math.min(Math.max(e.clientX, margin), window.innerWidth - margin);
+        setTip({ topic, difficulty, accuracy, hasData, x: left, y: e.clientY });
+    };
+
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 ring-1 ring-black/[0.02] dark:border-slate-800 dark:bg-slate-900">
 
@@ -86,8 +87,8 @@ export default function AccuracyHeatmap({ data = [] }) {
                     </div>
                 </div>
 
-                {/* Matrix Rows */}
-                <div className="space-y-1.5">
+                {/* Matrix Rows — vertical only; tooltip no longer affects layout */}
+                <div className="max-h-56 scrollbar-hidden space-y-1.5 overflow-y-auto overflow-x-hidden pr-1">
                     {data.map((row, i) => (
                         <div
                             key={row.topic}
@@ -96,15 +97,20 @@ export default function AccuracyHeatmap({ data = [] }) {
                             }`}
                         >
                             {/* Row Label */}
-                            <div className="w-28 shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-400 truncate pr-3">
-                                {row.topic}
+                            <div className="w-28 shrink-0 pr-3">
+                                <span
+                                    title={row.topic}
+                                    className="block truncate text-[10px] font-bold tracking-wider text-slate-500 dark:text-slate-500"
+                                >
+                                    {row.topic}
+                                </span>
                             </div>
 
                             {/* Cells */}
-                            <div className="flex flex-1 gap-1.5">
-                                <Cell topic={row.topic} difficulty="Easy" accuracy={row.easy} />
-                                <Cell topic={row.topic} difficulty="Medium" accuracy={row.medium} />
-                                <Cell topic={row.topic} difficulty="Hard" accuracy={row.hard} />
+                            <div className="flex min-w-0 flex-1 gap-1.5">
+                                <Cell topic={row.topic} difficulty="Easy" accuracy={row.easy} onHover={showTip} onLeave={() => setTip(null)} />
+                                <Cell topic={row.topic} difficulty="Medium" accuracy={row.medium} onHover={showTip} onLeave={() => setTip(null)} />
+                                <Cell topic={row.topic} difficulty="Hard" accuracy={row.hard} onHover={showTip} onLeave={() => setTip(null)} />
                             </div>
                         </div>
                     ))}
@@ -131,6 +137,27 @@ export default function AccuracyHeatmap({ data = [] }) {
                 <span className="shrink-0 font-semibold text-emerald-500">More Accurate (100%)</span>
             </div>
 
+            {/* Viewport-fixed Tooltip — always on top, never clipped */}
+            {tip && (
+                <div
+                    className="pointer-events-none fixed left-0 top-0 z-[9999]"
+                    style={{ transform: `translate(calc(${tip.x}px - 50%), calc(${tip.y}px - 100% - 14px))` }}
+                >
+                    <div className="relative rounded-lg border border-slate-100 bg-white/95 p-2 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 min-w-32 text-left">
+                        <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-35 mb-0.5">
+                            {tip.topic}
+                        </p>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                            <span>{tip.difficulty} Sector</span>
+                            <span className="font-semibold text-slate-600 dark:text-slate-400">
+                                {tip.hasData ? `${tip.accuracy}%` : "No data"}
+                            </span>
+                        </div>
+                        {/* Tooltip Caret */}
+                        <div className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-950" />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

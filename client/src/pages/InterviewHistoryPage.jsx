@@ -12,7 +12,7 @@ import MockHistoryFilters from "../components/mocktest-history/HistoryFilters";
 import MockTestTimeline from "../components/mocktest-history/MockTestTimeline";
 import MockEmptyState from "../components/mocktest-history/EmptyState";
 import API_BASE from "../utils/api";
-import { MOCK_TESTS } from "../data/mockTestData";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 
 const TARGET_LABELS = {
   faang: "FAANG / Big Tech",
@@ -27,66 +27,14 @@ const EXPERIENCE_LABELS = {
   senior: "Senior",
 };
 
-const MOCK_INTERVIEWS = [
-  {
-    id: 1,
-    targetCompany: "faang",
-    experience: "fresher",
-    startDate: "2026-01-02",
-    interviewDate: "2026-03-21",
-    status: "COMPLETED",
-    confidence: 81,
-    accuracy: 78,
-    questionsSolved: 1234,
-    duration: 79,
-    weakTopics: ["Dynamic Programming", "Graphs", "System Design"],
-  },
-  {
-    id: 2,
-    targetCompany: "product",
-    experience: "mid",
-    startDate: "2026-05-10",
-    interviewDate: "2026-07-28",
-    status: "ACTIVE",
-    confidence: 73,
-    accuracy: 69,
-    questionsSolved: 412,
-    duration: null,
-    weakTopics: ["Sliding Window", "Greedy Algorithms"],
-  },
-  {
-    id: 3,
-    targetCompany: "service",
-    experience: "senior",
-    startDate: "2025-09-01",
-    interviewDate: "2025-11-15",
-    status: "COMPLETED",
-    confidence: 88,
-    accuracy: 74,
-    questionsSolved: 876,
-    duration: 75,
-    weakTopics: ["System Design", "Microservices"],
-  },
-  {
-    id: 4,
-    targetCompany: "faang",
-    experience: "fresher",
-    startDate: "2025-03-01",
-    interviewDate: "2025-05-10",
-    status: "ARCHIVED",
-    confidence: 54,
-    accuracy: 49,
-    questionsSolved: 312,
-    duration: 70,
-    weakTopics: ["Dynamic Programming", "Trees", "Graphs", "OOP"],
-  },
-];
-
 function InterviewHistoryPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => getCachedProfile());
   const [tab, setTab] = useState("interview");
+  const [interviews, setInterviews] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [targetFilter, setTargetFilter] = useState("All");
@@ -114,31 +62,42 @@ function InterviewHistoryPage() {
           }
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
           setProfile(data);
+          setCachedProfile(data);
         })
         .catch(() => {});
   }, []);
 
-  const daysLeft = useMemo(() => {
-    if (!profile?.interviewDate) return null;
-    const target = new Date(profile.interviewDate);
-    const today = new Date();
-    target.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    return diff >= 0 ? diff : 0;
-  }, [profile?.interviewDate]);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    Promise.all([
+      fetch(`${API_BASE}/api/interviews`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((res) => res.json()),
+      fetch(`${API_BASE}/api/tests/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((res) => res.json()),
+    ])
+        .then(([interviewData, testData]) => {
+          if (Array.isArray(interviewData)) setInterviews(interviewData);
+          if (Array.isArray(testData)) setTests(testData);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+  }, []);
 
   const targetLabel = TARGET_LABELS[profile?.targetCompany] ?? null;
   const experienceLabel = EXPERIENCE_LABELS[profile?.experienceLevel] ?? null;
 
   const filtered = useMemo(() => {
-    let result = [...MOCK_INTERVIEWS];
+    let result = [...interviews];
 
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((i) =>
-          i.targetCompany.toLowerCase().includes(q) ||
-          i.weakTopics.some((t) => t.toLowerCase().includes(q))
+          i.targetCompany?.toLowerCase().includes(q) ||
+          (i.weakTopics || []).some((t) => t.toLowerCase().includes(q))
       );
     }
 
@@ -161,7 +120,7 @@ function InterviewHistoryPage() {
     });
 
     return result;
-  }, [search, statusFilter, targetFilter, sort]);
+  }, [interviews, search, statusFilter, targetFilter, sort]);
 
   const handleViewDetails = (interview) => {
     navigate(`/history/interview/${interview.id}/tests`);
@@ -172,13 +131,13 @@ function InterviewHistoryPage() {
   };
 
   const mockFiltered = useMemo(() => {
-    let result = [...MOCK_TESTS];
+    let result = [...tests];
 
     if (mockSearch.trim()) {
       const q = mockSearch.toLowerCase();
       result = result.filter((t) =>
           t.title.toLowerCase().includes(q) ||
-          t.weakTopics.some((w) => w.toLowerCase().includes(q))
+          (t.weakTopics || []).some((w) => w.toLowerCase().includes(q))
       );
     }
 
@@ -195,10 +154,26 @@ function InterviewHistoryPage() {
     });
 
     return result;
-  }, [mockSearch, mockStatus, mockType, mockSort]);
+  }, [tests, mockSearch, mockStatus, mockType, mockSort]);
 
-  const hasData = MOCK_INTERVIEWS.length > 0;
-  const hasMockData = MOCK_TESTS.length > 0;
+  const hasData = interviews.length > 0;
+  const hasMockData = tests.length > 0;
+
+  const interviewOverview = useMemo(() => {
+    const completed = interviews.filter((i) => i.status === "COMPLETED");
+    const active = interviews.filter((i) => i.status === "ACTIVE");
+    const successRate = completed.length
+        ? Math.round(completed.reduce((s, i) => s + (i.accuracy || 0), 0) / completed.length)
+        : 0;
+    return { total: interviews.length, completed: completed.length, active: active.length, successRate };
+  }, [interviews]);
+
+  const mockOverview = useMemo(() => {
+    const completed = tests.filter((t) => t.status === "COMPLETED");
+    const avgC = completed.length ? Math.round(completed.reduce((s, t) => s + (t.confidence || 0), 0) / completed.length) : 0;
+    const avgA = completed.length ? Math.round(completed.reduce((s, t) => s + (t.accuracy || 0), 0) / completed.length) : 0;
+    return { total: tests.length, completed: completed.length, avgConfidence: avgC, avgAccuracy: avgA };
+  }, [tests]);
 
   return (
       <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
@@ -207,7 +182,6 @@ function InterviewHistoryPage() {
               username={username}
               targetLabel={targetLabel}
               experienceLabel={experienceLabel}
-              daysLeft={daysLeft}
           />
 
           <div className="min-w-0 flex-1 space-y-6 pb-[calc(4rem_+_env(safe-area-inset-bottom))] lg:pb-0">
@@ -265,25 +239,37 @@ function InterviewHistoryPage() {
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="space-y-6"
                   >
-                    <MockHistoryOverview />
-                    <MockHistoryFilters
-                        search={mockSearch}
-                        onSearchChange={setMockSearch}
-                        status={mockStatus}
-                        onStatusChange={setMockStatus}
-                        type={mockType}
-                        onTypeChange={setMockType}
-                        sort={mockSort}
-                        onSortChange={setMockSort}
-                    />
-                    {mockFiltered.length > 0 ? (
-                        <MockTestTimeline tests={mockFiltered} onViewAnalysis={handleViewAnalysis} />
-                    ) : hasMockData ? (
-                        <p className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
-                          No mock tests match your filters.
-                        </p>
+                    {loading ? (
+                        <div className="flex justify-center py-12">
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                        </div>
                     ) : (
-                        <MockEmptyState />
+                        <>
+                          {hasMockData && (
+                              <>
+                                <MockHistoryOverview {...mockOverview} />
+                                <MockHistoryFilters
+                                    search={mockSearch}
+                                    onSearchChange={setMockSearch}
+                                    status={mockStatus}
+                                    onStatusChange={setMockStatus}
+                                    type={mockType}
+                                    onTypeChange={setMockType}
+                                    sort={mockSort}
+                                    onSortChange={setMockSort}
+                                />
+                              </>
+                          )}
+                          {mockFiltered.length > 0 ? (
+                              <MockTestTimeline tests={mockFiltered} onViewAnalysis={handleViewAnalysis} />
+                          ) : hasMockData ? (
+                              <p className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
+                                No mock tests match your filters.
+                              </p>
+                          ) : (
+                              <MockEmptyState />
+                          )}
+                        </>
                     )}
                   </motion.div>
               ) : (
@@ -295,30 +281,38 @@ function InterviewHistoryPage() {
                       transition={{ duration: 0.2, ease: "easeInOut" }}
                       className="space-y-6"
                   >
-                    {hasData && (
-                        <>
-                          <HistoryOverview />
-                          <HistoryFilters
-                              search={search}
-                              onSearchChange={setSearch}
-                              status={statusFilter}
-                              onStatusChange={setStatusFilter}
-                              target={targetFilter}
-                              onTargetChange={setTargetFilter}
-                              sort={sort}
-                              onSortChange={setSort}
-                          />
-                        </>
-                    )}
-
-                    {filtered.length > 0 ? (
-                        <InterviewTimeline interviews={filtered} onViewDetails={handleViewDetails} />
-                    ) : hasData ? (
-                        <p className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
-                          No interviews match your filters.
-                        </p>
+                    {loading ? (
+                        <div className="flex justify-center py-12">
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                        </div>
                     ) : (
-                        <EmptyState />
+                        <>
+                          {hasData && (
+                              <>
+                                <HistoryOverview {...interviewOverview} />
+                                <HistoryFilters
+                                    search={search}
+                                    onSearchChange={setSearch}
+                                    status={statusFilter}
+                                    onStatusChange={setStatusFilter}
+                                    target={targetFilter}
+                                    onTargetChange={setTargetFilter}
+                                    sort={sort}
+                                    onSortChange={setSort}
+                                />
+                              </>
+                          )}
+
+                          {filtered.length > 0 ? (
+                              <InterviewTimeline interviews={filtered} onViewDetails={handleViewDetails} />
+                          ) : hasData ? (
+                              <p className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
+                                No interviews match your filters.
+                              </p>
+                          ) : (
+                              <EmptyState />
+                          )}
+                        </>
                     )}
                   </motion.div>
               )}

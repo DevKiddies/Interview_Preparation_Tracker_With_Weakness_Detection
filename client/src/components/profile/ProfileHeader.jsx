@@ -4,7 +4,7 @@ export default function ProfileHeader() {
       <h1 className="text-lg font-extrabold text-slate-900 leading-tight dark:text-white">
         My Profile
       </h1>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-[10px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
         Manage your account and preferences
       </p>
     </div>

@@ -4,20 +4,43 @@
 
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, LogIn } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import API_BASE from "../utils/api.js";
+import { setCachedProfile } from "../utils/profileCache";
 
 import ErrorAlert from "../components/ui/ErrorAlert.jsx";
 import InputField from "../components/ui/InputFields.jsx";
 
+// GitHub OAuth is a full-page redirect (not a fetch call), so the backend can only
+// hand back an error via query params, not a JSON body — this turns those into
+// the same error text a failed email/password or Google login would show.
+function initialErrorFromQuery(searchParams) {
+  const error = searchParams.get("error");
+  if (!error) return "";
+  if (error === "banned") {
+    return searchParams.get("message") || "Your account has been banned. Please contact administration.";
+  }
+  if (error === "github_login_failed") {
+    return "GitHub login failed. Please try again.";
+  }
+  return "";
+}
+
 function LoginPage() {
-  const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const redirectedFrom = location.state?.from;
+
+  // If BanGuard just force-logged this user out mid-session, show that message
+  // immediately instead of a blank login form. Falls back to a query-param error
+  // (e.g. from the GitHub OAuth redirect flow) if there's no navigation state.
+  const [error, setError] = useState(
+    location.state?.message || initialErrorFromQuery(searchParams),
+  );
+  const [showPassword, setShowPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     identifier: "",
@@ -59,6 +82,8 @@ function LoginPage() {
         });
         const me = await meRes.json();
         if (me.username) localStorage.setItem("username", me.username);
+        if (me.avatarUrl) localStorage.setItem("avatarUrl", me.avatarUrl);
+        setCachedProfile(me);
         navigate(me.onboarded ? "/dashboard" : "/onboarding");
       } else {
         const message = await response.text();
@@ -99,6 +124,7 @@ function LoginPage() {
           if (me.username) localStorage.setItem("username", me.username);
           const avatar = me.avatarUrl || googleInfo.picture || "";
           if (avatar) localStorage.setItem("avatarUrl", avatar);
+          setCachedProfile({ ...me, avatarUrl: avatar || me.avatarUrl });
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
           navigate(me.onboarded ? "/dashboard" : "/onboarding");
         } else {

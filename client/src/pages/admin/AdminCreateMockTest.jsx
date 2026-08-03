@@ -142,6 +142,7 @@ export default function AdminCreateMockTest() {
     if (!form.name.trim()) errs.name = "Test name is required";
     if (!form.categoryId) errs.categoryId = "Please select a category";
     if (form.topicIds.length === 0) errs.topicIds = "Select at least one topic";
+    else if (availableCount === 0) errs.topicIds = "None of the selected topics have any questions yet — add questions to the Question Bank first, or pick different topics.";
     if (!form.questionCount || form.questionCount < 5 || form.questionCount > 50) errs.questionCount = "Enter a value between 5 and 50";
     if (!form.timeLimitMinutes || form.timeLimitMinutes < 5 || form.timeLimitMinutes > 120) errs.timeLimit = "Enter a value between 5 and 120 minutes";
     if (form.difficulty === "Mixed" && mixSum !== Number(form.questionCount)) errs.mixSum = `Difficulty mix total (${mixSum}) must equal question count (${form.questionCount})`;
@@ -329,7 +330,19 @@ export default function AdminCreateMockTest() {
                       })}
                     </div>
                     {errors.topicIds && <p className="text-xs text-rose-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{errors.topicIds}</p>}
-                    {availableCount > 0 && (
+                    {!errors.topicIds && form.topicIds.length > 0 && availableCount === 0 && (
+                      <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">
+                        <AlertTriangle size={11} />
+                        No questions exist for the selected topics yet — this test would be unplayable until questions are added.
+                      </p>
+                    )}
+                    {availableCount > 0 && availableCount < form.questionCount && (
+                      <p className="text-xs text-amber-500 mt-2 flex items-center gap-1">
+                        <AlertTriangle size={11} />
+                        Only {availableCount} question{availableCount !== 1 ? "s" : ""} available — fewer than the {form.questionCount} requested.
+                      </p>
+                    )}
+                    {availableCount > 0 && availableCount >= form.questionCount && (
                       <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Info size={11} />{availableCount} question{availableCount !== 1 ? "s" : ""} available in selected topics</p>
                     )}
                   </div>

@@ -9,7 +9,7 @@ const channels = [
   {
     icon: Mail,
     label: "Email Support",
-    value: "prepedge@gmail.com",
+    value: "team.prepedge@gmail.com",
     sub: "We reply within 24 hours",
     color: "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
   },

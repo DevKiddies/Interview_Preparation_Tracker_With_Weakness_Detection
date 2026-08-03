@@ -12,6 +12,7 @@ import com.preptracker.server.dto.LoginRequest;
 import com.preptracker.server.dto.RegisterRequest;
 import com.preptracker.server.dto.ResetPasswordRequest;
 import com.preptracker.server.dto.VerifyOtpRequest;
+import com.preptracker.server.exception.UnauthorizedException;
 import com.preptracker.server.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -21,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @RestController
@@ -101,6 +104,10 @@ public class AuthController {
         try {
             String token = authService.loginWithGithub(code);
             response.sendRedirect(frontendUrl + "/auth/callback?token=" + token);
+        } catch (UnauthorizedException e) {
+            // Banned-account message specifically, not the generic OAuth failure below
+            String message = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8);
+            response.sendRedirect(frontendUrl + "/login?error=banned&message=" + message);
         } catch (Exception e) {
             response.sendRedirect(frontendUrl + "/login?error=github_login_failed");
         }

@@ -35,7 +35,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(frontendUrl));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -58,6 +58,10 @@ public class SecurityConfig {
                         // Auth endpoints are public (login, register, OTP, OAuth callbacks)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/auth/**").permitAll()
+                        // Contact Us form — public, no login required to reach out
+                        .requestMatchers("/api/contact/**").permitAll()
+                        // Landing page hero stats — public aggregate counts, no auth needed
+                        .requestMatchers("/api/public/**").permitAll()
                         // AI Chatbot endpoint
                         .requestMatchers("/api/chat/**").authenticated()
                         // Admin panel routes require ROLE_ADMIN, which JwtFilter injects from the token's "role" claim

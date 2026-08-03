@@ -2,9 +2,10 @@
 // through motivational phrases and context-aware CTA buttons (different for
 // logged-in vs guest users).
 
-import { BarChart2, CheckCircle2 } from 'lucide-react'
+import { BarChart2, CheckCircle2, Target, FileText } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import API_BASE from '../utils/api.js'
 
 const WORDS = ['dream job.', 'top offer.', 'FAANG role.', 'six figures.', 'your goals.']
 // Typewriter timing constants — adjust these if the animation feels too fast/slow.
@@ -12,16 +13,83 @@ const TYPE_SPEED = 100   // ms per character while typing
 const DELETE_SPEED = 50  // ms per character while deleting (faster feels snappier)
 const PAUSE_MS = 1800    // how long the fully typed word stays visible before deleting
 
+// Mirrors the labels DashboardPage shows for the same onboarding field.
+const TARGET_LABELS = {
+  faang: 'FAANG / Big Tech',
+  product: 'Product Companies',
+  service: 'Service Companies',
+  competitive: 'Competitive Exams',
+}
+
 export default function HeroSection() {
   const [displayText, setDisplayText] = useState('')
   const [wordIndex, setWordIndex] = useState(0)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoggedIn] = useState(() => !!localStorage.getItem('token'))
+  const [stats, setStats] = useState({ totalUsers: null, totalQuestions: null })
+  const [profile, setProfile] = useState(null)
+  const [latestTest, setLatestTest] = useState(null)
+  const [username] = useState(() => localStorage.getItem('username') || '')
   const navigate = useNavigate()
 
+  // .then()-chained rather than async/await so the setState call is visibly
+  // nested inside a promise callback, not the effect body itself.
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem('token'))
+    fetch(`${API_BASE}/api/public/stats`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStats({ totalUsers: data.totalUsers, totalQuestions: data.totalQuestions })
+      })
+      .catch(() => {
+        // silent — the hero just keeps showing the "—" placeholder
+      })
   }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setProfile(data)
+      })
+      .catch(() => {
+        // silent — the goal card just falls back to the "set a goal" prompt
+      })
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API_BASE}/api/tests/latest`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setLatestTest(data)
+      })
+      .catch(() => {
+        // silent — the result card just falls back to the "take a test" prompt
+      })
+  }, [])
+
+  const formatStat = (n) => (n === null ? '—' : n.toLocaleString('en-US'))
+
+  // Whole days remaining until the interview date — same calculation as DashboardPage.
+  const daysLeft = (() => {
+    if (!profile?.interviewDate) return null
+    const target = new Date(profile.interviewDate)
+    const today = new Date()
+    target.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24))
+    return diff >= 0 ? diff : 0
+  })()
+
+  const targetLabel = TARGET_LABELS[profile?.targetCompany] ?? null
+  const hasGoal = daysLeft !== null
+
+  // More filled dots the closer the interview gets — an honest urgency gauge
+  // instead of a fixed "3 of 5" placeholder.
+  const urgencyDots = hasGoal ? Math.max(1, Math.min(5, 5 - Math.floor(daysLeft / 14))) : 0
 
   const handleGetStarted = () => {
     navigate(isLoggedIn ? '/dashboard' : '/signup')
@@ -95,12 +163,12 @@ export default function HeroSection() {
 
             <div className="flex items-center gap-8">
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">15,000+</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatStat(stats.totalUsers)}</p>
                 <p className="text-[10px] font-semibold tracking-widest text-gray-400 dark:text-slate-500 uppercase">Active Users</p>
               </div>
               <div className="w-px h-8 bg-gray-200 dark:bg-slate-700" />
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">5,000+</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatStat(stats.totalQuestions)}</p>
                 <p className="text-[10px] font-semibold tracking-widest text-gray-400 dark:text-slate-500 uppercase">Questions</p>
               </div>
               <div className="w-px h-8 bg-gray-200 dark:bg-slate-700" />
@@ -113,20 +181,36 @@ export default function HeroSection() {
 
           {/* Right — code card */}
           <div className="flex-1 max-w-lg relative">
-            {/* SDE-2 Goal floating card — top right */}
+            {/* Goal floating card — top right. Shows the signed-in user's real
+                target + countdown once loaded; falls back to a "set a goal"
+                prompt for guests or users who haven't set one yet. */}
             <div className="absolute -top-4 -right-4 z-10 bg-white dark:bg-slate-800 rounded-xl shadow-lg dark:shadow-slate-900/50 px-4 py-3 flex items-center gap-3 min-w-45 transition-colors duration-200">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
-                <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold">S</span>
+              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0">
+                {hasGoal ? (
+                  <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold">
+                    {(username || 'U').charAt(0).toUpperCase()}
+                  </span>
+                ) : (
+                  <Target className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                )}
               </div>
               <div>
-                <p className="text-gray-900 dark:text-slate-100 text-xs font-semibold">SDE-2 Goal</p>
-                <p className="text-gray-400 dark:text-slate-500 text-[10px]">84 days · On track</p>
+                <p className="text-gray-900 dark:text-slate-100 text-xs font-semibold">
+                  {hasGoal ? `${targetLabel ?? 'Your'} Goal` : 'Set Your Goal'}
+                </p>
+                <p className="text-gray-400 dark:text-slate-500 text-[10px]">
+                  {hasGoal
+                    ? daysLeft === 0
+                      ? 'Interview day!'
+                      : `${daysLeft} days · On track`
+                    : 'Pick an interview date'}
+                </p>
               </div>
               <div className="flex gap-0.5 ml-auto">
                 {[...Array(5)].map((_, i) => (
                   <div
                     key={i}
-                    className={`w-1.5 h-1.5 rounded-full ${i < 3 ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-600'}`}
+                    className={`w-1.5 h-1.5 rounded-full ${i < urgencyDots ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-600'}`}
                   />
                 ))}
               </div>
@@ -222,12 +306,24 @@ export default function HeroSection() {
               </div>
             </div>
 
-            {/* Test Passed floating card — bottom left */}
+            {/* Latest result floating card — bottom left. Shows the signed-in
+                user's real last test score once loaded; falls back to a
+                "take a test" prompt for guests or users with no attempts yet. */}
             <div className="absolute -bottom-4 -left-4 z-10 bg-white dark:bg-slate-800 rounded-xl shadow-lg dark:shadow-slate-900/50 px-4 py-3 flex items-center gap-3 transition-colors duration-200">
-              <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+              {latestTest ? (
+                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+              ) : (
+                <FileText className="w-5 h-5 text-gray-400 dark:text-slate-500 shrink-0" />
+              )}
               <div>
-                <p className="text-gray-900 dark:text-slate-100 text-xs font-semibold">Test Passed</p>
-                <p className="text-gray-400 dark:text-slate-500 text-[10px]">98% Accuracy · One solution</p>
+                <p className="text-gray-900 dark:text-slate-100 text-xs font-semibold">
+                  {latestTest ? 'Test Passed' : 'No Tests Yet'}
+                </p>
+                <p className="text-gray-400 dark:text-slate-500 text-[10px]">
+                  {latestTest
+                    ? `${Math.round(latestTest.accuracy)}% Accuracy · ${latestTest.category ?? `${latestTest.score}/${latestTest.total}`}`
+                    : 'Take your first mock test'}
+                </p>
               </div>
             </div>
           </div>

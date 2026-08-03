@@ -20,6 +20,7 @@ import java.util.Map;
 public record TestSubmissionRequest(
         String category,
         String topic,
+        String type,
         int timeTaken,
         List<Long> questionIds,
         Map<Long, String> answers,

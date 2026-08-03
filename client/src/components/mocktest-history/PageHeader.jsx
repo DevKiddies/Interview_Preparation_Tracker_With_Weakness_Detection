@@ -9,7 +9,7 @@ function PageHeader() {
                     Mock Test History
                 </h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                    All completed mock tests for this preparation.
+                    All completed preparation history.
                 </p>
             </div>
 

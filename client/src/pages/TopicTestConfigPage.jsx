@@ -3,9 +3,11 @@
 // how many questions (5–50) and how long (10–90 min) before hitting Start.
 // All config is passed through router state to TestInstructionsPage → MockTestPage.
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, PlayCircle, Clock, BookOpen, ChevronRight, X } from "lucide-react";
+import { Search, PlayCircle, Clock, BookOpen, ChevronRight, X, Target, Sparkles } from "lucide-react";
+import API_BASE from "../utils/api.js";
+import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 
 const TOPIC_GROUPS = [
   {
@@ -89,6 +91,36 @@ export default function TopicTestConfigPage() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [questionCount, setQuestionCount]   = useState(20);
   const [duration, setDuration]             = useState(1800);
+  const [focusTopics, setFocusTopics]       = useState(() => {
+    const cached = getCachedProfile();
+    return Array.isArray(cached?.focusTopics) ? cached.focusTopics : [];
+  });
+
+  // Refresh the onboarded focus topics from the server so highlighting and
+  // "Focus Practice" reflect the latest saved selections.
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.username) {
+            setCachedProfile(data);
+            if (Array.isArray(data.focusTopics)) setFocusTopics(data.focusTopics);
+          }
+        })
+        .catch(() => {});
+  }, []);
+
+  // Topics that exist both in the practice list and the user's focus list.
+  const availableFocusTopics = useMemo(() => {
+    const all = new Set(TOPIC_GROUPS.flatMap((g) => g.topics));
+    return focusTopics.filter((t) => all.has(t));
+  }, [focusTopics]);
+
+  const focusSet = useMemo(() => new Set(availableFocusTopics), [availableFocusTopics]);
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -110,7 +142,7 @@ export default function TopicTestConfigPage() {
     navigate("/practice/instructions", {
       state: {
         nextUrl:     "/practice/mock-tests/topic",
-        nextState:   { category: selectedTopics, limit: questionCount, duration },
+        nextState:   { topics: selectedTopics, limit: questionCount, duration },
         testTitle:   `${topicLabel} Practice Test`,
         questions:   questionCount,
         timeMins:    Math.round(duration / 60),
@@ -136,6 +168,40 @@ export default function TopicTestConfigPage() {
         </div>
 
         <div className="space-y-4">
+
+          {/* Focus Practice shortcut — one tap pre-selects all onboarded focus topics */}
+          {availableFocusTopics.length > 0 && (
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/10 p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                    <Sparkles size={14} className="text-emerald-500" />
+                    Your Focus Topics
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {availableFocusTopics.map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-full border border-emerald-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedTopics((prev) => {
+                    const merged = [...new Set([...prev, ...availableFocusTopics])];
+                    return merged;
+                  })}
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-500/20 transition hover:bg-emerald-700 active:scale-95"
+                >
+                  <Target size={13} />
+                  Focus Practice
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
             <p className="mb-3 text-sm font-bold text-slate-900 dark:text-white">
@@ -175,15 +241,19 @@ export default function TopicTestConfigPage() {
                     <div className="flex flex-wrap gap-2">
                       {group.topics.map((topic) => {
                         const isActive = selectedTopics.includes(topic);
+                        const isFocus = focusSet.has(topic);
                         return (
                           <button
                             key={topic}
                             onClick={() => toggleTopic(topic)}
                             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 shadow-sm ${
                               isActive ? group.active : group.color
-                            }`}
+                            } ${isFocus && !isActive ? "ring-2 ring-emerald-400/70 dark:ring-emerald-500/60" : ""}`}
                           >
                             {topic}
+                            {isFocus && !isActive && (
+                              <span className="ml-1 align-middle text-[9px] font-bold uppercase tracking-wide opacity-70">★</span>
+                            )}
                           </button>
                         );
                       })}

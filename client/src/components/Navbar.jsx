@@ -1,54 +1,15 @@
-// Navbar.jsx — sticky top navigation bar with three separate nav structures:
-// guest (not logged in), student (logged-in user), and admin.
+// Navbar.jsx — sticky top navigation bar, used on all public/student routes.
+// Never rendered on /admin/* routes (AdminLayout has its own header/sidebar),
+// so this only has guest (not logged in) and student (logged-in user) nav structures.
 // Avatar and username stay in sync with the profile settings page via a custom DOM event.
 
-import { Menu, X, ChevronDown, Moon, Sun, Bell } from "lucide-react";
+import { Menu, X, ChevronDown, Moon, Sun } from "lucide-react";
 import { useState, useEffect } from "react";
 import Logo from "./ui/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import API_BASE from "../utils/api.js";
-
-// Three separate nav configs because admins, logged-in students, and guests
-// have completely different sections. We pick the right one at render time.
-
-// ---- Admin Nav Structure ----
-const adminNavItems = [
-  { label: "Dashboard", to: "/admin/dashboard" },
-  {
-    label: "Users",
-    items: [
-      { label: "All Users", to: "/admin/users" },
-      { label: "User Results", to: "/admin/users/results" },
-      { label: "Banned Users", to: "/admin/users/banned" },
-    ],
-  },
-  {
-    label: "Questions",
-    items: [
-      { label: "Question Bank", to: "/admin/questions" },
-      { label: "Add Question", to: "/admin/questions/add" },
-      { label: "Categories & Topics", to: "/admin/questions/categories" },
-    ],
-  },
-  {
-    label: "Tests",
-    items: [
-      { label: "All Tests", to: "/admin/tests" },
-      { label: "Create Mock Test", to: "/admin/tests/create" },
-      { label: "Test Results", to: "/admin/tests/results" },
-    ],
-  },
-  {
-    label: "Analytics",
-    items: [
-      { label: "Platform Overview", to: "/admin/analytics" },
-      { label: "User Reports", to: "/admin/analytics/users" },
-      { label: "Weakness Analysis", to: "/admin/analytics/weaknesses" },
-    ],
-  },
-  { label: "Settings", to: "/admin/settings" },
-];
+import NotificationsBell from "./NotificationsBell.jsx";
 
 // ---- Guest (Public) Nav Structure ----
 const guestNavItems = [
@@ -57,7 +18,7 @@ const guestNavItems = [
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude", disabled: true },
     ],
   },
   {
@@ -96,7 +57,7 @@ const studentNavItems = [
     items: [
       { label: "Mock Tests", to: "/practice/mock-tests" },
       { label: "Coding Problems", to: "/practice/coding-problems" },
-      { label: "Aptitude & Reasoning", to: "/practice/aptitude" },
+      { label: "Aptitude & Reasoning", to: "/practice/aptitude", disabled: true },
     ],
   },
   {
@@ -194,9 +155,20 @@ function NavDropdown({
             : "opacity-0 invisible -translate-y-1 pointer-events-none"
         }`}
       >
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 py-2 min-w-47.5">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 py-2 min-w-60">
           {items.map((item) =>
-            item.to ? (
+            item.disabled ? (
+              <div
+                key={item.label}
+                title="Coming soon"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-400 dark:text-slate-600 cursor-not-allowed select-none whitespace-nowrap"
+              >
+                {item.label}
+                <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                  Upcoming
+                </span>
+              </div>
+            ) : item.to ? (
               <Link
                 key={item.label}
                 to={item.to}
@@ -277,7 +249,18 @@ function MobileNavSection({
       {isOpen && (
         <div className="flex flex-col gap-1 pl-4 pb-2">
           {items.map((item) =>
-            item.to ? (
+            item.disabled ? (
+              <div
+                key={item.label}
+                title="Coming soon"
+                className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-600 py-1.5 cursor-not-allowed select-none whitespace-nowrap"
+              >
+                {item.label}
+                <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+                  Upcoming
+                </span>
+              </div>
+            ) : item.to ? (
               <Link
                 key={item.label}
                 to={item.to}
@@ -305,18 +288,35 @@ function MobileNavSection({
   );
 }
 
+// ---- Small hover tooltip, positioned below the trigger it wraps ----
+function Tooltip({ label, children }) {
+  return (
+    <div className="relative inline-flex group">
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 dark:bg-slate-700 px-2.5 py-1 text-xs font-medium text-white opacity-0 scale-95 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-50"
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 // ---- Theme toggle button ----
 function ThemeToggle({ className = "" }) {
   const { isDark, toggle } = useTheme();
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label="Toggle dark mode"
-      className={`w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200 ${className}`}
-    >
-      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-    </button>
+    <Tooltip label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label="Toggle dark mode"
+        className={`w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200 ${className}`}
+      >
+        {isDark ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -332,7 +332,6 @@ export default function Navbar() {
   const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
-  const adminToken = localStorage.getItem("adminToken");
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
 
   useEffect(() => {
@@ -368,22 +367,12 @@ export default function Navbar() {
     navigate("/login");
   };
 
-  const handleAdminSignOut = () => {
-    localStorage.removeItem("adminToken");
-    setIsMenuOpen(false);
-    navigate("/admin/login");
-  };
-
   const goToAuth = (view) => {
     navigate(`/${view}`);
     setIsMenuOpen(false);
   };
 
-  const navItems = adminToken
-    ? adminNavItems
-    : token
-      ? studentNavItems
-      : guestNavItems;
+  const navItems = token ? studentNavItems : guestNavItems;
 
   const avatarLabel = (
     <div className="flex items-center gap-2">
@@ -418,19 +407,6 @@ export default function Navbar() {
     ],
   };
 
-  const adminItem = {
-    label: "Admin",
-    items: [
-      { label: "Dashboard", to: "/admin/dashboard" },
-      { label: "All Users", to: "/admin/users" },
-      { label: "Question Bank", to: "/admin/questions" },
-      { label: "All Tests", to: "/admin/tests" },
-      { label: "Analytics", to: "/admin/analytics" },
-      { label: "Settings", to: "/admin/settings" },
-      { label: "Logout", action: handleAdminSignOut },
-    ],
-  };
-
   return (
     <nav className="sticky top-0 z-50 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md px-6 py-2.5 shadow-sm transition-colors duration-200">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -455,20 +431,9 @@ export default function Navbar() {
 
         {/* Desktop Action Area */}
         <div className="hidden md:flex items-center gap-3 text-sm font-semibold">
-          {token && (
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200"
-            >
-              <Bell size={16} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-800" />
-            </button>
-          )}
+          {token && <NotificationsBell />}
           <ThemeToggle />
-          {adminToken ? (
-            <NavDropdown {...adminItem} align="right" />
-          ) : token ? (
+          {token ? (
             <NavDropdown {...profileItem} align="right" />
           ) : (
             <>
@@ -516,14 +481,7 @@ export default function Navbar() {
 
           <div className="h-px bg-slate-100 dark:bg-slate-700 my-2" />
 
-          {adminToken ? (
-            <MobileNavSection
-              {...adminItem}
-              openSection={openMobileSection}
-              setOpenSection={setOpenMobileSection}
-              onNavigate={() => setIsMenuOpen(false)}
-            />
-          ) : token ? (
+          {token ? (
             <MobileNavSection
               {...profileItem}
               sectionKey="profile"

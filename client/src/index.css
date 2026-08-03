@@ -163,3 +163,13 @@ code {
   scrollbar-width: thin;
   scrollbar-color: rgba(99, 102, 241, 0.35) transparent;
 }
+
+/* Hide scrollbar while keeping the area scrollable — used by dashboard widgets
+   (Confidence by Category, Accuracy Heatmap) whose inner lists scroll. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

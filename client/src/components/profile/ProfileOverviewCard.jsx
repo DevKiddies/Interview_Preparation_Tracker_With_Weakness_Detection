@@ -1,5 +1,5 @@
-import { useRef, useState, useEffect } from "react";
-import { Camera, Mail, ShieldCheck, Pencil, Lock, Briefcase, Calendar, X } from "lucide-react";
+import { useRef } from "react";
+import { Camera, Mail, ShieldCheck, Pencil, Lock, Briefcase, Calendar } from "lucide-react";
 
 function EditAction({ onClick, label }) {
     return (
@@ -14,216 +14,23 @@ function EditAction({ onClick, label }) {
     );
 }
 
-function EditProfileModal({ isOpen, initialTab, onClose, username, authProvider, onSaveUsername, onSavePassword }) {
-    const canEditPassword = authProvider === "LOCAL";
-    const [activeTab, setActiveTab] = useState(initialTab || "username");
-    const [usernameDraft, setUsernameDraft] = useState(username);
-    const [currentPassword, setCurrentPassword] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [passwordError, setPasswordError] = useState("");
-
-    useEffect(() => {
-        if (!isOpen) return;
-        setActiveTab(canEditPassword ? (initialTab || "username") : "username");
-        setUsernameDraft(username);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        setPasswordError("");
-    }, [isOpen, initialTab, username, canEditPassword]);
-
-    const isPasswordView = canEditPassword && activeTab === "password";
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleKey = (e) => e.key === "Escape" && onClose();
-        window.addEventListener("keydown", handleKey);
-        return () => window.removeEventListener("keydown", handleKey);
-    }, [isOpen, onClose]);
-
-    if (!isOpen) return null;
-
-    const inputStyle =
-        "w-full rounded-lg border border-[#E7E9EF] bg-white px-2.5 py-1.5 text-[13px] text-[#14171F] outline-none transition-colors focus:border-[#2647D6] focus:ring-2 focus:ring-[#2647D6]/15 dark:border-[#262B36] dark:bg-[#161A22] dark:text-[#F3F4F7]";
-    const labelStyle =
-        "text-[10px] font-semibold uppercase tracking-wider text-[#8A93A3] dark:text-[#6B7280]";
-    const tabBase =
-        "flex-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40";
-    const tabActive = "bg-white text-[#14171F] shadow-sm dark:bg-[#12151C] dark:text-[#F3F4F7]";
-    const tabInactive = "text-[#8A93A3] hover:text-[#14171F] dark:text-[#6B7280] dark:hover:text-[#F3F4F7]";
-
-    const handleUsernameSave = () => {
-        if (!usernameDraft.trim()) return;
-        onSaveUsername?.(usernameDraft.trim());
-        onClose();
-    };
-
-    const handlePasswordSave = () => {
-        if (!currentPassword || !newPassword || !confirmPassword) {
-            setPasswordError("Fill in all fields.");
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setPasswordError("New passwords don't match.");
-            return;
-        }
-        onSavePassword?.({ currentPassword, newPassword });
-        onClose();
-    };
-
-    return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={onClose}
-        >
-            <div
-                className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-[#12151C]"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="edit-profile-title"
-            >
-                <div className="flex items-center justify-between border-b border-[#E7E9EF] px-4 py-3 dark:border-[#262B36]">
-                    <h3
-                        id="edit-profile-title"
-                        className="text-[14px] font-semibold text-[#14171F] dark:text-[#F3F4F7]"
-                    >
-                        Edit profile
-                    </h3>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="flex h-6 w-6 items-center justify-center rounded-lg text-[#8A93A3] transition-colors hover:bg-[#F7F8FA] hover:text-[#14171F] dark:hover:bg-[#1A1E27] dark:hover:text-[#F3F4F7]"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-
-                <div className="px-4 pt-3">
-                    <div className="inline-flex w-full rounded-lg bg-[#F7F8FA] p-1 dark:bg-[#161A22]">
-                        <button
-                            onClick={() => {
-                                setActiveTab("username");
-                                setPasswordError("");
-                            }}
-                            className={`${tabBase} ${activeTab === "username" ? tabActive : tabInactive}`}
-                        >
-                            Username
-                        </button>
-                        <button
-                            disabled={!canEditPassword}
-                            title={!canEditPassword ? `Managed by ${authProvider === "GOOGLE" ? "Google" : "GitHub"}` : undefined}
-                            onClick={() => {
-                                setActiveTab("password");
-                                setPasswordError("");
-                            }}
-                            className={`${tabBase} ${isPasswordView ? tabActive : tabInactive}`}
-                        >
-                            Password
-                        </button>
-                    </div>
-                </div>
-
-                <div className="px-4 py-4">
-                    {!isPasswordView ? (
-                        <div className="flex flex-col gap-1.5">
-                            <label className={labelStyle} htmlFor="username-input">Username</label>
-                            <input
-                                id="username-input"
-                                value={usernameDraft}
-                                onChange={(e) => setUsernameDraft(e.target.value)}
-                                className={inputStyle}
-                                autoFocus
-                            />
-                            <p className="text-[11px] text-[#8A93A3] dark:text-[#6B7280]">
-                                Shown across PrepEdge.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <label className={labelStyle} htmlFor="current-password">Current password</label>
-                                <input
-                                    id="current-password"
-                                    type="password"
-                                    value={currentPassword}
-                                    onChange={(e) => setCurrentPassword(e.target.value)}
-                                    className={inputStyle}
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label className={labelStyle} htmlFor="new-password">New password</label>
-                                <input
-                                    id="new-password"
-                                    type="password"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    className={inputStyle}
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label className={labelStyle} htmlFor="confirm-password">Confirm new password</label>
-                                <input
-                                    id="confirm-password"
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className={inputStyle}
-                                />
-                            </div>
-                            {passwordError && (
-                                <p className="text-[11px] font-medium text-red-500">{passwordError}</p>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center justify-end gap-2 border-t border-[#E7E9EF] px-4 py-3 dark:border-[#262B36]">
-                    <button
-                        onClick={onClose}
-                        className="rounded-lg px-3.5 py-1.5 text-[12px] font-medium text-[#5B6472] transition-colors hover:bg-[#F7F8FA] dark:text-[#A7AFBD] dark:hover:bg-[#1A1E27]"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={isPasswordView ? handlePasswordSave : handleUsernameSave}
-                        className="rounded-lg bg-[#2647D6] px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#1D3AB8]"
-                    >
-                        Save changes
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export default function ProfileOverviewCard({
-                                                username = "vectorio",
-                                                initials = "V",
-                                                avatarUrl = "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=400&auto=format&fit=crop",
+                                                username = "",
+                                                initials = "U",
+                                                avatarUrl = "",
                                                 imgError = false,
                                                 setImgError = () => {},
                                                 uploadingAvatar = false,
                                                 avatarError = "",
                                                 handleAvatarChange = () => {},
-                                                profile = { email: "iamvectorio@gmail.com", authProvider: "GOOGLE" },
-                                                experienceLabel = "Student / Fresher",
-                                                targetLabel = "FAANG / Big Tech",
-                                                formattedDate = "July 1, 2026",
+                                                profile = {},
+                                                experienceLabel = null,
+                                                targetLabel = null,
+                                                formattedDate = null,
                                                 openEdit = () => {},
                                             }) {
     const fileInputRef = useRef(null);
     const isLocalAuth = profile?.authProvider === "LOCAL";
-
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [editTab, setEditTab] = useState("username");
-
-    const openEditModal = (tab) => {
-        setEditTab(tab);
-        setIsEditOpen(true);
-    };
 
     return (
         <div className="w-full overflow-hidden rounded-2xl border border-[#E7E9EF] bg-white shadow-[0_1px_2px_rgba(20,23,31,0.04)] dark:border-[#262B36] dark:bg-[#12151C]">
@@ -274,7 +81,7 @@ export default function ProfileOverviewCard({
                                 {experienceLabel}
                             </span>
                         )}
-                        <EditAction onClick={() => openEditModal("username")} label="Edit username" />
+                        <EditAction onClick={() => openEdit("username")} label="Edit username" />
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#5B6472] dark:text-[#A7AFBD]">
@@ -297,7 +104,7 @@ export default function ProfileOverviewCard({
                 </div>
             </div>
 
-            {/* Prep config band — display only */}
+            {/* Prep config band */}
             <div className="grid grid-cols-1 gap-4 border-t border-[#E7E9EF] p-4 sm:grid-cols-2 sm:p-5 dark:border-[#262B36]">
                 <div className="flex flex-col gap-1">
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#8A93A3] dark:text-[#6B7280]">
@@ -324,22 +131,14 @@ export default function ProfileOverviewCard({
             <div className="flex items-center justify-between gap-3 border-t border-[#E7E9EF] bg-[#F7F8FA] px-4 py-3 sm:px-5 dark:border-[#262B36] dark:bg-[#161A22]">
                 <span className="inline-flex items-center gap-1.5 text-[12px] text-[#5B6472] dark:text-[#A7AFBD]">
                     <Lock size={12} className="shrink-0 text-[#8A93A3]" />
-                    {isLocalAuth
-                        ? "Password"
-                        : `Signed in with ${profile?.authProvider === "GOOGLE" ? "Google" : "GitHub"}`}
+                    {profile?.authProvider
+                        ? isLocalAuth
+                            ? "Password"
+                            : `Signed in with ${profile.authProvider === "GOOGLE" ? "Google" : "GitHub"}`
+                        : ""}
                 </span>
-                {isLocalAuth && <EditAction onClick={() => openEditModal("password")} label="Change password" />}
+                {isLocalAuth && <EditAction onClick={() => openEdit("password")} label="Change password" />}
             </div>
-
-            <EditProfileModal
-                isOpen={isEditOpen}
-                initialTab={editTab}
-                onClose={() => setIsEditOpen(false)}
-                username={username}
-                authProvider={profile?.authProvider}
-                onSaveUsername={(val) => openEdit("username", { username: val })}
-                onSavePassword={(payload) => openEdit("password", payload)}
-            />
         </div>
     );
 }

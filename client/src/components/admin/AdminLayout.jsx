@@ -6,13 +6,11 @@ import {
   ClipboardList, FilePlus, FileBarChart,
   TrendingUp, BarChart, Brain,
   Settings, LogOut, Menu, X, ChevronDown,
-  Moon, Sun, CheckCircle2,
+  Moon, Sun,
 } from "lucide-react";
 import Logo from "../ui/Logo";
 import { useTheme } from "../../context/ThemeContext";
 
-// `connected: true` is a temporary marker for pages already wired to the real
-// backend (vs. still on mock data) — remove it once every page is wired.
 const navSections = [
   {
     title: "Overview",
@@ -23,31 +21,31 @@ const navSections = [
   {
     title: "User Management",
     items: [
-      { label: "All Users", to: "/admin/users", icon: Users, connected: true },
-      { label: "User Results", to: "/admin/users/results", icon: BarChart2, connected: true },
-      { label: "Banned Users", to: "/admin/users/banned", icon: UserX, connected: true },
+      { label: "All Users", to: "/admin/users", icon: Users },
+      { label: "User Results", to: "/admin/users/results", icon: BarChart2 },
+      { label: "Banned Users", to: "/admin/users/banned", icon: UserX },
     ],
   },
   {
     title: "Question Management",
     items: [
-      { label: "Question Bank", to: "/admin/questions", icon: Database, connected: true },
-      { label: "Add Question", to: "/admin/questions/add", icon: PlusCircle, connected: true },
-      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen, connected: true },
+      { label: "Question Bank", to: "/admin/questions", icon: Database },
+      { label: "Add Question", to: "/admin/questions/add", icon: PlusCircle },
+      { label: "Categories & Topics", to: "/admin/questions/categories", icon: FolderOpen },
     ],
   },
   {
     title: "Test Management",
     items: [
-      { label: "All Tests", to: "/admin/tests", icon: ClipboardList, connected: true },
-      { label: "Create Mock Test", to: "/admin/tests/create", icon: FilePlus, connected: true },
-      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart, connected: true },
+      { label: "All Tests", to: "/admin/tests", icon: ClipboardList },
+      { label: "Create Mock Test", to: "/admin/tests/create", icon: FilePlus },
+      { label: "Test Results", to: "/admin/tests/results", icon: FileBarChart },
     ],
   },
   {
     title: "Analytics & Reports",
     items: [
-      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp, connected: true },
+      { label: "Platform Overview", to: "/admin/analytics", icon: TrendingUp },
       { label: "User Reports", to: "/admin/analytics/users", icon: BarChart },
       { label: "Weakness Analysis", to: "/admin/analytics/weaknesses", icon: Brain, disabled: true },
     ],
@@ -133,7 +131,7 @@ export default function AdminLayout() {
 
                 {!isCollapsed && (
                   <div className="flex flex-col gap-0.5">
-                    {section.items.map(({ label, to, icon: Icon, disabled, connected }) => {
+                    {section.items.map(({ label, to, icon: Icon, disabled }) => {
                       if (disabled) {
                         return (
                           <div
@@ -163,9 +161,6 @@ export default function AdminLayout() {
                         >
                           <Icon size={16} className="shrink-0" />
                           <span className="flex-1 min-w-0 truncate whitespace-nowrap">{label}</span>
-                          {connected && (
-                            <CheckCircle2 size={13} className="shrink-0 text-green-500" title="Connected to backend" />
-                          )}
                         </Link>
                       );
                     })}

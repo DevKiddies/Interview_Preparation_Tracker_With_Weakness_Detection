@@ -50,6 +50,7 @@ public class AuthService {
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
     private final TokenBlackListService tokenBlackListService;
+    private final NotificationService notificationService;
     private final RestTemplate restTemplate;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -154,8 +155,9 @@ public class AuthService {
             return;
         }
 
-        throw new UnauthorizedException("Your account has been suspended" +
-                (user.getBanReason() != null ? ": " + user.getBanReason() : "."));
+        throw new UnauthorizedException("Your account has been banned" +
+                (user.getBanReason() != null ? ": " + user.getBanReason() : "") +
+                ". Please contact administration.");
     }
 
     @Transactional
@@ -177,6 +179,11 @@ public class AuthService {
         String token = jwtUtil.generateToken(user);
         verificationTokenRepository.save(verificationToken);
         userRepository.save(user);
+
+        notificationService.create(user.getId(), "WELCOME", "Welcome to PrepEdge!",
+                "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
+                "/practice/mock-tests");
+
         return new AuthResponse(token);
     }
 
@@ -254,6 +261,9 @@ public class AuthService {
 
         token.setUsed(true);
         verificationTokenRepository.save(token);
+
+        notificationService.create(user.getId(), "SECURITY", "Password reset",
+                "Your password was reset successfully. If this wasn't you, contact support immediately.", null);
     }
 
     public AuthResponse loginWithGoogle(String accessToken) {
@@ -286,6 +296,7 @@ public class AuthService {
             Optional<User> existingByGoogleId = userRepository.findByGoogleId(googleId);
             if (existingByGoogleId.isPresent()) {
                 User user = existingByGoogleId.get();
+                enforceNotBanned(user);
                 // Only apply the platform avatar when the user hasn't uploaded a custom photo.
                 // Custom uploads are stored as base64 data URIs; platform URLs are plain https.
                 if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
@@ -297,6 +308,7 @@ public class AuthService {
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
+                enforceNotBanned(user);
                 user.setGoogleId(googleId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GOOGLE"));
                 if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
@@ -314,8 +326,14 @@ public class AuthService {
             newUser.setAvatarUrl(picture);
             userRepository.save(newUser);
 
+            notificationService.create(newUser.getId(), "WELCOME", "Welcome to PrepEdge!",
+                    "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
+                    "/practice/mock-tests");
+
             return new AuthResponse(jwtUtil.generateToken(newUser));
 
+        } catch (UnauthorizedException e) {
+            throw e; // don't mask "account banned" behind a generic "Google login failed" message
         } catch (Exception e) {
             throw new RuntimeException("Google login failed: " + e.getMessage());
         }
@@ -375,6 +393,7 @@ public class AuthService {
             Optional<User> existingByGithubId = userRepository.findByGithubId(githubId);
             if (existingByGithubId.isPresent()) {
                 User user = existingByGithubId.get();
+                enforceNotBanned(user);
                 if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
                 userRepository.save(user);
                 return jwtUtil.generateToken(user);
@@ -383,6 +402,7 @@ public class AuthService {
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
+                enforceNotBanned(user);
                 user.setGithubId(githubId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GITHUB"));
                 if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
@@ -400,8 +420,14 @@ public class AuthService {
             newUser.setAvatarUrl(githubAvatar);
             userRepository.save(newUser);
 
+            notificationService.create(newUser.getId(), "WELCOME", "Welcome to PrepEdge!",
+                    "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
+                    "/practice/mock-tests");
+
             return jwtUtil.generateToken(newUser);
 
+        } catch (UnauthorizedException e) {
+            throw e; // don't mask "account banned" behind a generic "GitHub login failed" message
         } catch (Exception e) {
             throw new RuntimeException("GitHub login failed: " + e.getMessage());
         }

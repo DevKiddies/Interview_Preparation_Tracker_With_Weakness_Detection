@@ -7,6 +7,7 @@ import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import FormStepper from "../components/ui/FormStepper.jsx";
 import API_BASE from "../utils/api.js";
+import { setCachedProfile } from "../utils/profileCache";
 
 function OnBoardingPage() {
   const steps = [
@@ -69,6 +70,15 @@ function OnBoardingPage() {
       if (response.ok) {
         if (formData.username.trim()) localStorage.setItem("username", formData.username.trim());
         if (formData.avatarUrl) localStorage.setItem("avatarUrl", formData.avatarUrl);
+        setCachedProfile({
+          username: formData.username.trim(),
+          avatarUrl: formData.avatarUrl,
+          targetCompany: formData.targetCompany,
+          interviewDate: formData.interviewDate,
+          experienceLevel: formData.experienceLevel,
+          focusTopics: formData.focusTopics,
+          onboarded: true,
+        });
         window.dispatchEvent(new CustomEvent("user-profile-updated"));
         navigate("/dashboard");
       } else {
