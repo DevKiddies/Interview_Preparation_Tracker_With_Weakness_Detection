@@ -1,6 +1,12 @@
 package com.preptracker.server.service;
 
 import com.preptracker.server.dto.AdminDashboardDTO;
+import com.preptracker.server.dto.CategoryQuestionCountDTO;
+import com.preptracker.server.dto.DailyActiveDTO;
+import com.preptracker.server.dto.PlatformHealthDTO;
+import com.preptracker.server.dto.RecentActivityDTO;
+import com.preptracker.server.dto.TopicPerformanceDTO;
+import com.preptracker.server.dto.UserGrowthPointDTO;
 import com.preptracker.server.repository.QuestionRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TestAttemptRepository.QuestionPassRateProjection;
@@ -10,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +27,7 @@ public class AdminDashboardService {
         private final TestAttemptRepository testAttemptRepository;
         private final TestSessionRepository testSessionRepository;
         private final UserSessionService userSessionService;
+        private final AdminAnalyticsService adminAnalyticsService;
 
         public AdminDashboardDTO getDashboardStats() {
 
@@ -34,13 +42,13 @@ public class AdminDashboardService {
 
                 Double avg = testAttemptRepository.getAverageAccuracy();
                 double averageScore = (avg == null) ? 0.0 : avg;
-                
+
                 // Count the number of banned users
                 long bannedUsers = userRepository.countByIsBannedTrue();
 
                 // Calculate average session duration in minutes
                 Double averageSessionDuration = userSessionService.getAverageSessionDurationMinutes();
-                
+
                 // Calculate question pass rate
                 QuestionPassRateProjection passRateData = testAttemptRepository.getQuestionPassRateData();
                 double questionPassRate = 0.0;
@@ -60,6 +68,16 @@ public class AdminDashboardService {
                         testCompletionRate = (completedSessions * 100.0) / totalSessions;
                 }
 
+                // ── Chart data (real, computed from persisted rows) ─────────────
+                List<UserGrowthPointDTO> userGrowth = adminAnalyticsService.getUserGrowth();
+                List<DailyActiveDTO> dailyActive = adminAnalyticsService.getDailyActive(14);
+                List<CategoryQuestionCountDTO> questionsByCategory =
+                                adminAnalyticsService.getQuestionsByCategory();
+                List<TopicPerformanceDTO> topicPerformance =
+                                adminAnalyticsService.getTopicPerformance();
+                PlatformHealthDTO platformHealth = adminAnalyticsService.getPlatformHealth();
+                List<RecentActivityDTO> recentActivity = adminAnalyticsService.getRecentActivity(10);
+
                 return new AdminDashboardDTO(
                                 totalUsers,
                                 totalQuestions,
@@ -69,7 +87,13 @@ public class AdminDashboardService {
                                 bannedUsers,
                                 averageSessionDuration,
                                 questionPassRate,
-                                testCompletionRate
+                                testCompletionRate,
+                                userGrowth,
+                                dailyActive,
+                                questionsByCategory,
+                                topicPerformance,
+                                platformHealth,
+                                recentActivity
                 );
         }
 }

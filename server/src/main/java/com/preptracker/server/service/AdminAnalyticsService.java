@@ -7,10 +7,13 @@ package com.preptracker.server.service;
 
 import com.preptracker.server.dto.AdminPlatformOverviewDTO;
 import com.preptracker.server.dto.AdminUserReportsDTO;
+import com.preptracker.server.dto.CategoryQuestionCountDTO;
 import com.preptracker.server.dto.CountBreakdownDTO;
+import com.preptracker.server.dto.DailyActiveDTO;
 import com.preptracker.server.dto.KpiDTO;
 import com.preptracker.server.dto.MonthlyPointDTO;
 import com.preptracker.server.dto.PlatformHealthDTO;
+import com.preptracker.server.dto.RecentActivityDTO;
 import com.preptracker.server.dto.TopPerformerDTO;
 import com.preptracker.server.dto.TopicPerformanceDTO;
 import com.preptracker.server.dto.UserGrowthPointDTO;
@@ -26,12 +29,14 @@ import com.preptracker.server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -125,6 +130,140 @@ public class AdminAnalyticsService {
                 engagementTiers(users, attemptsByUserId),
                 topPerformers(users, attemptsByUserId)
         );
+    }
+
+    // Cumulative total-users-as-of-month-end alongside that month's new signups,
+    // for the admin dashboard "User Activity" growth chart (same 12-month
+    // window as the Platform Overview growth series).
+    public List<UserGrowthPointDTO> getUserGrowth() {
+        return userGrowth(userRepository.findAll(), LocalDateTime.now());
+    }
+
+    // Per-topic completion & score for the dashboard "Test Completion by Topic"
+    // chart — mirrors the Platform Overview topic performance list.
+    public List<TopicPerformanceDTO> getTopicPerformance() {
+        return topicPerformance(testAttemptRepository.findAll());
+    }
+
+    // Question coverage / onboarding / email-verification percentages for the
+    // dashboard's Platform Health section.
+    public PlatformHealthDTO getPlatformHealth() {
+        return platformHealth(userRepository.findAll());
+    }
+
+    // Per-day count of users whose last_active_at landed on that day, for the
+    // "Daily Active" bar chart. Includes zero-fill days so the axis reads cleanly.
+    public List<DailyActiveDTO> getDailyActive(int days) {
+        List<User> users = userRepository.findAll();
+        LocalDate today = LocalDate.now();
+
+        Map<LocalDate, Long> counts = new LinkedHashMap<>();
+        for (int i = days - 1; i >= 0; i--) {
+            counts.put(today.minusDays(i), 0L);
+        }
+        for (User u : users) {
+            if (u.getLastActiveAt() == null) continue;
+            LocalDate day = u.getLastActiveAt().toLocalDate();
+            counts.computeIfPresent(day, (k, v) -> v + 1);
+        }
+
+        return counts.entrySet().stream()
+                .map(e -> new DailyActiveDTO(
+                        e.getKey().format(java.time.format.DateTimeFormatter.ofPattern("MMM d")),
+                        e.getValue()))
+                .toList();
+    }
+
+    // Question bank size per category, for the dashboard's distribution pie.
+    // Only categories that actually contain questions appear.
+    public List<CategoryQuestionCountDTO> getQuestionsByCategory() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (var q : questionRepository.findAll()) {
+            String name = q.getCategory() != null ? q.getCategory().getName() : "Uncategorized";
+            counts.merge(name, 1L, Long::sum);
+        }
+        return counts.entrySet().stream()
+                .map(e -> new CategoryQuestionCountDTO(e.getKey(), e.getValue()))
+                .sorted(Comparator.comparingLong(CategoryQuestionCountDTO::count).reversed())
+                .toList();
+    }
+
+    // Latest platform events for the "Recent Activity" feed: newest signups,
+    // completed test attempts, and applied bans, merged and sorted newest-first.
+    public List<RecentActivityDTO> getRecentActivity(int limit) {
+        List<User> users = userRepository.findAll();
+        List<TestAttempt> attempts = testAttemptRepository.findAll();
+
+        List<RecentActivityDTO> items = new ArrayList<>();
+
+        for (User u : users) {
+            if (u.getCreatedAt() != null) {
+                items.add(new RecentActivityDTO(
+                        "user_registered",
+                        "New user registered",
+                        u.getEmail(),
+                        relativeTime(u.getCreatedAt()),
+                        "success"));
+            }
+            if (Boolean.TRUE.equals(u.getIsBanned()) && u.getBannedAt() != null) {
+                items.add(new RecentActivityDTO(
+                        "user_banned",
+                        "User account suspended",
+                        u.getEmail() + (u.getBanReason() == null ? "" : " — " + u.getBanReason()),
+                        relativeTime(u.getBannedAt()),
+                        "warning"));
+            }
+        }
+
+        for (TestAttempt a : attempts) {
+            items.add(new RecentActivityDTO(
+                    "test_completed",
+                    "Test attempt submitted",
+                    (a.getCategory() == null ? "Mock test" : a.getCategory())
+                            + " — " + round1(a.getAccuracy()) + "% accuracy",
+                    relativeTime(a.getTakenAt()),
+                    "info"));
+        }
+
+        // Events aren't stored with a single shared timestamp column, so sort by
+        // the raw age embedded in each relative string (works because the feed
+        // is recent and we build the strings from real timestamps below).
+        items.sort(Comparator.comparingLong(AdminAnalyticsService::ageMillis));
+        return items.stream().limit(limit).toList();
+    }
+
+    // Seconds since epoch, extracted from a relative time string ("5 min ago").
+    // Used purely to order the recent-activity feed newest-first.
+    private static long ageMillis(RecentActivityDTO dto) {
+        String time = dto.time();
+        try {
+            if (time.endsWith(" min ago")) {
+                return Long.parseLong(time.split(" ")[0]) * 60_000L;
+            }
+            if (time.endsWith(" hr ago")) {
+                return Long.parseLong(time.split(" ")[0]) * 3_600_000L;
+            }
+            if (time.endsWith(" days ago")) {
+                return Long.parseLong(time.split(" ")[0]) * 86_400_000L;
+            }
+            if (time.endsWith(" sec ago")) {
+                return Long.parseLong(time.split(" ")[0]) * 1_000L;
+            }
+        } catch (NumberFormatException ignored) { }
+        return Long.MAX_VALUE;
+    }
+
+    // "5 min ago" style label for a past timestamp.
+    private static String relativeTime(LocalDateTime at) {
+        Duration d = Duration.between(at, LocalDateTime.now());
+        long seconds = Math.max(0, d.getSeconds());
+        if (seconds < 60) return "just now";
+        long minutes = seconds / 60;
+        if (minutes < 60) return minutes + " min ago";
+        long hours = minutes / 60;
+        if (hours < 24) return hours + " hr ago";
+        long days = hours / 24;
+        return days == 1 ? "1 day ago" : days + " days ago";
     }
 
     // Cumulative total-users-as-of-month-end alongside that month's new signups,

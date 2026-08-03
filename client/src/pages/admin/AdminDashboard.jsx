@@ -1,9 +1,10 @@
-// AdminDashboard.jsx — Admin overview dashboard showing platform-wide stats, user growth
-// charts, question distribution, test completion trends, recent activity feed,
-// platform health metrics, and quick-action shortcuts.
-// All data is currently mocked in adminDashboardData.js — swap for API calls when ready.
+// AdminDashboard.jsx — Admin overview dashboard showing platform-wide stats,
+// user growth charts, question distribution, test completion trends, recent
+// activity feed, and platform health metrics.
+// All data is live: a single GET /api/admin/dashboard returns the stat cards
+// plus every chart series, computed server-side from real persisted rows.
 
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   AreaChart,
@@ -38,17 +39,12 @@ import {
   Clock,
   Target,
   RefreshCw,
+  Loader2,
+  BarChart2,
+  PieChart as PieIcon,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  userGrowthData,
-  dailyActiveUsers,
-  questionsByCategory,
-  weeklyTestCompletion,
-  recentActivity,
-  platformHealthMetrics,
-} from "../../data/adminDashboardData";
-
+import { TOPIC_COLORS } from "../../data/adminTestsData";
 import API_BASE from "../../utils/api";
 
 // ─── icon & color maps ────────────────────────────────────────────────────────
@@ -115,6 +111,20 @@ const COLOR = {
   },
 };
 
+// Fallback palette for categories that don't match a TOPIC_COLORS key.
+const FALLBACK_PIE_COLORS = [
+  "#3b82f6",
+  "#6366f1",
+  "#14b8a6",
+  "#f59e0b",
+  "#a855f7",
+  "#10b981",
+  "#f43f5e",
+  "#0ea5e9",
+  "#84cc16",
+  "#f97316",
+];
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function ActivityStatusIcon({ status }) {
@@ -140,7 +150,12 @@ function ChartTooltip({ active, payload, label }) {
           style={{ color: p.color }}
           className="font-medium leading-5"
         >
-          {p.name}: <span className="font-bold">{p.value}</span>
+          {p.name}:{" "}
+          <span className="font-bold">
+            {typeof p.value === "number"
+              ? p.value.toLocaleString()
+              : p.value}
+          </span>
         </p>
       ))}
     </div>
@@ -153,7 +168,20 @@ function PieTooltip({ active, payload }) {
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 shadow-lg text-xs">
       <p className="font-semibold text-slate-700 dark:text-slate-200">{name}</p>
-      <p className="text-slate-500 dark:text-slate-400">{value} questions</p>
+      <p className="text-slate-500 dark:text-slate-400">
+        {value.toLocaleString()} questions
+      </p>
+    </div>
+  );
+}
+
+function EmptyChart({ icon: Icon, message }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <Icon size={26} className="text-slate-300 dark:text-slate-700 mb-2" />
+      <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[240px]">
+        {message}
+      </p>
     </div>
   );
 }
@@ -194,9 +222,11 @@ function StatCard({ stat }) {
         </p>
       </div>
 
-      <p className="text-[11px] text-slate-400 dark:text-slate-500">
-        {stat.sublabel}
-      </p>
+      {stat.sublabel && (
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
+          {stat.sublabel}
+        </p>
+      )}
     </div>
   );
 }
@@ -234,11 +264,37 @@ function ViewAllLink({ to }) {
   );
 }
 
+// Segmented toggle reused by the activity chart (Growth/Daily Active) and the
+// platform-health range picker.
+function Segmented({ options, value, onChange, size = "sm" }) {
+  return (
+    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 shrink-0">
+      {options.map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          className={`${
+            size === "sm" ? "px-3 py-1.5 text-[11px]" : "px-3.5 py-1.5 text-xs"
+          } font-semibold rounded-md transition-colors ${
+            value === key
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const { isDark } = useTheme();
   const [activityTab, setActivityTab] = useState("growth"); // "growth" | "dau"
+  const [growthRange, setGrowthRange] = useState("All"); // "3M" | "6M" | "All"
+  const [dauDays, setDauDays] = useState(7); // 7 | 14
 
   const axisColor = isDark ? "#64748b" : "#94a3b8";
   const gridColor = isDark ? "#1e293b" : "#f1f5f9";
@@ -251,32 +307,43 @@ export default function AdminDashboard() {
   });
 
   const [dashboardStats, setDashboardStats] = useState(null);
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/dashboard`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-          },
-        });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-        if (!res.ok) throw new Error("Failed to load dashboard");
-
-        const data = await res.json();
-        setDashboardStats(data);
-      } catch (err) {
-        console.error(err);
-      }
+  const loadDashboard = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load dashboard");
+      setDashboardStats(await res.json());
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to load dashboard");
     }
-
-    loadDashboard();
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    loadDashboard().finally(() => setLoading(false));
+  }, [loadDashboard]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadDashboard();
+    setRefreshing(false);
+  }
+
   const platformStats = dashboardStats
     ? [
         {
           id: "users",
           label: "Total Users",
-          value: dashboardStats.totalUsers,
+          value: dashboardStats.totalUsers.toLocaleString(),
           icon: "users",
           color: "blue",
           change: "",
@@ -286,7 +353,7 @@ export default function AdminDashboard() {
         {
           id: "questions",
           label: "Questions",
-          value: dashboardStats.totalQuestions,
+          value: dashboardStats.totalQuestions.toLocaleString(),
           icon: "book-open",
           color: "indigo",
           change: "",
@@ -296,7 +363,7 @@ export default function AdminDashboard() {
         {
           id: "active-users",
           label: "Active Today",
-          value: dashboardStats.totalUsersActiveToday,
+          value: dashboardStats.totalUsersActiveToday.toLocaleString(),
           icon: "user-check",
           color: "emerald",
           change: "",
@@ -306,7 +373,7 @@ export default function AdminDashboard() {
         {
           id: "tests",
           label: "Tests Taken",
-          value: dashboardStats.totalTestsTaken,
+          value: dashboardStats.totalTestsTaken.toLocaleString(),
           icon: "clipboard-list",
           color: "teal",
           change: "",
@@ -326,7 +393,7 @@ export default function AdminDashboard() {
         {
           id: "banned-users",
           label: "Banned Users",
-          value: dashboardStats.bannedUsers,
+          value: dashboardStats.bannedUsers.toLocaleString(),
           icon: "user-x",
           color: "rose",
           change: "",
@@ -356,6 +423,71 @@ export default function AdminDashboard() {
       ]
     : [];
 
+  // Chart data derived from the live payload.
+  const growthData = useMemo(() => {
+    if (!dashboardStats?.userGrowth) return [];
+    const data = dashboardStats.userGrowth;
+    const months = { "3M": 3, "6M": 6, All: 12 }[growthRange];
+    return data.slice(-months);
+  }, [dashboardStats, growthRange]);
+
+  const dauData = useMemo(() => {
+    if (!dashboardStats?.dailyActive) return [];
+    return dashboardStats.dailyActive.slice(-dauDays);
+  }, [dashboardStats, dauDays]);
+
+  const questionsByCategory = useMemo(() => {
+    if (!dashboardStats?.questionsByCategory) return [];
+    return dashboardStats.questionsByCategory.map((c, i) => ({
+      name: c.name,
+      value: c.count,
+      color: TOPIC_COLORS[c.name]
+        ? TOPIC_COLORS[c.name].chart
+        : FALLBACK_PIE_COLORS[i % FALLBACK_PIE_COLORS.length],
+    }));
+  }, [dashboardStats]);
+
+  const testCompletion = useMemo(() => {
+    if (!dashboardStats?.topicPerformance) return [];
+    return dashboardStats.topicPerformance.map((t) => ({
+      topic: t.topic,
+      completed: t.attempts,
+      avgScore: Math.round(t.avgAccuracy),
+    }));
+  }, [dashboardStats]);
+
+  const recentActivity = dashboardStats?.recentActivity ?? [];
+  const platformHealth = dashboardStats?.platformHealth;
+  const totalQuestionCount =
+    questionsByCategory.reduce((s, c) => s + c.value, 0) ||
+    dashboardStats?.totalQuestions ||
+    0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading dashboard…
+      </div>
+    );
+  }
+
+  if (error || !dashboardStats) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertCircle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          {error || "Failed to load dashboard"}
+        </p>
+        <button
+          onClick={handleRefresh}
+          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        >
+          <RefreshCw size={14} /> Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 pb-6">
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
@@ -369,6 +501,14 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
           <Link
             to="/admin/questions/add"
             className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors shadow-sm"
@@ -393,121 +533,122 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* ── Platform Health ─────────────────────────────────────────────────── */}
-      {/*
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {platformHealthMetrics.map((metric) => {
-          const Icon = ICON_MAP[metric.icon];
-          const c = COLOR[metric.color];
-          return (
-            <div
-              key={metric.label}
-              className={`flex items-center gap-3 bg-white dark:bg-slate-900 border ${c.border} rounded-xl px-4 py-3 shadow-sm`}
-            >
-              <div className={`p-2 rounded-lg ${c.bg} shrink-0`}>
-                <Icon size={15} className={c.icon} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-extrabold text-slate-900 dark:text-white leading-none">
-                  {metric.value}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
-                  {metric.label}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>*/}
-
       {/* ── Charts Row 1: User Activity + Question Distribution ─────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* User Activity Chart (2/3 width) */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-          <div className="flex items-start justify-between mb-5 gap-2">
+          <div className="flex flex-wrap items-start justify-between mb-5 gap-2">
             <div>
               <p className="text-[15px] font-bold text-slate-900 dark:text-white">
                 User Activity
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Platform engagement overview
+                {activityTab === "growth"
+                  ? "Cumulative & new user signups per month"
+                  : "Users active per day (last_active_at)"}
               </p>
             </div>
-            {/* Toggle */}
-            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 shrink-0">
-              {[
-                { key: "growth", label: "Growth" },
-                { key: "dau", label: "Daily Active" },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActivityTab(key)}
-                  className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
-                    activityTab === key
-                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <Segmented
+                options={[
+                  { key: "growth", label: "Growth" },
+                  { key: "dau", label: "Daily Active" },
+                ]}
+                value={activityTab}
+                onChange={setActivityTab}
+              />
+              {activityTab === "growth" ? (
+                <Segmented
+                  options={[
+                    { key: "3M", label: "3M" },
+                    { key: "6M", label: "6M" },
+                    { key: "All", label: "All" },
+                  ]}
+                  value={growthRange}
+                  onChange={setGrowthRange}
+                />
+              ) : (
+                <Segmented
+                  options={[
+                    { key: 7, label: "7d" },
+                    { key: 14, label: "14d" },
+                  ]}
+                  value={dauDays}
+                  onChange={(k) => setDauDays(Number(k))}
+                />
+              )}
             </div>
           </div>
 
-          <ResponsiveContainer width="100%" height={230}>
-            {activityTab === "growth" ? (
-              <AreaChart
-                data={userGrowthData}
-                margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.22} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gNew" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.22} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                <Area
-                  type="monotone"
-                  dataKey="users"
-                  name="Total Users"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  fill="url(#gTotal)"
-                  dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="newUsers"
-                  name="New Users"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  fill="url(#gNew)"
-                  dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-              </AreaChart>
+          {activityTab === "growth" ? (
+            growthData.length === 0 ? (
+              <EmptyChart
+                icon={BarChart2}
+                message="No user signups recorded yet — the growth trend will appear as users join."
+              />
             ) : (
+              <ResponsiveContainer width="100%" height={230}>
+                <AreaChart
+                  data={growthData}
+                  margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gNew" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: axisColor, fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: axisColor, fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="totalUsers"
+                    name="Total Users"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fill="url(#gTotal)"
+                    dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="newUsers"
+                    name="New Users"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fill="url(#gNew)"
+                    dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )
+          ) : dauData.length === 0 ? (
+            <EmptyChart
+              icon={BarChart2}
+              message="No login activity recorded yet — daily active counts appear once users log in."
+            />
+          ) : (
+            <ResponsiveContainer width="100%" height={230}>
               <BarChart
-                data={dailyActiveUsers}
+                data={dauData}
                 margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -521,18 +662,19 @@ export default function AdminDashboard() {
                   tick={{ fill: axisColor, fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
+                  allowDecimals={false}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <Bar
-                  dataKey="dau"
+                  dataKey="active"
                   name="Active Users"
                   fill="#3b82f6"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={44}
                 />
               </BarChart>
-            )}
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Question Distribution Pie (1/3 width) */}
@@ -542,112 +684,199 @@ export default function AdminDashboard() {
               Questions by Category
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              2,156 total questions
+              {totalQuestionCount.toLocaleString()} total questions
             </p>
           </div>
-          <ResponsiveContainer width="100%" height={170}>
-            <PieChart>
-              <Pie
-                data={questionsByCategory}
-                cx="50%"
-                cy="50%"
-                innerRadius={48}
-                outerRadius={78}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {questionsByCategory.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} strokeWidth={0} />
+          {questionsByCategory.length === 0 ? (
+            <EmptyChart
+              icon={PieIcon}
+              message="No questions in the bank yet — add questions to see the category breakdown."
+            />
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={170}>
+                <PieChart>
+                  <Pie
+                    data={questionsByCategory}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={78}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {questionsByCategory.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} strokeWidth={0} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {questionsByCategory.map((cat) => (
+                  <div key={cat.name} className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: cat.color }}
+                    />
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
+                      {cat.name}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 ml-auto">
+                      {cat.value}
+                    </span>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip content={<PieTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
-            {questionsByCategory.map((cat) => (
-              <div key={cat.name} className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: cat.color }}
-                />
-                <span className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
-                  {cat.name}
-                </span>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* ── Charts Row 2: Test Completion ────────────────────────────────────── */}
       <SectionCard
         title="Test Completion by Topic"
-        subtitle="Total tests completed & average score per subject"
+        subtitle="Total tests completed & average score per topic"
       >
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart
-            data={weeklyTestCompletion}
-            margin={{ top: 4, right: 4, left: -15, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis
-              dataKey="topic"
-              tick={{ fill: axisColor, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: axisColor, fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-            <Bar
-              dataKey="completed"
-              name="Tests Completed"
-              fill="#3b82f6"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={36}
-            />
-            <Bar
-              dataKey="avgScore"
-              name="Avg Score (%)"
-              fill="#10b981"
-              radius={[4, 4, 0, 0]}
-              maxBarSize={36}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        {testCompletion.length === 0 ? (
+          <EmptyChart
+            icon={BarChart2}
+            message="No test attempts yet — topic performance will appear once users take tests."
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={testCompletion}
+              margin={{ top: 4, right: 4, left: -15, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis
+                dataKey="topic"
+                tick={{ fill: axisColor, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: axisColor, fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip content={<ChartTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
+              <Bar
+                dataKey="completed"
+                name="Tests Completed"
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={36}
+              />
+              <Bar
+                dataKey="avgScore"
+                name="Avg Score (%)"
+                fill="#10b981"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={36}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </SectionCard>
+
+      {/* ── Platform Health ─────────────────────────────────────────────────── */}
+      {platformHealth && (
+        <SectionCard
+          title="Platform Health"
+          subtitle="Question coverage, onboarding & email verification rates"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {[
+              {
+                label: "Question Coverage",
+                value: Math.round(platformHealth.questionCoverage),
+                desc: "Topics with ≥3 questions",
+              },
+              {
+                label: "User Onboarding",
+                value: Math.round(platformHealth.onboardingRate),
+                desc: "Users who completed onboarding",
+              },
+              {
+                label: "Email Verification",
+                value: Math.round(platformHealth.emailVerificationRate),
+                desc: "Users with verified email",
+              },
+            ].map(({ label, value, desc }) => (
+              <div key={label}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div>
+                    <span className="text-sm font-medium text-slate-800 dark:text-white">
+                      {label}
+                    </span>
+                    <p className="text-xs text-slate-400">{desc}</p>
+                  </div>
+                  <span
+                    className={`text-sm font-bold ${
+                      value >= 80
+                        ? "text-green-600 dark:text-green-400"
+                        : value >= 60
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-rose-500"
+                    }`}
+                  >
+                    {value}%
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700">
+                  <div
+                    className="h-2 rounded-full transition-all"
+                    style={{
+                      width: `${value}%`,
+                      background:
+                        value >= 80 ? "#22c55e" : value >= 60 ? "#f59e0b" : "#ef4444",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       {/* ── Recent Activity ──────────────────────────────────────────────── */}
       <SectionCard
         title="Recent Activity"
-        subtitle="Latest events across the platform"
+        subtitle="Latest signups, test attempts & bans across the platform"
         action={<ViewAllLink to="/admin/analytics" />}
       >
-        <div className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800/70">
-          {recentActivity.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-            >
-              <ActivityStatusIcon status={item.status} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug truncate">
-                  {item.message}
-                </p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                  {item.detail}
-                </p>
+        {recentActivity.length === 0 ? (
+          <EmptyChart
+            icon={Activity}
+            message="No activity yet — this feed fills in as users register and take tests."
+          />
+        ) : (
+          <div className="flex flex-col divide-y divide-slate-50 dark:divide-slate-800/70">
+            {recentActivity.map((item, idx) => (
+              <div
+                key={`${item.type}-${idx}`}
+                className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
+              >
+                <ActivityStatusIcon status={item.status} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug truncate">
+                    {item.message}
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                    {item.detail}
+                  </p>
+                </div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 pt-0.5">
+                  {item.time}
+                </span>
               </div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 pt-0.5">
-                {item.time}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </SectionCard>
     </div>
   );

@@ -41,7 +41,6 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class DashboardStatsService {
 
     private static final int WEEK_DAYS = 7;
@@ -60,52 +59,65 @@ public class DashboardStatsService {
     private final TopicRepository topicRepository;
     private final TechniqueTopicRepository techniqueTopicRepository;
     private final UserProfileRepository userProfileRepository;
-public DashboardStatsDTO getStats(UUID userId) {
-    LocalDateTime now = LocalDateTime.now();
-    LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
-    LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
-    List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
-    List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
-
-    if (rows == null || rows.isEmpty()) {
-        return new DashboardStatsDTO(
-                null,
-                null,
-                0, // testsAttempted
-                0, // questionsSolved
-                computeStreak(attemptTimestamps),
-                null,
-                null,
-                0
-        );
+    public DashboardStatsService(UserAttemptRepository userAttemptRepository,
+            TestAttemptRepository testAttemptRepository,
+            CategoryRepository categoryRepository,
+            TopicRepository topicRepository,
+            TechniqueTopicRepository techniqueTopicRepository,
+            UserProfileRepository userProfileRepository) {
+        this.userAttemptRepository = userAttemptRepository;
+        this.testAttemptRepository = testAttemptRepository;
+        this.categoryRepository = categoryRepository;
+        this.topicRepository = topicRepository;
+        this.techniqueTopicRepository = techniqueTopicRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
-    Object[] row = rows.get(0);
+    public DashboardStatsDTO getStats(UUID userId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
+        LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
-    Integer confidence = round(row[0]);
-    Integer accuracy = round100(row[1]);
+        List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
+        List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
 
-    int testsAttempted = ((Number) row[2]).intValue();
-    int solved = ((Number) row[3]).intValue();
-    int solvedThisWeek = ((Number) row[4]).intValue();
+        if (rows == null || rows.isEmpty()) {
+            return new DashboardStatsDTO(
+                    null,
+                    null,
+                    0, // testsAttempted
+                    0, // questionsSolved
+                    computeStreak(attemptTimestamps),
+                    null,
+                    null,
+                    0);
+        }
 
-    Integer recentConf = round(row[5]);
-    Integer prevConf = round(row[6]);
-    Integer recentAcc = round100(row[7]);
-    Integer prevAcc = round100(row[8]);
+        Object[] row = rows.get(0);
 
-    return new DashboardStatsDTO(
-            confidence,
-            accuracy,
-            testsAttempted,
-            solved,
-            computeStreak(attemptTimestamps),
-            delta(recentConf, prevConf),
-            delta(recentAcc, prevAcc),
-            solvedThisWeek
-    );
-}
+        Integer confidence = round(row[0]);
+        Integer accuracy = round100(row[1]);
+
+        int testsAttempted = ((Number) row[2]).intValue();
+        int solved = ((Number) row[3]).intValue();
+        int solvedThisWeek = ((Number) row[4]).intValue();
+
+        Integer recentConf = round(row[5]);
+        Integer prevConf = round(row[6]);
+        Integer recentAcc = round100(row[7]);
+        Integer prevAcc = round100(row[8]);
+
+        return new DashboardStatsDTO(
+                confidence,
+                accuracy,
+                testsAttempted,
+                solved,
+                computeStreak(attemptTimestamps),
+                delta(recentConf, prevConf),
+                delta(recentAcc, prevAcc),
+                solvedThisWeek);
+    }
 
     public List<CategoryConfidenceDTO> getCategoryConfidence(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
@@ -183,7 +195,8 @@ public DashboardStatsDTO getStats(UUID userId) {
     // Claiming 90% confidence in a category should require ~90% topic coverage,
     // not just high scores on the handful of topics that were attempted.
     private Integer coverageConfidence(List<Long> topicIds, Map<Long, Integer> topicConfidence) {
-        if (topicIds.isEmpty()) return null;
+        if (topicIds.isEmpty())
+            return null;
         double sum = 0;
         for (Long topicId : topicIds) {
             Integer conf = topicConfidence.get(topicId);
@@ -199,7 +212,8 @@ public DashboardStatsDTO getStats(UUID userId) {
     // to EVIDENCE_TARGET: smooth, no arbitrary bands, never above the raw value,
     // and independent of how many questions exist in the topic's bank.
     private Integer weightConfidence(Integer rawConfidence, int distinctAnswered) {
-        if (rawConfidence == null) return null;
+        if (rawConfidence == null)
+            return null;
         double weight = Math.min(1.0, distinctAnswered / (double) EVIDENCE_TARGET);
         return (int) Math.round(rawConfidence * weight);
     }
@@ -231,7 +245,7 @@ public DashboardStatsDTO getStats(UUID userId) {
             int count = ((Number) r[4]).intValue();
             int distinct = ((Number) r[5]).intValue();
             techniqueStatsByTopic.computeIfAbsent(topicId, k -> new HashMap<>())
-                    .put(techniqueId, new double[]{conf, acc, count, distinct});
+                    .put(techniqueId, new double[] { conf, acc, count, distinct });
         }
 
         // technique_id -> topic_id (a technique can hang under several topics,
@@ -266,7 +280,8 @@ public DashboardStatsDTO getStats(UUID userId) {
             Map<Long, double[]> topicTechniqueStats = techniqueStatsByTopic.getOrDefault(topicId, Map.of());
             List<Long> attachedTechniques = new ArrayList<>();
             for (Map.Entry<Long, Long> e : techniqueParent.entrySet()) {
-                if (e.getValue().equals(topicId)) attachedTechniques.add(e.getKey());
+                if (e.getValue().equals(topicId))
+                    attachedTechniques.add(e.getKey());
             }
 
             int techniqueQuestions = 0;
@@ -305,14 +320,16 @@ public DashboardStatsDTO getStats(UUID userId) {
                     if (techniqueConfCount == topicTotal) {
                         generalRawConf = topicConf; // degenerate: only listed techniques
                     } else {
-                        generalRawConf = (int) Math.round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
+                        generalRawConf = (int) Math
+                                .round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
                     }
                 }
                 if (topicAcc != null) {
                     if (techniqueAccCount == topicTotal) {
                         generalAcc = topicAcc; // degenerate: only listed techniques
                     } else {
-                        generalAcc = (int) Math.round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
+                        generalAcc = (int) Math
+                                .round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
                     }
                 }
             }
@@ -395,7 +412,7 @@ public DashboardStatsDTO getStats(UUID userId) {
             double confidence = r[1] == null ? Double.NaN : ((Number) r[1]).doubleValue();
             double accuracy = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue() * 100;
             int count = ((Number) r[3]).intValue();
-            byDay.put(day, new double[]{confidence, accuracy, count});
+            byDay.put(day, new double[] { confidence, accuracy, count });
         }
 
         Map<String, List<TrendPointDTO>> trend = new LinkedHashMap<>();
@@ -430,8 +447,8 @@ public DashboardStatsDTO getStats(UUID userId) {
         LocalDate lastMonday = end.minusDays(daysBack).plusDays(7);
         List<TrendPointDTO> out = new ArrayList<>();
         for (int w = weeks - 1; w >= 0; w--) {
-            LocalDate weekEnd = lastMonday.minusDays(7L * w);       // exclusive
-            LocalDate weekStart = weekEnd.minusDays(7);              // inclusive
+            LocalDate weekEnd = lastMonday.minusDays(7L * w); // exclusive
+            LocalDate weekStart = weekEnd.minusDays(7); // inclusive
             double[] v = aggregate(byDay, weekStart, weekEnd);
             out.add(new TrendPointDTO("W" + (weeks - w),
                     Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
@@ -448,8 +465,8 @@ public DashboardStatsDTO getStats(UUID userId) {
         LocalDate end = LocalDate.now().withDayOfMonth(1).plusMonths(1);
         List<TrendPointDTO> out = new ArrayList<>();
         for (int m = months - 1; m >= 0; m--) {
-            LocalDate monthEnd = end.minusMonths(m);          // exclusive
-            LocalDate monthStart = monthEnd.minusMonths(1);   // inclusive
+            LocalDate monthEnd = end.minusMonths(m); // exclusive
+            LocalDate monthStart = monthEnd.minusMonths(1); // inclusive
             double[] v = aggregate(byDay, monthStart, monthEnd);
             out.add(new TrendPointDTO("M" + (months - m),
                     Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
@@ -465,11 +482,18 @@ public DashboardStatsDTO getStats(UUID userId) {
         int confWeight = 0, accWeight = 0;
         for (LocalDate d = start; d.isBefore(end); d = d.plusDays(1)) {
             double[] v = byDay.get(d);
-            if (v == null) continue;
-            if (!Double.isNaN(v[0])) { confSum += v[0] * v[2]; confWeight += v[2]; }
-            if (!Double.isNaN(v[1])) { accSum += v[1] * v[2]; accWeight += v[2]; }
+            if (v == null)
+                continue;
+            if (!Double.isNaN(v[0])) {
+                confSum += v[0] * v[2];
+                confWeight += v[2];
+            }
+            if (!Double.isNaN(v[1])) {
+                accSum += v[1] * v[2];
+                accWeight += v[2];
+            }
         }
-        return new double[]{
+        return new double[] {
                 confWeight == 0 ? Double.NaN : confSum / confWeight,
                 accWeight == 0 ? Double.NaN : accSum / accWeight,
         };
@@ -498,12 +522,13 @@ public DashboardStatsDTO getStats(UUID userId) {
             Long topicId = ((Number) r[0]).longValue();
             String difficulty = (String) r[1];
             double accuracy = ((Number) r[2]).doubleValue() * 100;
-            double[] bucket = accByTopic.computeIfAbsent(topicId, k -> new double[]{-1, -1, -1});
+            double[] bucket = accByTopic.computeIfAbsent(topicId, k -> new double[] { -1, -1, -1 });
             switch (difficulty) {
                 case "easy" -> bucket[0] = accuracy;
                 case "medium" -> bucket[1] = accuracy;
                 case "hard" -> bucket[2] = accuracy;
-                default -> { }
+                default -> {
+                }
             }
         }
 
@@ -522,7 +547,8 @@ public DashboardStatsDTO getStats(UUID userId) {
                 for (String name : raw.split(",")) {
                     String trimmed = name.trim();
                     topicName.forEach((id, n) -> {
-                        if (n.equals(trimmed)) focusIds.add(id);
+                        if (n.equals(trimmed))
+                            focusIds.add(id);
                     });
                 }
             }
@@ -530,7 +556,8 @@ public DashboardStatsDTO getStats(UUID userId) {
 
         List<AccuracyHeatmapRowDTO> out = new ArrayList<>();
         for (Map.Entry<Long, String> e : topicName.entrySet()) {
-            if (!focusIds.isEmpty() && !focusIds.contains(e.getKey())) continue;
+            if (!focusIds.isEmpty() && !focusIds.contains(e.getKey()))
+                continue;
             double[] bucket = accByTopic.get(e.getKey());
             out.add(new AccuracyHeatmapRowDTO(
                     e.getValue(),
@@ -572,7 +599,8 @@ public DashboardStatsDTO getStats(UUID userId) {
 
         List<LocalDate> active = new ArrayList<>();
         for (ActivityDayDTO d : days) {
-            if (d.attempts() > 0) active.add(LocalDate.parse(d.date()));
+            if (d.attempts() > 0)
+                active.add(LocalDate.parse(d.date()));
         }
         Set<LocalDate> activeSet = new HashSet<>(active);
 
@@ -580,7 +608,8 @@ public DashboardStatsDTO getStats(UUID userId) {
         if (!activeSet.isEmpty()) {
             // A streak stays alive if the user practiced yesterday but not yet today.
             LocalDate cursor = LocalDate.now();
-            if (!activeSet.contains(cursor)) cursor = cursor.minusDays(1);
+            if (!activeSet.contains(cursor))
+                cursor = cursor.minusDays(1);
             while (activeSet.contains(cursor)) {
                 current++;
                 cursor = cursor.minusDays(1);
@@ -591,9 +620,12 @@ public DashboardStatsDTO getStats(UUID userId) {
         LocalDate prev = null;
         int run = 0;
         for (LocalDate d : active) {
-            if (prev != null && d.equals(prev.plusDays(1))) run++;
-            else run = 1;
-            if (run > longest) longest = run;
+            if (prev != null && d.equals(prev.plusDays(1)))
+                run++;
+            else
+                run = 1;
+            if (run > longest)
+                longest = run;
             prev = d;
         }
 
@@ -601,22 +633,28 @@ public DashboardStatsDTO getStats(UUID userId) {
     }
 
     private String trendOf(Integer recent, Integer prev) {
-        if (recent == null || prev == null) return "flat";
+        if (recent == null || prev == null)
+            return "flat";
         int diff = recent - prev;
-        if (diff > 1) return "up";
-        if (diff < -1) return "down";
+        if (diff > 1)
+            return "up";
+        if (diff < -1)
+            return "down";
         return "flat";
     }
 
     private int computeStreak(List<LocalDateTime> attemptTimestamps) {
-        if (attemptTimestamps == null || attemptTimestamps.isEmpty()) return 0;
+        if (attemptTimestamps == null || attemptTimestamps.isEmpty())
+            return 0;
 
         Map<LocalDate, Boolean> days = new HashMap<>();
-        for (LocalDateTime ts : attemptTimestamps) days.put(ts.toLocalDate(), Boolean.TRUE);
+        for (LocalDateTime ts : attemptTimestamps)
+            days.put(ts.toLocalDate(), Boolean.TRUE);
 
         LocalDate cursor = LocalDate.now();
         // A streak stays alive if the user practiced yesterday but not yet today.
-        if (!days.containsKey(cursor)) cursor = cursor.minusDays(1);
+        if (!days.containsKey(cursor))
+            cursor = cursor.minusDays(1);
 
         int streak = 0;
         while (days.containsKey(cursor)) {
@@ -627,17 +665,20 @@ public DashboardStatsDTO getStats(UUID userId) {
     }
 
     private Integer delta(Integer recent, Integer prev) {
-        if (recent == null || prev == null) return null;
+        if (recent == null || prev == null)
+            return null;
         return recent - prev;
     }
 
     private Integer round(Object value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         return (int) Math.round(((Number) value).doubleValue());
     }
 
     private Integer round100(Object value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         return (int) Math.round(((Number) value).doubleValue() * 100);
     }
 }
