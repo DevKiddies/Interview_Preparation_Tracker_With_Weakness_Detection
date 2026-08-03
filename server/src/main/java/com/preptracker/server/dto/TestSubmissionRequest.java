@@ -7,11 +7,14 @@ package com.preptracker.server.dto;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public record TestSubmissionRequest(
         String category,
         String topic,
         int timeTaken,
         List<Long> questionIds,
-        Map<Long, String> answers
+        Map<Long, String> answers,
+        // Added sessionId to track the test session associated with this submission
+        UUID sessionId
 ) {}

@@ -45,6 +45,8 @@ export default function MockTestPage() {
   const [timeLeft, setTimeLeft]               = useState(initialTime);
   const [tabSwitches, setTabSwitches]         = useState(0);
   const [showTabWarning, setShowTabWarning]   = useState(false);
+  // Added state to track the session ID for the test. Currently, this is not being used in the frontend, but it can be useful for future enhancements or debugging.
+  // const [sessionId, setSessionId] = useState(null);
 
   const initialTimeRef = useRef(initialTime);
   const doSubmitRef = useRef(null);
@@ -89,7 +91,7 @@ export default function MockTestPage() {
     if (category) {
       const cats = Array.isArray(category) ? category : [category];
       cats.forEach((c) => qs.append("category", c));
-    }
+    }  
 
     fetch(`${API_BASE}/api/questions?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -100,6 +102,36 @@ export default function MockTestPage() {
           setLoading(false);
           saveToCache({ questions: data, selectedAnswers: {}, statuses: [], currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, initialTime: initialTimeRef.current });
         })
+        // .then(async (data) => {
+        //   setQuestions(data);
+        //   setLoading(false);
+                
+        //   // Start a test session on the backend
+        //   const sessionRes = await fetch(
+        //     `${API_BASE}/api/tests/start/${testId}`,
+        //     {
+        //       method: "POST",
+        //       headers: {
+        //         Authorization: `Bearer ${token}`,
+        //       },
+        //     }
+        //   );
+        
+        //   const newSessionId = await sessionRes.json();
+        
+        //   setSessionId(newSessionId);
+        
+        //   saveToCache({
+        //     questions: data,
+        //     selectedAnswers: {},
+        //     statuses: [],
+        //     currentIndex: 0,
+        //     timeLeft: initialTimeRef.current,
+        //     tabSwitches: 0,
+        //     initialTime: initialTimeRef.current,
+        //     sessionId: newSessionId,
+        //   });
+        // })
         .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
   }, []);
 
