@@ -12,7 +12,9 @@ import java.util.UUID;
 
 public interface TestAttemptRepository extends JpaRepository<TestAttempt, Long> {
     List<TestAttempt> findByUserId(UUID userId);
+
     List<TestAttempt> findByUserIdOrderByTakenAtDesc(UUID userId);
+
     Optional<TestAttempt> findFirstByUserIdOrderByTakenAtDesc(UUID userId);
 
     // Distinct dates (as LocalDateTime values) on which the user attempted any
@@ -33,4 +35,25 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Long> 
             """, nativeQuery = true)
     List<Object[]> findDailyStudyTime(@Param("userId") UUID userId,
                                       @Param("start") LocalDateTime start);
+
+    // Admin dashboard: average accuracy across all test attempts. Double (not
+    // double) so an empty table returns null instead of crashing.
+    @Query("SELECT AVG(t.accuracy) FROM TestAttempt t")
+    Double getAverageAccuracy();
+
+    // Admin dashboard: total correct answers and total questions across all
+    // attempts, used to compute the question pass rate.
+    public interface QuestionPassRateProjection {
+        Long getTotalCorrect();
+
+        Long getTotalQuestions();
+    }
+
+    @Query("""
+                SELECT
+                    SUM(t.score) AS totalCorrect,
+                    SUM(t.total) AS totalQuestions
+                FROM TestAttempt t
+            """)
+    QuestionPassRateProjection getQuestionPassRateData();
 }

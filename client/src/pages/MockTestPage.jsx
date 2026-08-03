@@ -138,6 +138,36 @@ export default function MockTestPage() {
           setLoading(false);
           saveToCache({ questions: data, selectedAnswers: {}, flagged: {}, currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, switches: {}, questionTimes: {}, initialTime: initialTimeRef.current });
         })
+        // .then(async (data) => {
+        //   setQuestions(data);
+        //   setLoading(false);
+                
+        //   // Start a test session on the backend
+        //   const sessionRes = await fetch(
+        //     `${API_BASE}/api/tests/start/${testId}`,
+        //     {
+        //       method: "POST",
+        //       headers: {
+        //         Authorization: `Bearer ${token}`,
+        //       },
+        //     }
+        //   );
+        
+        //   const newSessionId = await sessionRes.json();
+        
+        //   setSessionId(newSessionId);
+        
+        //   saveToCache({
+        //     questions: data,
+        //     selectedAnswers: {},
+        //     statuses: [],
+        //     currentIndex: 0,
+        //     timeLeft: initialTimeRef.current,
+        //     tabSwitches: 0,
+        //     initialTime: initialTimeRef.current,
+        //     sessionId: newSessionId,
+        //   });
+        // })
         .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
   }, []);
 
