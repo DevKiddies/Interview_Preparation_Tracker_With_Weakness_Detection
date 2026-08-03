@@ -7,10 +7,10 @@ package com.preptracker.server.dto;
 public record DashboardStatsDTO(
         Integer overallConfidence,
         Integer overallAccuracy,
+        int testsAttempted,
         int questionsSolved,
         int studyStreak,
         Integer confidenceDelta,
         Integer accuracyDelta,
         int solvedThisWeek
-) {
-}
+) {}

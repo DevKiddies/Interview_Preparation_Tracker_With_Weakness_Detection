@@ -10,6 +10,8 @@ public class UserAnalysisContext {
 
     private int totalTests;
 
+    private int questionsSolved;
+
     private double averageScore;
 
     private double averageConfidence;
@@ -19,6 +21,14 @@ public class UserAnalysisContext {
     private List<String> weakTopics;
 
     private String currentQuestion;
+    
+    public int getQuestionsSolved() {
+    return questionsSolved;
+}
+
+public void setQuestionsSolved(int questionsSolved) {
+    this.questionsSolved = questionsSolved;
+}
 
     public UserAnalysisContext() {
     }

@@ -45,11 +45,21 @@ GeminiResponse response = webClient.post()
         .block();
 
     // Return Gemini's generated text
-    return response.getCandidates()
-            .get(0)
-            .getContent()
-            .getParts()
-            .get(0)
-            .getText();
+   if (response == null ||
+    response.getCandidates() == null ||
+    response.getCandidates().isEmpty() ||
+    response.getCandidates().get(0).getContent() == null ||
+    response.getCandidates().get(0).getContent().getParts() == null ||
+    response.getCandidates().get(0).getContent().getParts().isEmpty()) {
+
+    throw new RuntimeException("Gemini returned an empty response.");
+}
+
+return response.getCandidates()
+        .get(0)
+        .getContent()
+        .getParts()
+        .get(0)
+        .getText();
 }
 }
