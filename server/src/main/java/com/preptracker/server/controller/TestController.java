@@ -73,13 +73,4 @@ public class TestController {
     public ResponseEntity<List<AvailableTestResponse>> availableTests() {
         return ResponseEntity.ok(testService.getAvailableTests());
     }
-
-    // Backs the mock/topic test history timeline.
-    @GetMapping("/history")
-    public ResponseEntity<List<TestHistoryDTO>> history() {
-        String principal = (String) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal();
-        UUID userId = UUID.fromString(principal);
-        return ResponseEntity.ok(testHistoryService.getHistory(userId));
-    }
 }
