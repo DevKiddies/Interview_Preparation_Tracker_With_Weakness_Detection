@@ -16,6 +16,7 @@ package com.preptracker.server.dto;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public record TestSubmissionRequest(
         String category,
@@ -26,5 +27,8 @@ public record TestSubmissionRequest(
         Map<Long, String> answers,
         Map<Long, Integer> switchCounts,
         List<Long> flaggedIds,
-        Map<Long, Integer> questionTime
+        Map<Long, Integer> questionTime,
+        // Optional: the test session id returned by POST /api/tests/start/{testId}.
+        // When present, the server marks that session completed on submission.
+        UUID sessionId
 ) {}
