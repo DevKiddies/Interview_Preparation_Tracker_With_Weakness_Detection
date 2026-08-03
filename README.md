@@ -6,7 +6,8 @@
 <br/>
 
 [![React](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://supabase.com/)
 [![Redis](https://img.shields.io/badge/Redis-Session_Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
@@ -15,11 +16,11 @@
 
 <br/>
 
-**PrepEdge** is a full-stack intelligent interview preparation platform that helps candidates ace technical interviews through adaptive practice, real-time weakness detection, and personalized analytics.
+**PrepEdge** is a full-stack interview preparation platform that helps candidates track their progress across interview cycles, take timed mock/topic assessments, and surface weak topics through confidence-vs-accuracy analytics — backed by a dedicated admin panel for managing the question bank, tests, and users.
 
 <br/>
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Getting Started](#-getting-started) · [Environment Variables](#-environment-variables) · [API Reference](#-api-reference) · [Team](#-team)
+[Features](#-features) · [Project Status](#-project-status) · [Tech Stack](#-tech-stack) · [Getting Started](#-getting-started) · [Environment Variables](#-environment-variables) · [API Reference](#-api-reference) · [Team](#-team)
 
 </div>
 
@@ -32,21 +33,21 @@
 <td width="50%">
 
 ### 🔐 Authentication & Security
-- Email + OTP verification flow
-- Google OAuth 2.0 & GitHub OAuth 2.0
-- Smart account linking across providers
-- Stateless JWT with Redis token blacklisting
+- Email + OTP verification flow (Brevo transactional email)
+- Google OAuth 2.0 & GitHub OAuth 2.0 login
+- Stateless JWT auth with Redis-backed token blacklisting (logout)
 - Password reset via email OTP
-- IDOR-protected user endpoints
+- Per-user IDOR-protected endpoints (`/api/users/{id}` enforces self-access)
+- Isolated admin authentication (`ROLE_ADMIN`, separate login/token space from users)
 
 </td>
 <td width="50%">
 
-### 📋 Onboarding Wizard
-- 4-step personalized setup
-- Target company selection (FAANG, Product, Service)
-- Interview date tracking with countdown
-- Experience level & focus topic configuration
+### 📋 Onboarding & Interview Tracking
+- 4-step onboarding wizard (target company, experience, focus topics, interview date)
+- Track multiple interview cycles at once, each with its own countdown
+- Close out an interview with a result: Selected / Not Selected / Archived
+- Interview history timeline with per-interview mock-test drill-down
 
 </td>
 </tr>
@@ -54,41 +55,42 @@
 <td width="50%">
 
 ### 🧪 Mock Tests & Practice
-- 90-minute full DSA assessments (20 questions)
-- Configurable topic-based practice sessions
-- Real-time countdown timer with question navigator
-- Flag/skip functionality
-- Server-side grading (answers never exposed to client)
+- Full mock assessments and configurable topic-based practice sessions
+- Real-time countdown timer with question navigator, flag/skip support
+- Server-side grading — correct answers are never sent to the client
+- Per-question confidence rating, calibrated against actual correctness
+- In-progress attempts cached client-side so a refresh doesn't lose answers
 
 </td>
 <td width="50%">
 
-### 📊 Analytics Dashboard
-- Weakness Radar Chart across all topics
-- Confidence vs. Accuracy trend charts (7-day / 30-day)
-- Activity heatmap calendar
-- Per-category score breakdown
-- Danger Zone alert for critical weak areas
+### 📊 Analytics & Weakness Detection
+- Weakness radar chart across all topic categories
+- Confidence vs. accuracy trend charts and per-category breakdowns
+- Activity heatmap calendar on the profile page
+- "Danger Zone" alerts for topics with high confidence but low accuracy (blind spots)
+- Confidence Explorer — drill into any topic's question-level history
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 🧠 Weakness Detection
-- Automated weak topic identification from test history
-- Progress bars per topic with mastery levels
-- Personalized recommendations engine (in progress)
-- Confidence calibration tracking
+### 🔔 Notifications & Resources
+- In-app notification bell with unread count and mark-as-read
+- Notes, cheat sheets, and coding-problem reference pages (Markdown-rendered)
+- Interview experiences shared across users
+- Public "Contact Us" form routed to the team inbox
 
 </td>
 <td width="50%">
 
 ### 🛠️ Admin Panel
-- Secure admin authentication (isolated from user auth)
-- User management dashboard
-- Question bank management
-- Test analytics overview
+- Dashboard, user management, and ban/unban with an audit-friendly banned-users view
+- Question bank: search/filter/paginate, create, bulk-create, edit, delete
+- Category / topic / technique / company metadata management
+- Mock test builder and per-test result review
+- Platform analytics overview, user reports, and weakness-analysis views
 
 </td>
 </tr>
@@ -96,62 +98,81 @@
 
 ---
 
+## 📌 Project Status
+
+The project is under active development (**~80% complete**). Core auth, onboarding, mock testing, grading, confidence scoring, interview tracking, and the bulk of the admin panel are built and wired end-to-end against the real backend. Known gaps and in-progress pieces:
+
+- **Admin dashboard overview** (`AdminDashboard.jsx`) still renders static mock data — the backing endpoint (`GET /api/admin/analytics/overview`) already exists and just needs to be wired in.
+- **Personalized recommendation engine** (suggesting what to practice next based on weak topics) is not yet built.
+- **Automated test coverage** is minimal — only the default Spring Boot context-load smoke test exists; no frontend test suite yet.
+- Some admin routes (`/admin/users/:userId`, `/admin/questions/edit/:id`) are intentionally stubbed with a "Coming Soon" placeholder pending detail-view designs.
+
+---
+
 ## 🛠 Tech Stack
 
-### Frontend
+### Frontend (`client/`)
 | Technology | Version | Purpose |
 |---|---|---|
-| React | 19.2.5 | UI Framework |
-| Vite | 8.0.9 | Build Tool & Dev Server |
-| Tailwind CSS | 4.3.0 | Utility-first Styling |
-| React Router DOM | 7.15.1 | Client-side Routing |
-| Recharts | 3.8.1 | Data Visualization (Radar, Line, Bar) |
-| @react-oauth/google | 0.13.5 | Google OAuth Integration |
-| Lucide React | 1.16.0 | Icon Library |
+| React | 19.2.5 | UI framework |
+| Vite | 8.0.9 | Build tool & dev server |
+| Tailwind CSS | 4.3.0 | Utility-first styling |
+| React Router DOM | 7.15.1 | Client-side routing, lazy-loaded pages |
+| Recharts | 3.8.1 | Data visualization (radar, line, bar, pie) |
+| Framer Motion | 12.43.0 | Animations & transitions |
+| React Markdown + remark-gfm | 10.1.0 / 4.0.1 | Rendering notes/cheat-sheet content |
+| @react-oauth/google | 0.13.5 | Google OAuth integration |
+| Lucide React | 1.16.0 | Icon library |
+| ESLint | 9.39.4 | Linting |
 
-### Backend
+### Backend (`server/`)
 | Technology | Version | Purpose |
 |---|---|---|
-| Spring Boot | 3.5.16 | REST API Framework |
+| Spring Boot | 3.3.5 | REST API framework |
 | Java | 21 | Runtime |
-| Spring Security | — | Route-level Access Control |
-| Spring Data JPA | — | ORM / Database Layer |
-| jjwt | 0.11.5 | JWT Generation & Validation |
-| PostgreSQL (Supabase) | — | Primary Database |
-| Redis | — | Token Blacklisting & Caching |
-| Brevo API | — | Transactional Email (OTP) |
-| Project Lombok | — | Boilerplate Reduction |
+| Spring Security | — | Route-level access control, CORS, BCrypt |
+| Spring Data JPA / Hibernate | — | ORM / database layer |
+| jjwt | 0.11.5 | JWT generation & validation |
+| PostgreSQL (Supabase) | — | Primary database |
+| Spring Data Redis | — | JWT blacklist on logout |
+| Brevo API | — | Transactional email (OTP, notifications) |
+| Google API Client | 2.6.0 | Google OAuth token verification |
+| Project Lombok | 1.18.46 | Boilerplate reduction |
+| Maven | — | Build tool (via `mvnw` wrapper) |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLIENT (React + Vite)                │
-│  Landing → Auth → Onboarding → Dashboard → Test → Results  │
-└────────────────────────┬────────────────────────────────────┘
-                         │  REST API  (JWT Bearer Token)
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  SERVER (Spring Boot / Java 21)             │
-│                                                             │
-│  AuthController  UserController  QuestionController         │
-│  TestController  AdminController                            │
-│                                                             │
-│  ┌──────────────┐  ┌────────────┐  ┌────────────────────┐  │
-│  │  Spring      │  │  JWT       │  │  Redis             │  │
-│  │  Security    │  │  Filter    │  │  (Token Blacklist) │  │
-│  └──────────────┘  └────────────┘  └────────────────────┘  │
-└────────┬───────────────────────────────────────────────────-┘
+┌──────────────────────────────────────────────────────────────────┐
+│                     CLIENT (React 19 + Vite)                     │
+│   Landing → Auth → Onboarding → Dashboard → Mock Test → Results  │
+│                    Admin Panel (separate layout & auth)          │
+└────────────────────────────┬──────────────────────────────────────┘
+                              │  REST API  (JWT Bearer Token)
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                SERVER (Spring Boot 3.3 / Java 21)                │
+│                                                                    │
+│  Auth · Users · Interviews · Tests · Questions · Notifications    │
+│  Admin (Auth · Users · Questions · Tests · Analytics · Metadata)  │
+│                                                                    │
+│  ┌──────────────┐  ┌────────────┐  ┌───────────────────────────┐ │
+│  │  Spring      │  │  JWT       │  │  Redis                    │ │
+│  │  Security    │  │  Filter    │  │  (Logout Token Blacklist) │ │
+│  └──────────────┘  └────────────┘  └───────────────────────────┘ │
+└────────┬───────────────────────────────────────────────────────-─┘
          │
          ▼
-┌─────────────────────────┐    ┌────────────────────────┐
-│  PostgreSQL (Supabase)  │    │  External APIs          │
-│  Users, Profiles,       │    │  • Google OAuth 2.0     │
-│  Questions, Admins,     │    │  • GitHub OAuth 2.0     │
-│  VerificationTokens     │    │  • Brevo (Email)        │
-└─────────────────────────┘    └────────────────────────┘
+┌──────────────────────────┐    ┌─────────────────────────┐
+│  PostgreSQL (Supabase)   │    │  External APIs          │
+│  Users, Interviews,      │    │  • Google OAuth 2.0     │
+│  Test/User Attempts,     │    │  • GitHub OAuth 2.0     │
+│  Questions, Categories,  │    │  • Brevo (Email)        │
+│  Topics, Techniques,     │    │                         │
+│  Companies, Admins       │    │                         │
+└──────────────────────────┘    └─────────────────────────┘
 ```
 
 ---
@@ -161,26 +182,36 @@
 ```
 Interview_Preparation_Tracker_With_Weakness_Detection/
 │
-├── client/                          # React Frontend
+├── client/                              # React frontend
 │   └── src/
-│       ├── pages/                   # Route-level page components
+│       ├── pages/                       # Route-level page components
+│       │   └── admin/                   # Admin panel pages
 │       ├── components/
-│       │   ├── dashboard/           # 10 modular dashboard widgets
-│       │   └── ui/                  # Reusable UI primitives
-│       ├── context/                 # Theme (dark/light) context
-│       ├── utils/                   # API config, form validation
-│       └── data/                    # Static placeholder data
+│       │   ├── admin/                   # Admin shell/layout
+│       │   ├── dashboard/               # Dashboard widgets (radar, heatmap, trends)
+│       │   ├── confidence/              # Confidence Explorer views
+│       │   ├── interview/               # Onboarding/interview-setup steps
+│       │   ├── interview-history/       # Interview timeline & filters
+│       │   ├── mock-test/                # Quiz-taking UI (header, navigator, footer)
+│       │   ├── mock-test-selection/     # Test browsing/filtering
+│       │   ├── mocktest-history/        # Per-interview test history
+│       │   ├── profile/                 # Profile & activity heatmap
+│       │   ├── result/                  # Result overview/analytics/review tabs
+│       │   └── ui/                      # Reusable primitives (Card, ProgressBar, ...)
+│       ├── context/                     # Theme (dark/light) context
+│       ├── utils/                       # API base URL, auth/profile caching, validation
+│       └── data/                        # Static display metadata (category labels/colors)
 │
-├── server/                          # Spring Boot Backend
+├── server/                              # Spring Boot backend
 │   └── src/main/java/com/preptracker/server/
-│       ├── config/                  # Security, JWT, Redis, CORS
-│       ├── controller/              # REST API endpoints
-│       ├── service/                 # Business logic layer
-│       ├── model/                   # JPA entities
-│       ├── repository/              # Spring Data JPA interfaces
-│       ├── dto/                     # Request / Response DTOs
-│       ├── exception/               # Custom exception classes
-│       └── util/                    # JWT utilities
+│       ├── config/                      # Security, JWT filter, Redis, CORS, exception handling
+│       ├── controller/                  # REST endpoints (user-facing + admin)
+│       ├── service/                     # Business logic layer
+│       ├── model/                       # JPA entities
+│       ├── repository/                  # Spring Data JPA interfaces
+│       ├── dto/                         # Request / response DTOs
+│       ├── exception/                   # Custom exception types
+│       └── util/                        # JWT utilities
 │
 ├── LICENSE
 └── README.md
@@ -193,19 +224,18 @@ Interview_Preparation_Tracker_With_Weakness_Detection/
 ### Prerequisites
 - **Java 21+**
 - **Node.js 18+**
-- **Maven** (or use the included `mvnw` wrapper)
+- **Maven** (or use the included `mvnw` / `mvnw.cmd` wrapper)
 - **PostgreSQL** (local or [Supabase](https://supabase.com))
-- **Redis** (local instance)
+- **Redis** (local instance — defaults to `localhost:6379`)
 
 ---
 
 ### Backend Setup
 
 ```bash
-# Navigate to the server directory
 cd server
 
-# Copy environment template and fill in your values
+# Copy the env template and fill in your values
 cp .env.example .env
 
 # Build the project
@@ -222,10 +252,9 @@ cp .env.example .env
 ### Frontend Setup
 
 ```bash
-# Navigate to the client directory
 cd client
 
-# Copy environment template and fill in your values
+# Copy the env template and fill in your values
 cp .env.example .env
 
 # Install dependencies
@@ -241,6 +270,8 @@ npm run dev
 
 ## 🔑 Environment Variables
 
+Both `client/.env` and `server/.env` are git-ignored — copy the `.env.example` in each folder as a starting point. **Never commit real `.env` files.**
+
 ### Server (`server/.env`)
 
 ```env
@@ -250,9 +281,9 @@ DB_USERNAME=your_db_username
 DB_PASSWORD=your_db_password
 
 # JWT
-JWT_SECRET_KEY=your_super_secret_key_min_24_chars
+JWT_SECRET_KEY=your_super_secret_key_min_32_chars
 
-# Email (Brevo / Sendinblue)
+# Email (Brevo)
 BREVO_API_KEY=your_brevo_api_key
 BREVO_SENDER_EMAIL=noreply@yourdomain.com
 
@@ -262,11 +293,9 @@ GOOGLE_CLIENT_ID=your_google_client_id
 # GitHub OAuth 2.0
 GITHUB_CLIENT_ID=your_github_client_id
 GITHUB_CLIENT_SECRET=your_github_client_secret
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
 ```
+
+> Redis host/port, the GitHub OAuth redirect URI, and the frontend callback URL are currently hardcoded in `application.properties` for local development (`localhost:6379`, `localhost:8080`, `localhost:5173`). Update those directly in `application.properties` for other environments.
 
 ### Client (`client/.env`)
 
@@ -279,22 +308,55 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 
 ## 📡 API Reference
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/api/auth/register` | — | Register new user |
-| `POST` | `/api/auth/login` | — | Login with email/password |
-| `POST` | `/api/auth/google` | — | Google OAuth login |
-| `GET` | `/api/auth/github/callback` | — | GitHub OAuth callback |
-| `POST` | `/api/auth/verify-otp` | — | Verify email OTP |
-| `POST` | `/api/auth/forgot-password` | — | Request password reset |
-| `POST` | `/api/auth/reset-password` | — | Reset password with OTP |
-| `POST` | `/api/auth/logout` | JWT | Logout (blacklist token) |
-| `GET` | `/api/users/me` | JWT | Get current user profile |
-| `PUT` | `/api/users/me` | JWT | Update user profile |
-| `DELETE` | `/api/users/me` | JWT | Delete account |
-| `GET` | `/api/questions` | JWT | Fetch questions (with filters) |
-| `POST` | `/api/tests/submit` | JWT | Submit test for grading |
-| `POST` | `/api/admin/auth/login` | — | Admin login |
+All endpoints are prefixed `/api`. Auth is stateless JWT (Bearer token); admin endpoints additionally require a `ROLE_ADMIN` token.
+
+### Public
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/register` | Register a new user |
+| POST | `/auth/login` | Email/password login |
+| POST | `/auth/verify-otp` | Verify registration OTP |
+| POST | `/auth/resend-otp` | Resend verification OTP |
+| POST | `/auth/google` | Login via Google access token |
+| GET | `/auth/github` | Redirect to GitHub OAuth authorize URL |
+| GET | `/auth/github/callback` | GitHub OAuth callback → redirects to frontend with JWT |
+| POST | `/auth/forgot-password` | Request password-reset OTP |
+| POST | `/auth/reset-password` | Reset password with OTP |
+| POST | `/auth/logout` | Logout (blacklists current token) |
+| POST | `/admin/auth/login` | Admin login → JWT with `ROLE_ADMIN` |
+| POST | `/contact` | Submit the "Contact Us" form |
+| GET | `/public/stats` | Aggregate landing-page stats (user/question counts) |
+
+### Authenticated (user)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/users/me` | Current user's full profile |
+| GET / PUT / DELETE | `/users/{id}` | Get / update / delete own account (username, password, avatar, interview date) |
+| POST | `/users/onboarding` | Complete the onboarding flow |
+| GET | `/interviews` | List the user's interview tracks + aggregate stats |
+| POST | `/interviews/{id}/result` | Close an interview with a result |
+| GET | `/questions` | Fetch shuffled questions, filterable by topic/category/limit |
+| POST | `/tests/submit` | Submit a completed test for grading + confidence scoring |
+| GET | `/tests/latest` | Most recent test attempt (for the dashboard card) |
+| GET | `/tests/available` | List available full mock assessments |
+| GET | `/tests/history` | Persisted mock/topic test history |
+| GET | `/notifications` | List recent notifications |
+| GET | `/notifications/unread-count` | Unread notification count |
+| PATCH | `/notifications/{id}/read` \| `/notifications/read-all` | Mark one / all notifications read |
+
+### Admin (`ROLE_ADMIN`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/admin/users` \| `/admin/users/banned` | List users / banned users |
+| POST | `/admin/users/{id}/ban` \| `/admin/users/{id}/unban` | Ban / unban a user |
+| GET | `/admin/questions` \| `/admin/questions/search` \| `/admin/questions/stats` | List / search+paginate / stats for questions |
+| POST | `/admin/questions` \| `/admin/questions/bulk` | Create a question / bulk-create |
+| PUT / DELETE | `/admin/questions/{id}` | Update / delete a question |
+| GET / POST / PUT / DELETE | `/admin/tests` \| `/admin/tests/{id}` | Manage mock tests |
+| GET | `/admin/results` | List all persisted test results |
+| GET | `/admin/analytics/overview` | Platform-wide KPIs, growth, and health |
+| GET | `/admin/categories` \| `/admin/topics` \| `/admin/techniques` \| `/admin/companies` \| `/admin/technique-topics` | List metadata |
+| POST / DELETE | `/admin/topics` \| `/admin/topics/{id}` | Create / delete a topic |
 
 ---
 
