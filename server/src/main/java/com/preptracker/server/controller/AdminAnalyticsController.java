@@ -4,6 +4,7 @@ package com.preptracker.server.controller;
 // "Platform Overview" page. Gated by ROLE_ADMIN via SecurityConfig.
 
 import com.preptracker.server.dto.AdminPlatformOverviewDTO;
+import com.preptracker.server.dto.AdminUserReportsDTO;
 import com.preptracker.server.service.AdminAnalyticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,5 +22,10 @@ public class AdminAnalyticsController {
     @GetMapping("/overview")
     public ResponseEntity<AdminPlatformOverviewDTO> getOverview() {
         return ResponseEntity.ok(adminAnalyticsService.getOverview());
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<AdminUserReportsDTO> getUserReports() {
+        return ResponseEntity.ok(adminAnalyticsService.getUserReports());
     }
 }
