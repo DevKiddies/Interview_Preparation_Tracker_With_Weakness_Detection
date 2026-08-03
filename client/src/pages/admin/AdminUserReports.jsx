@@ -1,23 +1,62 @@
 // AdminUserReports.jsx — Analytics & Reports > User Reports page.
 // User-centric analytics: growth chart, demographics breakdown (experience level,
 // auth provider, target company), engagement tiers, and top performers leaderboard.
+// Fetches live data from GET /api/admin/analytics/users, computed server-side from
+// real users/user_profiles/test_attempts rows.
 
+import { useState, useEffect, useCallback } from "react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
   Users, UserPlus, TrendingUp, Flame, Trophy, Star, Zap,
-  Mail, Code2,
+  Mail, Code2, Loader2, AlertTriangle,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import {
-  monthlyGrowthData, experienceLevelData, authProviderData,
-  targetCompanyData, engagementTiers, topPerformersData,
-} from "../../data/adminAnalyticsData";
 import { TOPIC_COLORS } from "../../data/adminTestsData";
+import API_BASE from "../../utils/api";
 
 const RANK_ICONS = [Trophy, Star, Zap];
+
+// Onboarding stores raw ids/codes rather than display strings — map them to
+// friendly labels + chart colors here, same way TOPIC_COLORS does for topics.
+const EXPERIENCE_META = {
+  fresher:     { label: "Student / Fresher", color: "#3b82f6" },
+  mid:         { label: "Mid-level (2-4 yrs)", color: "#6366f1" },
+  senior:      { label: "Senior (5+ yrs)", color: "#22c55e" },
+  unspecified: { label: "Not specified", color: "#94a3b8" },
+};
+
+const COMPANY_META = {
+  faang:       { label: "FAANG / Big Tech" },
+  product:     { label: "Product Companies" },
+  service:     { label: "Service Companies" },
+  competitive: { label: "Competitive Exams" },
+  unspecified: { label: "Not specified" },
+};
+
+const PROVIDER_META = {
+  LOCAL:  { label: "Email/Password", color: "#3b82f6" },
+  GOOGLE: { label: "Google", color: "#ef4444" },
+  GITHUB: { label: "GitHub", color: "#6366f1" },
+};
+
+const ENGAGEMENT_META = {
+  "Power Users": { desc: "10+ tests", color: "#3b82f6", bg: "bg-blue-500" },
+  "Active":      { desc: "5–9 tests", color: "#22c55e", bg: "bg-green-500" },
+  "Moderate":    { desc: "2–4 tests", color: "#f59e0b", bg: "bg-amber-400" },
+  "Casual":      { desc: "1 test", color: "#a855f7", bg: "bg-purple-500" },
+  "Inactive":    { desc: "No tests", color: "#94a3b8", bg: "bg-slate-400" },
+};
+
+function metaLabel(meta, key) {
+  return meta[key]?.label ?? key;
+}
+
+function metaColor(meta, key, fallback = "#94a3b8") {
+  return meta[key]?.color ?? fallback;
+}
 
 function StatCard({ label, value, sub, icon: Icon, color }) {
   return (
@@ -46,18 +85,66 @@ const CustomTooltip = ({ active, payload, label, isDark }) => {
   );
 };
 
+async function fetchUserReports() {
+  const res = await fetch(`${API_BASE}/api/admin/analytics/users`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+  });
+  if (!res.ok) throw new Error("Failed to load user reports");
+  return res.json();
+}
+
 export default function AdminUserReports() {
   const { isDark } = useTheme();
   const axisColor = isDark ? "#94a3b8" : "#64748b";
   const gridColor = isDark ? "#1e293b" : "#f1f5f9";
 
-  const totalUsers = monthlyGrowthData[monthlyGrowthData.length - 1].totalUsers;
-  const newThisMonth = monthlyGrowthData[monthlyGrowthData.length - 1].newUsers;
-  const totalEngaged = engagementTiers.filter(t => t.tier !== "Inactive").reduce((s, t) => s + t.count, 0);
-  const totalEngagementCount = engagementTiers.reduce((s, t) => s + t.count, 0);
-  const retentionRate = ((totalEngaged / totalEngagementCount) * 100).toFixed(1);
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const maxCompany = Math.max(...targetCompanyData.map(d => d.count));
+  const loadReport = useCallback(async () => {
+    try {
+      setReport(await fetchUserReports());
+    } catch (err) {
+      setError(err.message || "Failed to load user reports");
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    loadReport().finally(() => setLoading(false));
+  }, [loadReport]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+        <Loader2 size={22} className="animate-spin mr-2" /> Loading user reports…
+      </div>
+    );
+  }
+
+  if (error || !report) {
+    return (
+      <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800/40 rounded-xl p-10 text-center shadow-sm">
+        <AlertTriangle size={28} className="text-rose-500 mx-auto mb-3" />
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{error || "Failed to load user reports"}</p>
+      </div>
+    );
+  }
+
+  const {
+    totalUsers, newThisMonth, retentionRate, avgTestsPerUser,
+    monthlyGrowth, experienceLevels, authProviders, targetCompanies,
+    engagementTiers, topPerformers,
+  } = report;
+
+  const maxCompany = targetCompanies.length ? Math.max(...targetCompanies.map(d => d.count)) : 0;
+  const totalEngagementCount = engagementTiers.reduce((s, t) => s + t.count, 0);
+  const engagementTiersWithPct = engagementTiers.map(t => ({
+    ...t,
+    pct: totalEngagementCount ? ((t.count / totalEngagementCount) * 100).toFixed(1) : "0.0",
+  }));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -71,10 +158,10 @@ export default function AdminUserReports() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Users"     value={totalUsers.toLocaleString()} sub="all time"              icon={Users}     color="blue"   />
-        <StatCard label="New This Month"  value={`+${newThisMonth}`}          sub="June 2024"             icon={UserPlus}  color="green"  />
-        <StatCard label="Retention Rate"  value={`${retentionRate}%`}         sub="took at least 1 test"  icon={TrendingUp} color="indigo" />
-        <StatCard label="Avg Tests/User"  value="3.7"                         sub="last 30 days"          icon={Flame}     color="amber"  />
+        <StatCard label="Total Users"     value={totalUsers.toLocaleString()}   sub="all time"             icon={Users}     color="blue"   />
+        <StatCard label="New This Month"  value={`+${newThisMonth}`}            sub="this calendar month"  icon={UserPlus}  color="green"  />
+        <StatCard label="Retention Rate"  value={`${retentionRate}%`}           sub="took at least 1 test" icon={TrendingUp} color="indigo" />
+        <StatCard label="Avg Tests/User"  value={avgTestsPerUser.toFixed(1)}    sub="all time"             icon={Flame}     color="amber"  />
       </div>
 
       {/* User Growth Chart */}
@@ -82,7 +169,7 @@ export default function AdminUserReports() {
         <h3 className="font-semibold text-sm text-slate-800 dark:text-white mb-0.5">User Growth</h3>
         <p className="text-xs text-slate-400 mb-4">Monthly new registrations over 12 months</p>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={monthlyGrowthData}>
+          <AreaChart data={monthlyGrowth}>
             <defs>
               <linearGradient id="newUsersGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
@@ -119,28 +206,28 @@ export default function AdminUserReports() {
           <ResponsiveContainer width="100%" height={170}>
             <PieChart>
               <Pie
-                data={experienceLevelData}
+                data={experienceLevels}
                 dataKey="count"
-                nameKey="level"
+                nameKey="key"
                 cx="50%"
                 cy="50%"
                 innerRadius={45}
                 outerRadius={72}
                 paddingAngle={3}
               >
-                {experienceLevelData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                {experienceLevels.map((d, i) => <Cell key={i} fill={metaColor(EXPERIENCE_META, d.key)} />)}
               </Pie>
               <Tooltip
                 contentStyle={{ background: isDark ? "#1e293b" : "#fff", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }}
-                formatter={(v, n) => [v.toLocaleString() + " users", n]}
+                formatter={(v, n) => [v.toLocaleString() + " users", metaLabel(EXPERIENCE_META, n)]}
               />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-1.5 mt-2">
-            {experienceLevelData.map(d => (
-              <div key={d.level} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                <span className="flex-1">{d.level}</span>
+            {experienceLevels.map(d => (
+              <div key={d.key} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: metaColor(EXPERIENCE_META, d.key) }} />
+                <span className="flex-1">{metaLabel(EXPERIENCE_META, d.key)}</span>
                 <span className="font-semibold text-slate-800 dark:text-white">{d.count}</span>
               </div>
             ))}
@@ -152,20 +239,21 @@ export default function AdminUserReports() {
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white mb-1">Sign-up Method</h3>
           <p className="text-xs text-slate-400 mb-4">How users registered</p>
           <div className="space-y-4">
-            {authProviderData.map(d => {
-              const pct = ((d.count / totalUsers) * 100).toFixed(1);
-              const Icon = d.provider === "GitHub" ? Code2 : Mail;
+            {authProviders.map(d => {
+              const pct = totalUsers ? ((d.count / totalUsers) * 100).toFixed(1) : "0.0";
+              const providerColor = metaColor(PROVIDER_META, d.key);
+              const Icon = d.key === "GITHUB" ? Code2 : Mail;
               return (
-                <div key={d.provider}>
+                <div key={d.key}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300">
-                      <Icon size={13} style={{ color: d.color }} />
-                      {d.provider}
+                      <Icon size={13} style={{ color: providerColor }} />
+                      {metaLabel(PROVIDER_META, d.key)}
                     </span>
                     <span className="text-xs font-semibold text-slate-800 dark:text-white">{d.count} · {pct}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700">
-                    <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: d.color }} />
+                    <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: providerColor }} />
                   </div>
                 </div>
               );
@@ -179,11 +267,11 @@ export default function AdminUserReports() {
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white mb-1">Target Companies</h3>
           <p className="text-xs text-slate-400 mb-4">User interview goals</p>
           <div className="space-y-2.5">
-            {targetCompanyData.map(d => (
-              <div key={d.company} className="flex items-center gap-2">
-                <span className="text-xs text-slate-600 dark:text-slate-400 w-20 shrink-0">{d.company}</span>
+            {targetCompanies.map(d => (
+              <div key={d.key} className="flex items-center gap-2">
+                <span className="text-xs text-slate-600 dark:text-slate-400 w-24 shrink-0">{metaLabel(COMPANY_META, d.key)}</span>
                 <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-700">
-                  <div className="h-2 rounded-full bg-blue-500 dark:bg-blue-400 transition-all" style={{ width: `${(d.count / maxCompany) * 100}%` }} />
+                  <div className="h-2 rounded-full bg-blue-500 dark:bg-blue-400 transition-all" style={{ width: `${maxCompany ? (d.count / maxCompany) * 100 : 0}%` }} />
                 </div>
                 <span className="text-xs font-medium text-slate-700 dark:text-slate-300 w-8 text-right">{d.count}</span>
               </div>
@@ -198,26 +286,20 @@ export default function AdminUserReports() {
         <p className="text-xs text-slate-400 mb-4">Segmented by number of tests completed</p>
         {/* Stacked bar */}
         <div className="flex rounded-xl overflow-hidden h-5 mb-4">
-          {engagementTiers.map(t => {
-            const pct = ((t.count / totalEngagementCount) * 100).toFixed(1);
-            return (
-              <div key={t.tier} style={{ width: `${pct}%`, background: t.color }} title={`${t.tier}: ${t.count} users (${pct}%)`} />
-            );
-          })}
+          {engagementTiersWithPct.map(t => (
+            <div key={t.key} style={{ width: `${t.pct}%`, background: metaColor(ENGAGEMENT_META, t.key) }} title={`${t.key}: ${t.count} users (${t.pct}%)`} />
+          ))}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {engagementTiers.map(t => {
-            const pct = ((t.count / totalEngagementCount) * 100).toFixed(1);
-            return (
-              <div key={t.tier} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center">
-                <div className="w-2.5 h-2.5 rounded-full mx-auto mb-2" style={{ background: t.color }} />
-                <p className="text-sm font-bold text-slate-900 dark:text-white">{t.count}</p>
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{t.tier}</p>
-                <p className="text-xs text-slate-400">{t.desc}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{pct}%</p>
-              </div>
-            );
-          })}
+          {engagementTiersWithPct.map(t => (
+            <div key={t.key} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 text-center">
+              <div className="w-2.5 h-2.5 rounded-full mx-auto mb-2" style={{ background: metaColor(ENGAGEMENT_META, t.key) }} />
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{t.count}</p>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{t.key}</p>
+              <p className="text-xs text-slate-400">{ENGAGEMENT_META[t.key]?.desc}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t.pct}%</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -227,6 +309,9 @@ export default function AdminUserReports() {
           <Trophy size={16} className="text-amber-500" />
           <h3 className="font-semibold text-sm text-slate-800 dark:text-white">Top Performers</h3>
         </div>
+        {topPerformers.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-10">No test attempts yet — top performers will appear once users start taking tests.</p>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50">
@@ -237,7 +322,7 @@ export default function AdminUserReports() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {topPerformersData.map(u => {
+              {topPerformers.map(u => {
                 const topicColor = TOPIC_COLORS[u.topic];
                 const RankIcon = u.rank <= 3 ? RANK_ICONS[u.rank - 1] : null;
                 return (
@@ -252,7 +337,7 @@ export default function AdminUserReports() {
                       <p className="text-xs text-slate-400">{u.email}</p>
                     </td>
                     <td className="px-5 py-3">
-                      {topicColor && (
+                      {topicColor && u.topic && (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${topicColor.bg} ${topicColor.text}`}>{u.topic}</span>
                       )}
                     </td>
@@ -276,6 +361,7 @@ export default function AdminUserReports() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );
