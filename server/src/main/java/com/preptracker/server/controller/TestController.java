@@ -57,16 +57,6 @@ public class TestController {
         return ResponseEntity.ok(result);
     }
 
-    // Backs the Mock Test History page — the current user's persisted test
-    // attempts (mock + topic), newest first. The aggregation of confidence and
-    // weak topics lives in TestHistoryService.
-    @GetMapping("/history")
-    public ResponseEntity<List<TestHistoryDTO>> getHistory() {
-        String principal = (String) SecurityContextHolder.getContext()
-                .getAuthentication().getPrincipal();
-        return ResponseEntity.ok(testHistoryService.getHistory(UUID.fromString(principal)));
-    }
-
     // Backs the landing page hero's "Test Passed" card — the user's real most
     // recent result instead of a hardcoded placeholder. 204 when they haven't
     // taken a test yet, so the frontend can fall back to a "take your first test" prompt.
