@@ -58,6 +58,8 @@ public class SecurityConfig {
                         // Auth endpoints are public (login, register, OTP, OAuth callbacks)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/auth/**").permitAll()
+                        // AI Chatbot endpoint
+                        .requestMatchers("/api/chat/**").authenticated()
                         // Admin panel routes require ROLE_ADMIN, which JwtFilter injects from the token's "role" claim
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
