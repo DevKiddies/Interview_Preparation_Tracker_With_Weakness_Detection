@@ -8,6 +8,7 @@ package com.preptracker.server.repository;
 import com.preptracker.server.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,4 +27,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByGithubId(String githubId);
 
+    // ===========================
+    // Admin Dashboard Methods
+    // ===========================
+
+    long countByIsBannedFalse();
+
+    long countByIsBannedTrue();
+
+    long countByLastActiveAtAfter(LocalDateTime dateTime);
 }

@@ -25,6 +25,7 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             SELECT
               AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS overall_conf,
               AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS overall_acc,
+              COUNT(DISTINCT ua.test_attempt_id) AS tests_attempted,
               COUNT(*) AS solved,
               COALESCE(SUM(CASE WHEN ua.created_at >= :thisStart THEN 1 ELSE 0 END), 0) AS solved_week,
               AVG(CASE WHEN ua.created_at >= :thisStart AND ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS recent_conf,

@@ -16,7 +16,6 @@ import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
-import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
@@ -42,7 +41,6 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class DashboardStatsService {
 
     private static final int WEEK_DAYS = 7;
@@ -62,32 +60,66 @@ public class DashboardStatsService {
     private final TechniqueTopicRepository techniqueTopicRepository;
     private final UserProfileRepository userProfileRepository;
 
-    public DashboardStatsDTO getStats(UUID userId) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
-        LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
-
-        List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
-        List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
-
-        if (rows == null || rows.isEmpty()) {
-            return new DashboardStatsDTO(null, null, 0, computeStreak(attemptTimestamps), null, null, 0);
-        }
-
-        Object[] row = rows.get(0);
-        Integer confidence = round(row[0]);
-        Integer accuracy = round100(row[1]);
-        int solved = ((Number) row[2]).intValue();
-        int solvedThisWeek = ((Number) row[3]).intValue();
-        Integer recentConf = round(row[4]);
-        Integer prevConf = round(row[5]);
-        Integer recentAcc = round100(row[6]);
-        Integer prevAcc = round100(row[7]);
-
-        return new DashboardStatsDTO(
-                confidence, accuracy, solved, computeStreak(attemptTimestamps),
-                delta(recentConf, prevConf), delta(recentAcc, prevAcc), solvedThisWeek);
+    public DashboardStatsService(UserAttemptRepository userAttemptRepository,
+                                 TestAttemptRepository testAttemptRepository,
+                                 CategoryRepository categoryRepository,
+                                 TopicRepository topicRepository,
+                                 TechniqueTopicRepository techniqueTopicRepository,
+                                 UserProfileRepository userProfileRepository) {
+        this.userAttemptRepository = userAttemptRepository;
+        this.testAttemptRepository = testAttemptRepository;
+        this.categoryRepository = categoryRepository;
+        this.topicRepository = topicRepository;
+        this.techniqueTopicRepository = techniqueTopicRepository;
+        this.userProfileRepository = userProfileRepository;
     }
+
+    public DashboardStatsDTO getStats(UUID userId) {
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
+    LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
+
+    List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
+    List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
+
+    if (rows == null || rows.isEmpty()) {
+        return new DashboardStatsDTO(
+                null,
+                null,
+                0, // testsAttempted
+                0, // questionsSolved
+                computeStreak(attemptTimestamps),
+                null,
+                null,
+                0
+        );
+    }
+
+    Object[] row = rows.get(0);
+
+    Integer confidence = round(row[0]);
+    Integer accuracy = round100(row[1]);
+
+    int testsAttempted = ((Number) row[2]).intValue();
+    int solved = ((Number) row[3]).intValue();
+    int solvedThisWeek = ((Number) row[4]).intValue();
+
+    Integer recentConf = round(row[5]);
+    Integer prevConf = round(row[6]);
+    Integer recentAcc = round100(row[7]);
+    Integer prevAcc = round100(row[8]);
+
+    return new DashboardStatsDTO(
+            confidence,
+            accuracy,
+            testsAttempted,
+            solved,
+            computeStreak(attemptTimestamps),
+            delta(recentConf, prevConf),
+            delta(recentAcc, prevAcc),
+            solvedThisWeek
+    );
+}
 
     public List<CategoryConfidenceDTO> getCategoryConfidence(UUID userId) {
         LocalDateTime now = LocalDateTime.now();

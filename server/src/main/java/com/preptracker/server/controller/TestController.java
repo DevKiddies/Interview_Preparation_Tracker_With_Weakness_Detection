@@ -12,6 +12,8 @@ import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
 import com.preptracker.server.service.TestHistoryService;
 import com.preptracker.server.service.TestService;
+import com.preptracker.server.service.TestSessionService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,19 +30,31 @@ public class TestController {
     private final TestService testService;
     private final TestHistoryService testHistoryService;
 
-    @PostMapping("/submit")
-    public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
-        return ResponseEntity.ok(testService.submitTest(request));
+    private final TestSessionService testSessionService;
+
+    // Creates a test session row when the user starts a test. Returns the
+    // generated session id, which the frontend can submit alongside the answers
+    // so the session can be marked completed (see submitTest).
+    @PostMapping("/start/{testId}")
+    public ResponseEntity<UUID> startTest(@PathVariable Long testId) {
+        UUID sessionId = testSessionService.startSession(authenticatedUserId(), testId);
+        return ResponseEntity.ok(sessionId);
     }
 
-    // Backs the Mock Test History page — the current user's persisted test
-    // attempts (mock + topic), newest first. The aggregation of confidence and
-    // weak topics lives in TestHistoryService.
-    @GetMapping("/history")
-    public ResponseEntity<List<TestHistoryDTO>> getHistory() {
+    private UUID authenticatedUserId() {
         String principal = (String) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
-        return ResponseEntity.ok(testHistoryService.getHistory(UUID.fromString(principal)));
+        return UUID.fromString(principal);
+    }
+
+    @PostMapping("/submit")
+    public ResponseEntity<TestResultResponse> submitTest(@RequestBody TestSubmissionRequest request) {
+        TestResultResponse result = testService.submitTest(request);
+        // Mark the test session as completed when the submission carries one
+        if (request.sessionId() != null) {
+            testSessionService.completeSession(request.sessionId());
+        }
+        return ResponseEntity.ok(result);
     }
 
     // Backs the landing page hero's "Test Passed" card — the user's real most
@@ -72,5 +86,14 @@ public class TestController {
     @GetMapping("/available")
     public ResponseEntity<List<AvailableTestResponse>> availableTests() {
         return ResponseEntity.ok(testService.getAvailableTests());
+    }
+
+    // Backs the mock/topic test history timeline.
+    @GetMapping("/history")
+    public ResponseEntity<List<TestHistoryDTO>> history() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        UUID userId = UUID.fromString(principal);
+        return ResponseEntity.ok(testHistoryService.getHistory(userId));
     }
 }
