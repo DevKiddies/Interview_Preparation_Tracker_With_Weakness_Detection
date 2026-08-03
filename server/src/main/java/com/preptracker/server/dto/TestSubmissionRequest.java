@@ -16,15 +16,17 @@ package com.preptracker.server.dto;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public record TestSubmissionRequest(
-        String category,
-        String topic,
-        String type,
-        int timeTaken,
-        List<Long> questionIds,
-        Map<Long, String> answers,
-        Map<Long, Integer> switchCounts,
-        List<Long> flaggedIds,
-        Map<Long, Integer> questionTime
-) {}
+                String category,
+                String topic,
+                String type,
+                int timeTaken,
+                List<Long> questionIds,
+                Map<Long, String> answers,
+                Map<Long, Integer> switchCounts,
+                List<Long> flaggedIds,
+                Map<Long, Integer> questionTime,
+                UUID sessionId) {
+}
