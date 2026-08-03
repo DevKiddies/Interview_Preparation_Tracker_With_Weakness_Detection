@@ -48,8 +48,11 @@ export default function MockTestPage() {
   const [fetchError, setFetchError] = useState(null);
 
   const [currentIndex, setCurrentIndex]       = useState(0);
+  // selectedAnswers is the single source of truth for "answered": selecting an
+  // option immediately answers the question (no Next click required). flagged
+  // is fully independent — a question can be answered AND flagged at once.
   const [selectedAnswers, setSelectedAnswers]  = useState({});
-  const [statuses, setStatuses]               = useState([]);
+  const [flagged, setFlagged]                 = useState({});
   const [timeLeft, setTimeLeft]               = useState(initialTime);
   const [tabSwitches, setTabSwitches]         = useState(0);
   const [showTabWarning, setShowTabWarning]   = useState(false);
@@ -62,10 +65,10 @@ export default function MockTestPage() {
   const initialTimeRef = useRef(initialTime);
   const doSubmitRef = useRef(null);
   const fetchedRef = useRef(false);
-  const stateRef = useRef({ questions, selectedAnswers, timeLeft, statuses, switches, questionTimes });
+  const stateRef = useRef({ questions, selectedAnswers, flagged, timeLeft, switches, questionTimes });
   useEffect(() => {
-    stateRef.current = { questions, selectedAnswers, timeLeft, statuses, switches, questionTimes };
-  }, [questions, selectedAnswers, timeLeft, statuses, switches, questionTimes]);
+    stateRef.current = { questions, selectedAnswers, flagged, timeLeft, switches, questionTimes };
+  }, [questions, selectedAnswers, flagged, timeLeft, switches, questionTimes]);
 
   // Per-question elapsed time: ticks every second for whichever question is
   // currently visible (mirrors the overall timer's second-granularity).
@@ -95,9 +98,18 @@ export default function MockTestPage() {
       try {
         const state = JSON.parse(cached);
         setQuestions(state.questions);
-        setSelectedAnswers(state.selectedAnswers);
-        setStatuses(state.statuses);
-        setCurrentIndex(state.currentIndex);
+        setSelectedAnswers(state.selectedAnswers ?? {});
+        // Migrate legacy caches that stored a single "statuses" array where
+        // answered/flagged/skipped were mutually exclusive: rebuild the
+        // independent flagged map from any "flagged" statuses.
+        if (state.flagged) {
+          setFlagged(state.flagged);
+        } else if (Array.isArray(state.statuses)) {
+          const f = {};
+          state.statuses.forEach((s, idx) => { if (s === "flagged") f[idx] = true; });
+          setFlagged(f);
+        }
+        setCurrentIndex(state.currentIndex ?? 0);
         setTimeLeft(state.timeLeft);
         setTabSwitches(state.tabSwitches ?? 0);
         setSwitches(state.switches ?? {});
@@ -124,7 +136,7 @@ export default function MockTestPage() {
         .then((data) => {
           setQuestions(data);
           setLoading(false);
-          saveToCache({ questions: data, selectedAnswers: {}, statuses: [], currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, switches: {}, questionTimes: {}, initialTime: initialTimeRef.current });
+          saveToCache({ questions: data, selectedAnswers: {}, flagged: {}, currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, switches: {}, questionTimes: {}, initialTime: initialTimeRef.current });
         })
         .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
   }, []);
@@ -132,8 +144,8 @@ export default function MockTestPage() {
   // Persist progress on every meaningful change
   useEffect(() => {
     if (questions.length === 0) return;
-    saveToCache({ questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, switches, questionTimes, initialTime: initialTimeRef.current });
-  }, [questions, selectedAnswers, statuses, currentIndex, timeLeft, tabSwitches, switches, questionTimes]);
+    saveToCache({ questions, selectedAnswers, flagged, currentIndex, timeLeft, tabSwitches, switches, questionTimes, initialTime: initialTimeRef.current });
+  }, [questions, selectedAnswers, flagged, currentIndex, timeLeft, tabSwitches, switches, questionTimes]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -170,7 +182,7 @@ export default function MockTestPage() {
     if (submitting) return;
     setSubmitting(true);
 
-    const { questions: qs, selectedAnswers: sa, timeLeft: tl, statuses: st, switches: sw, questionTimes: qt } = stateRef.current;
+    const { questions: qs, selectedAnswers: sa, flagged: fl, timeLeft: tl, switches: sw, questionTimes: qt } = stateRef.current;
     const token       = localStorage.getItem("token");
     const questionIds = qs.map((q) => q.id);
     const answers     = {};
@@ -183,7 +195,7 @@ export default function MockTestPage() {
     const questionTime = {};
     qs.forEach((q, idx) => {
       if (sa[idx]) answers[q.id] = sa[idx];
-      if (st[idx] === "flagged") flaggedIds.push(q.id);
+      if (fl[idx]) flaggedIds.push(q.id);
       if (sw[idx] > 0) switchCounts[q.id] = sw[idx];
       if (qt[idx] > 0) questionTime[q.id] = qt[idx];
     });
@@ -216,19 +228,23 @@ export default function MockTestPage() {
   doSubmitRef.current = doSubmit;
 
   const currentQuestion  = questions[currentIndex];
-  const isCurrentFlagged = statuses[currentIndex] === "flagged";
+  const isCurrentFlagged = !!flagged[currentIndex];
   const hasAnswer        = !!selectedAnswers[currentIndex];
 
-  const handleSaveNext = () => {
-    setStatuses((prev) => {
-      const u = [...prev];
-      u[currentIndex] = selectedAnswers[currentIndex]
-          ? "answered"
-          : u[currentIndex] !== "flagged"
-              ? "skipped"
-              : "flagged";
-      return u;
+  // Select marks the question answered immediately — no Next click needed.
+  const handleSelectOption = (opt) => {
+    setSelectedAnswers((prev) => {
+      const previous = prev[currentIndex];
+      if (previous && previous !== opt) {
+        setSwitches((s) => ({ ...s, [currentIndex]: (s[currentIndex] || 0) + 1 }));
+      }
+      return { ...prev, [currentIndex]: opt };
     });
+  };
+
+  // Next only navigates. It never recalculates answered/flagged state —
+  // those are derived purely from selectedAnswers / flagged.
+  const handleSaveNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((p) => p + 1);
     } else {
@@ -236,28 +252,21 @@ export default function MockTestPage() {
     }
   };
 
+  // Flagging is independent of the answer. Toggling the flag never touches
+  // selectedAnswers, so the answered count is unaffected.
   const handleFlag = () =>
-      setStatuses((prev) => {
-        const u = [...prev];
-        u[currentIndex] = u[currentIndex] === "flagged" ? "unvisited" : "flagged";
-        return u;
-      });
+      setFlagged((prev) => ({ ...prev, [currentIndex]: !prev[currentIndex] }));
 
-  const handleNavigate = (idx) => {
-    setStatuses((prev) => {
-      if (prev[currentIndex] === "flagged") return prev;
-      const u = [...prev];
-      u[currentIndex] = selectedAnswers[currentIndex] ? "answered" : "skipped";
-      return u;
-    });
-    setCurrentIndex(idx);
-  };
+  // Navigation only moves the pointer; the current question keeps whatever
+  // answered/flagged state it already has.
+  const handleNavigate = (idx) => setCurrentIndex(idx);
 
+  // Clearing the selection is the ONLY way the answered count decreases.
   const handleClear = () =>
       setSelectedAnswers((prev) => { const u = { ...prev }; delete u[currentIndex]; return u; });
 
-  const answeredCount    = statuses.filter((s) => s === "answered").length;
-  const flaggedCount     = statuses.filter((s) => s === "flagged").length;
+  const answeredCount    = Object.keys(selectedAnswers).length;
+  const flaggedCount     = Object.keys(flagged).filter((k) => flagged[k]).length;
   const notAnsweredCount = questions.length - answeredCount;
 
   if (loading) return (
@@ -303,7 +312,6 @@ export default function MockTestPage() {
         <QuizHeader
             timeLeft={timeLeft}
             total={questions.length}
-            statuses={statuses}
             title={testTitle}
             subtitle={isTopicTest ? "Topic Practice" : "Software Engineer I"}
             onToggleSidebar={() => setSidebarOpen((p) => !p)}
@@ -317,17 +325,7 @@ export default function MockTestPage() {
                 index={currentIndex}
                 total={questions.length}
                 selectedOption={selectedAnswers[currentIndex]}
-                onSelect={(opt) => {
-                  // Count answer switches: changing from one selected option to a
-                  // different one increments the switch counter for this question.
-                  setSelectedAnswers((prev) => {
-                    const previous = prev[currentIndex];
-                    if (previous && previous !== opt) {
-                      setSwitches((s) => ({ ...s, [currentIndex]: (s[currentIndex] || 0) + 1 }));
-                    }
-                    return { ...prev, [currentIndex]: opt };
-                  });
-                }}
+                onSelect={handleSelectOption}
             />
             <QuizFooterControls
                 onPrev={() => setCurrentIndex((p) => Math.max(0, p - 1))}
@@ -344,7 +342,8 @@ export default function MockTestPage() {
           <QuizSidebarNavigator
               total={questions.length}
               currentIndex={currentIndex}
-              statuses={statuses}
+              selectedAnswers={selectedAnswers}
+              flagged={flagged}
               onNavigate={handleNavigate}
               isOpen={sidebarOpen}
               onClose={() => setSidebarOpen(false)}

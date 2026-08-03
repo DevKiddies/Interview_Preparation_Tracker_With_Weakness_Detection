@@ -51,7 +51,7 @@ export default function Sidebar({ username, targetLabel, experienceLabel }) {
   }, []);
 
   const initials = username ? username.slice(0, 2).toUpperCase() : "U";
-  const subtitle = targetLabel || experienceLabel || "Interview Prep";
+  const subtitle = experienceLabel || targetLabel || "Interview Prep";
 
   const isActive = ({ to, exact }) =>
       exact ? location.pathname === to : location.pathname.startsWith(to);

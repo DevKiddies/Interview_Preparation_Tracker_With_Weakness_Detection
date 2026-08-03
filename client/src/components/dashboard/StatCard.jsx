@@ -98,6 +98,21 @@ export default function StatCard({
             </h2>
 
             {/* Footer */}
+            <div className="mt-1 flex items-center gap-1">
+                {change !== undefined && change !== null ? (
+                    <>
+                        <TrendIcon size={12} className={trendColor} />
+                        <span className={`text-[10px] font-bold ${trendColor}`}>{change}</span>
+                        {description && (
+                            <span className="text-[10px] font-medium text-white/60">{description}</span>
+                        )}
+                    </>
+                ) : (
+                    description && (
+                        <span className="text-[10px] font-medium text-white/60">{description}</span>
+                    )
+                )}
+            </div>
         </div>
     );
 }

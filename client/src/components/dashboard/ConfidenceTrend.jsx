@@ -14,17 +14,19 @@ function CustomTooltip({ active, payload, label }) {
 
     const confidence = payload[0].value;
     const accuracy = payload[1].value;
-    const gap = confidence - accuracy;
 
     let status = "Well Calibrated";
     let statusColor = "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10";
 
-    if (gap > 5) {
-        status = "Overconfident";
-        statusColor = "text-rose-500 bg-rose-50 dark:bg-rose-500/10";
-    } else if (gap < -5) {
-        status = "Underconfident";
-        statusColor = "text-amber-500 bg-amber-50 dark:bg-amber-500/10";
+    if (confidence != null && accuracy != null) {
+        const gap = confidence - accuracy;
+        if (gap > 5) {
+            status = "Overconfident";
+            statusColor = "text-rose-500 bg-rose-50 dark:bg-rose-500/10";
+        } else if (gap < -5) {
+            status = "Underconfident";
+            statusColor = "text-amber-500 bg-amber-50 dark:bg-amber-500/10";
+        }
     }
 
     return (
@@ -35,13 +37,13 @@ function CustomTooltip({ active, payload, label }) {
           <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-indigo-500" /> Confidence
           </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{confidence}%</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{confidence != null ? `${confidence}%` : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
           <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500" /> Accuracy
           </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{accuracy}%</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{accuracy != null ? `${accuracy}%` : "—"}</span>
                 </div>
                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
                 <div className="flex items-center justify-between text-[11px] font-semibold">
@@ -55,6 +57,7 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function ConfidenceTrend({ data }) {
     const [range, setRange] = useState("7D");
+    const series = data?.[range] ?? [];
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -90,8 +93,13 @@ export default function ConfidenceTrend({ data }) {
 
             {/* Main Chart Area */}
             <div className="h-56 w-full -ml-6">
+                {series.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        No attempts in this period yet.
+                    </div>
+                ) : (
                 <ResponsiveContainer width="100%" height="100%" debounce={100}>
-                    <AreaChart data={data[range]} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                    <AreaChart data={series} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
@@ -148,6 +156,7 @@ export default function ConfidenceTrend({ data }) {
                         />
                     </AreaChart>
                 </ResponsiveContainer>
+                )}
             </div>
 
             {/* Clean Bottom Legend Indicator */}

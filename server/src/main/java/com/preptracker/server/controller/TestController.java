@@ -33,6 +33,16 @@ public class TestController {
         return ResponseEntity.ok(testService.submitTest(request));
     }
 
+    // Backs the Mock Test History page — the current user's persisted test
+    // attempts (mock + topic), newest first. The aggregation of confidence and
+    // weak topics lives in TestHistoryService.
+    @GetMapping("/history")
+    public ResponseEntity<List<TestHistoryDTO>> getHistory() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return ResponseEntity.ok(testHistoryService.getHistory(UUID.fromString(principal)));
+    }
+
     // Backs the landing page hero's "Test Passed" card — the user's real most
     // recent result instead of a hardcoded placeholder. 204 when they haven't
     // taken a test yet, so the frontend can fall back to a "take your first test" prompt.
@@ -44,6 +54,18 @@ public class TestController {
         return testService.getLatestAttempt(userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    // Reconstructs the full per-question result for one of the current user's
+    // attempts. Backs the results page when deep-linked from mock-test history
+    // or a TEST_RESULT notification, where only the attempt id is known.
+    @GetMapping("/attempts/{attemptId}")
+    public ResponseEntity<TestResultResponse> getAttemptResult(@PathVariable Long attemptId) {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return testService.getAttemptResult(UUID.fromString(principal), attemptId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Backs the "Full Assessments" grid on the mock test selection page.

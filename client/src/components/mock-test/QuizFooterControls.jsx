@@ -55,8 +55,7 @@ export default function QuizFooterControls({
                     "Submit"
                 ) : (
                     <>
-                        <span className="sm:hidden">Next</span>
-                        <span className="hidden sm:inline">Save And Next</span>
+                        <span>Next</span>
                         <ChevronRight size={15} />
                     </>
                 )}

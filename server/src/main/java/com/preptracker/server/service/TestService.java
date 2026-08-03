@@ -162,7 +162,7 @@ public class TestService {
 
             notificationService.create(userId, "TEST_RESULT", "Test results are ready",
                     "You scored " + score + "/" + total + " (" + accuracy + "%) — review your breakdown now.",
-                    "/practice/results");
+                    "/practice/results?attemptId=" + saved.getId());
         }
 
         return new TestResultResponse(score, total, request.timeTaken(), accuracy, results, breakdown);
@@ -171,6 +171,64 @@ public class TestService {
     public Optional<LatestTestResponse> getLatestAttempt(UUID userId) {
         return testAttemptRepository.findFirstByUserIdOrderByTakenAtDesc(userId)
                 .map(a -> new LatestTestResponse(a.getScore(), a.getTotal(), a.getAccuracy(), a.getCategory()));
+    }
+
+    // Rebuilds the full result payload for a previously-submitted attempt so the
+    // results page can deep-link from mock-test history / notifications, where
+    // only the attempt id is known (not the in-memory result object that POST
+    // /api/tests/submit originally returned).
+    @Transactional(readOnly = true)
+    public Optional<TestResultResponse> getAttemptResult(UUID userId, Long attemptId) {
+        return testAttemptRepository.findById(attemptId)
+                .filter(a -> userId.equals(a.getUserId()))
+                .map(this::buildResultFromAttempt);
+    }
+
+    private TestResultResponse buildResultFromAttempt(TestAttempt attempt) {
+        List<UserAttempt> uas = userAttemptRepository
+                .findByTestAttemptIdOrderBySelectionSequenceAsc(attempt.getId());
+
+        Map<Long, Question> byId = new HashMap<>();
+        for (Question q : questionRepository.findAllById(uas.stream().map(UserAttempt::getQuestionId).toList())) {
+            byId.put(q.getId(), q);
+        }
+
+        int score = 0;
+        List<TestResultResponse.QuestionResult> results = new ArrayList<>();
+        Map<String, int[]> catMap = new LinkedHashMap<>();
+
+        for (UserAttempt ua : uas) {
+            Question q = byId.get(ua.getQuestionId());
+            if (q == null) continue;
+
+            boolean correct = Boolean.TRUE.equals(ua.getIsCorrect());
+            if (correct) score++;
+
+            String catName = q.getCategory().getName();
+            int[] counts = catMap.computeIfAbsent(catName, k -> new int[]{0, 0});
+            counts[1]++;
+            if (correct) counts[0]++;
+
+            Technique technique = q.getTechnique();
+            results.add(new TestResultResponse.QuestionResult(
+                    q.getId(), q.getQuestion(),
+                    List.of(q.getOptionA(), q.getOptionB(), q.getOptionC(), q.getOptionD()),
+                    ua.getFinalAnswer(), correctText(q), correct,
+                    catName, q.getTopic().getName(),
+                    technique != null ? technique.getName() : null, q.getDifficulty(),
+                    ua.getConfidenceScore(), ua.getConfidenceState()
+            ));
+        }
+
+        Map<String, TestResultResponse.CategoryStats> breakdown = new LinkedHashMap<>();
+        catMap.forEach((cat, c) -> breakdown.put(cat, new TestResultResponse.CategoryStats(c[0], c[1])));
+
+        int total = results.size();
+        double accuracy = total == 0 ? 0.0 : Math.round((score * 100.0 / total) * 10.0) / 10.0;
+
+        return new TestResultResponse(score, total,
+                attempt.getTimeTakenSeconds() != null ? attempt.getTimeTakenSeconds() : 0,
+                accuracy, results, breakdown);
     }
 
     // Backs the "Full Assessments" grid on the mock test selection page — every

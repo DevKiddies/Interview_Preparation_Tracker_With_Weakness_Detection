@@ -37,6 +37,7 @@ function InterviewPage() {
     const [focusTopics, setFocusTopics] = useState([]);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [archiving, setArchiving] = useState(false);
     const [interviews, setInterviews] = useState([]);
 
     useEffect(() => {
@@ -165,6 +166,59 @@ function InterviewPage() {
         setDeleting(false);
         clearInterviewClosed();
     }, []);
+
+    // Archive the current interview: closes the active track (kept in history
+    // as ARCHIVED), clears the current goal so the preparation card reads
+    // empty, and drops the settings page back to step 1 so a new goal can be
+    // set for the next interview.
+    const handleArchive = useCallback(async () => {
+        setArchiving(true);
+        const token = localStorage.getItem("token");
+        try {
+            const active = interviews.find((i) => i.status === "ACTIVE");
+            if (token && active) {
+                await fetch(`${API_BASE}/api/interviews/${active.id}/result`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ result: "ARCHIVED" }),
+                }).catch(() => {});
+                setInterviews((prev) =>
+                    prev.map((i) => (i.id === active.id ? { ...i, status: "ARCHIVED" } : i))
+                );
+            }
+            const res = await fetch(`${API_BASE}/api/users/onboarding`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    targetCompany: "",
+                    experienceLevel: "",
+                    interviewDate: "",
+                    focusTopics: [],
+                }),
+            });
+            if (res.ok) {
+                setTargetCompany("");
+                setExperienceLevel("");
+                setInterviewDate("");
+                setFocusTopics([]);
+                setCachedProfile({
+                    ...getCachedProfile(),
+                    targetCompany: "",
+                    experienceLevel: "",
+                    interviewDate: "",
+                    focusTopics: [],
+                });
+                setStep(1);
+            }
+        } catch {
+            /* ignore */
+        }
+        setArchiving(false);
+        clearInterviewClosed();
+    }, [interviews]);
 
     const goNext = () => {
         if (!canAdvance) return;
@@ -321,7 +375,7 @@ function InterviewPage() {
                     )}
                 </section>
 
-                <DangerZone onDelete={handleDelete} loading={deleting} />
+                <DangerZone onDelete={handleDelete} loading={deleting} onArchive={handleArchive} archiving={archiving} />
             </div>
         </div>
     );

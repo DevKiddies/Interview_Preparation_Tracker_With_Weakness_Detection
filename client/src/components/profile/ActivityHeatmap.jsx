@@ -1,5 +1,7 @@
 // ActivityHeatmap.jsx — monthly calendar heatmap showing daily study activity.
-import { useState, useMemo } from "react";
+// All data comes from /api/users/me/dashboard/activity-heatmap (real attempts),
+// no synthesized values.
+import { useState, useEffect, useMemo } from "react";
 import {
   CalendarDays,
   Flame,
@@ -10,12 +12,32 @@ import {
   Sparkles,
 } from "lucide-react";
 import DashboardCard from "../ui/DashboardCard";
+import API_BASE from "../../utils/api.js";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// "Activity Level" buckets for the default metric, derived from how many
+// distinct questions the user actually answered that day.
+function activityLevel(questions) {
+  if (questions === 0) return 0;
+  if (questions <= 5) return 1;
+  if (questions <= 12) return 2;
+  if (questions <= 25) return 3;
+  return 4;
+}
+
+const EMPTY_STATS = {
+  activityLv: 0, attempts: 0, questions: 0, confidence: 0, accuracy: 0, studyMinutes: 0,
+};
+
+// Builds the "yyyy-MM-dd" key the backend uses as ActivityDayDTO.date.
+function toKey(year, month, day) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 const METRICS = {
   activity: {
@@ -81,40 +103,7 @@ const LEVEL_COLORS = [
   "bg-indigo-700 dark:bg-indigo-300 text-white dark:text-indigo-950 hover:bg-indigo-800 dark:hover:bg-indigo-200",
 ];
 
-function drand(s) {
-  const x = Math.sin(s * 9301 + 49297) * 233280;
-  return x - Math.floor(x);
-}
-
-function synthesizeDay(date) {
-  const seed = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
-  const r = drand(seed);
-
-  let activityLv;
-  if (r < 0.45) activityLv = 0;
-  else if (r < 0.65) activityLv = 1;
-  else if (r < 0.82) activityLv = 2;
-  else if (r < 0.94) activityLv = 3;
-  else activityLv = 4;
-
-  if (activityLv === 0) {
-    return { activityLv, questions: 0, confidence: 0, accuracy: 0, studyMinutes: 0 };
-  }
-
-  const jitterQ = drand(seed + 1);
-  const jitterC = drand(seed + 2);
-  const jitterA = drand(seed + 3);
-  const jitterT = drand(seed + 4);
-
-  const questions = Math.round(activityLv * 12 + jitterQ * 10);
-  const confidence = Math.min(99, Math.round(35 + activityLv * 12 + jitterC * 15));
-  const accuracy = Math.min(99, Math.round(40 + activityLv * 10 + jitterA * 18));
-  const studyMinutes = Math.round(activityLv * 45 + jitterT * 40);
-
-  return { activityLv, questions, confidence, accuracy, studyMinutes };
-}
-
-function buildMonth(year, month, today, metricKey) {
+function buildMonth(year, month, today, metricKey, statsByDay) {
   const first = new Date(year, month, 1);
   const totalDays = new Date(year, month + 1, 0).getDate();
   const startDow = (first.getDay() + 6) % 7;
@@ -127,12 +116,10 @@ function buildMonth(year, month, today, metricKey) {
     const date = new Date(year, month, d);
     const isToday = date.getTime() === today.getTime();
     const isFuture = date > today;
-    const stats = isFuture
-        ? { activityLv: 0, questions: 0, confidence: 0, accuracy: 0, studyMinutes: 0 }
-        : synthesizeDay(date);
+    const stats = isFuture ? EMPTY_STATS : (statsByDay.get(toKey(year, month, d)) ?? EMPTY_STATS);
     const lv = isFuture ? 0 : metric.level(stats);
     cells.push({ date, day: d, lv, stats, isToday, isFuture, colIndex: (startDow + d - 1) % 7 });
-    if (!isFuture) activeFlags.push(stats.activityLv > 0);
+    if (!isFuture) activeFlags.push(stats.attempts > 0);
   }
 
   while (cells.length % 7 !== 0) cells.push(null);
@@ -165,7 +152,7 @@ function CellTooltip({ cell }) {
     );
   }
 
-  if (stats.activityLv === 0) {
+  if (stats.attempts === 0) {
     return (
         <div className="space-y-0.5">
           <p className="font-bold text-slate-700 dark:text-slate-200">{dateStr}</p>
@@ -276,6 +263,39 @@ export default function ActivityHeatmap() {
   const [selMonth, setSelMonth] = useState(today.getMonth());
   const [metricKey, setMetricKey] = useState("activity");
 
+  // Real per-day stats: dateKey ("yyyy-MM-dd") -> stat object, plus the
+  // server-computed streak summary. Loaded once; the backend covers ~3 years.
+  const [statsByDay, setStatsByDay] = useState(new Map());
+  const [serverStreaks, setServerStreaks] = useState({ current: 0, longest: 0 });
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/me/dashboard/activity-heatmap`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("load failed"))))
+        .then((data) => {
+          const map = new Map();
+          for (const d of data.days ?? []) {
+            map.set(d.date, {
+              activityLv: activityLevel(d.questions ?? 0),
+              attempts: d.attempts ?? 0,
+              questions: d.questions ?? 0,
+              confidence: d.confidence ?? 0,
+              accuracy: d.accuracy ?? 0,
+              studyMinutes: d.studyMinutes ?? 0,
+            });
+          }
+          setStatsByDay(map);
+          setServerStreaks({
+            current: data.currentStreak ?? 0,
+            longest: data.longestStreak ?? 0,
+          });
+        })
+        .catch(() => { /* leave the heatmap empty rather than showing fake data */ });
+  }, []);
+
   const isCurrent = selYear === maxYear && selMonth === today.getMonth();
   const canGoPrev = selYear > minYear || selMonth > 0;
   const canGoNext = !isCurrent;
@@ -296,11 +316,16 @@ export default function ActivityHeatmap() {
   };
 
   const { cells, totalDays, activeDays, maxStreak, streak } = useMemo(
-      () => buildMonth(selYear, selMonth, today, metricKey),
-      [selYear, selMonth, today, metricKey]
+      () => buildMonth(selYear, selMonth, today, metricKey, statsByDay),
+      [selYear, selMonth, today, metricKey, statsByDay]
   );
 
   const metric = METRICS[metricKey];
+
+  // Global streaks come from the server (computed across all fetched history);
+  // the per-month streak (insight card) is still derived from the visible month.
+  const globalCurrentStreak = serverStreaks.current || streak;
+  const globalLongestStreak = serverStreaks.longest > maxStreak ? serverStreaks.longest : maxStreak;
 
   return (
       <DashboardCard
@@ -441,7 +466,7 @@ export default function ActivityHeatmap() {
                 </div>
                 <div>
                   <p className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1">
-                    {streak}
+                    {globalCurrentStreak}
                   </p>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     Current Streak
@@ -455,7 +480,7 @@ export default function ActivityHeatmap() {
                 </div>
                 <div>
                   <p className="text-xl font-black text-slate-900 dark:text-white leading-none mb-1">
-                    {maxStreak}
+                    {globalLongestStreak}
                   </p>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     Longest Streak

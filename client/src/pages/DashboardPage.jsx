@@ -13,14 +13,11 @@ import PreparationCard from "../components/dashboard/PreparationCard";
 import API_BASE from "../utils/api.js";
 import { getInterviewClosed } from "../utils/interviewState";
 import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
+import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache";
 import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
-import { topicConfidence } from "../data/dashboardData";
-import { confidenceTrend } from "../data/dashboardData";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
-import { blindSpotData } from "../data/dashboardData";
 import AccuracyHeatmap from "../components/dashboard/AccuracyHeatmap";
-import { accuracyHeatmap } from "../data/dashboardData";
 
 const TARGET_LABELS = {
   faang: "FAANG / Big Tech",
@@ -35,10 +32,25 @@ const EXPERIENCE_LABELS = {
   senior: "Senior",
 };
 
+function formatDelta(value, suffix = "%") {
+  if (value === undefined || value === null) return null;
+  return `${value > 0 ? "+" : ""}${value}${suffix}`;
+}
+
+function trendOf(value) {
+  if (value === undefined || value === null || value === 0) return "neutral";
+  return value > 0 ? "up" : "down";
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState(localStorage.getItem("username") || "");
   const [profile, setProfile] = useState(() => getCachedProfile());
+  const [stats, setStats] = useState(() => getCachedDashboard()?.stats ?? null);
+  const [categories, setCategories] = useState(() => getCachedDashboard()?.categories ?? []);
+  const [trend, setTrend] = useState(() => getCachedDashboard()?.trend ?? null);
+  const [blindSpots, setBlindSpots] = useState(() => getCachedDashboard()?.blindSpots ?? []);
+  const [heatmap, setHeatmap] = useState(() => getCachedDashboard()?.heatmap ?? []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -60,6 +72,62 @@ export default function DashboardPage() {
           window.dispatchEvent(new CustomEvent("user-profile-updated"));
           setProfile(data);
           setCachedProfile(data);
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          setStats(data);
+          setCachedDashboard({ ...getCachedDashboard(), stats: data });
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/categories`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setCategories(data);
+            setCachedDashboard({ ...getCachedDashboard(), categories: data });
+          }
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/trend`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          setTrend(data);
+          setCachedDashboard({ ...getCachedDashboard(), trend: data });
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/blind-spots`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setBlindSpots(data);
+            setCachedDashboard({ ...getCachedDashboard(), blindSpots: data });
+          }
+        })
+        .catch(() => {});
+
+    fetch(`${API_BASE}/api/users/me/dashboard/accuracy-heatmap`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setHeatmap(data);
+            setCachedDashboard({ ...getCachedDashboard(), heatmap: data });
+          }
         })
         .catch(() => {});
   }, []);
@@ -107,19 +175,7 @@ export default function DashboardPage() {
     return {
       label: "Start",
       icon: <Play size={14} fill="currentColor" />,
-      onClick: () =>
-          navigate("/practice/instructions", {
-            state: {
-              nextUrl: "/practice/mock-tests/dsa",
-              nextState: null,
-              testTitle: "DSA Fundamentals",
-              questions: 20,
-              timeMins: 90,
-              difficulty: "Mixed",
-              description:
-                  "Arrays, HashMaps, Trees, Graphs, Sorting & Dynamic Programming",
-            },
-          }),
+      onClick: () => navigate("/practice/mock-tests"),
     };
   }, [prepCardStatus, navigate]);
 
@@ -147,55 +203,54 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard
                   title="Overall Confidence"
-                  value="78%"
+                  value={stats?.overallConfidence != null ? `${stats.overallConfidence}%` : "—"}
                   icon="brain"
                   color="blue"
-                  change="+3%"
-                  trend="up"
+                  change={formatDelta(stats?.confidenceDelta)}
+                  trend={trendOf(stats?.confidenceDelta)}
                   description="vs last week"
               />
 
               <StatCard
                   title="Overall Accuracy"
-                  value="82%"
+                  value={stats?.overallAccuracy != null ? `${stats.overallAccuracy}%` : "—"}
                   icon="target"
                   color="green"
-                  change="+2%"
-                  trend="up"
+                  change={formatDelta(stats?.accuracyDelta)}
+                  trend={trendOf(stats?.accuracyDelta)}
                   description="vs last week"
               />
 
               <StatCard
                   title="Questions Solved"
-                  value="1,247"
+                  value={stats?.questionsSolved != null ? stats.questionsSolved.toLocaleString() : "—"}
                   icon="book"
                   color="purple"
-                  change="+56"
-                  trend="up"
+                  change={stats?.solvedThisWeek != null ? formatDelta(stats.solvedThisWeek, "") : null}
+                  trend="neutral"
                   description="this week"
               />
 
               <StatCard
                   title="Study Streak"
-                  value="18 Days"
+                  value={stats?.studyStreak != null ? `${stats.studyStreak} Days` : "—"}
                   icon="flame"
                   color="orange"
-                  change="+2"
-                  trend="up"
+                  change={null}
                   description="current streak"
               />
             </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ConfidenceByCategory topics={topicConfidence} />
-              <ConfidenceTrend data={confidenceTrend} />
+              <ConfidenceByCategory topics={categories} />
+              <ConfidenceTrend data={trend ?? {}} />
             </div>
 
             {/* Charts Row 2 — Side by Side Grid */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BlindSpotAnalysis data={blindSpotData} />
-              <AccuracyHeatmap data={accuracyHeatmap} />
+              <BlindSpotAnalysis data={blindSpots} />
+              <AccuracyHeatmap data={heatmap} />
             </div>
           </div>
         </div>
