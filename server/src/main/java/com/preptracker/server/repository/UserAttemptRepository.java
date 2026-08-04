@@ -55,13 +55,14 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             FROM user_attempts ua
             JOIN topics t ON t.id = ua.topic_id
             JOIN categories c ON c.id = t.category_id
-            WHERE ua.user_id = :userId
+            WHERE ua.user_id = :userId AND ua.topic_id IN (:topicIds)
             GROUP BY c.id, c.name
             ORDER BY q_count DESC
             """, nativeQuery = true)
     List<Object[]> findCategoryConfidence(@Param("userId") UUID userId,
                                           @Param("thisStart") LocalDateTime thisStart,
-                                          @Param("prevStart") LocalDateTime prevStart);
+                                          @Param("prevStart") LocalDateTime prevStart,
+                                          @Param("topicIds") Collection<Long> topicIds);
 
     // Rows of [topicId, confidence, accuracy, questionCount, distinctAnswered] —
     // used by the Confidence Explorer's topic-level table. questionCount counts
