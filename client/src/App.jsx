@@ -8,6 +8,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import BanGuard from "./components/BanGuard";
+import FloatingChatbot from "./components/chat/FloatingChatbot";
 import PageSkeleton from "./components/ui/PageSkeleton";
 import DashboardSkeleton from "./components/dashboard/DashboardSkeleton";
 import API_BASE from "./utils/api";
@@ -37,9 +38,7 @@ const CodingProblemsPage = lazy(() => import("./pages/CodingProblemsPage"));
 const InterviewExperiencesPage = lazy(() => import("./pages/InterviewExperiencesPage"));
 
 const MockTestPage = lazy(() => import("./pages/MockTestPage"));
-const MockTestSelectionPage = lazy(
-  () => import("./pages/MockTestSelectionPage"),
-);
+const MockTestSelectionPage = lazy(() => import("./pages/MockTestSelectionPage"));
 const TopicTestConfigPage = lazy(() => import("./pages/TopicTestConfigPage"));
 const TestResultPage = lazy(() => import("./pages/TestResultPage"));
 const TestInstructionsPage = lazy(() => import("./pages/TestInstructionsPage"));
@@ -57,21 +56,13 @@ const AdminAllUsers = lazy(() => import("./pages/admin/AdminAllUsers"));
 const AdminUserResults = lazy(() => import("./pages/admin/AdminUserResults"));
 const AdminQuestionBank = lazy(() => import("./pages/admin/AdminQuestionBank"));
 const AdminAddQuestion = lazy(() => import("./pages/admin/AdminAddQuestion"));
-const AdminCategoriesTopics = lazy(
-  () => import("./pages/admin/AdminCategoriesTopics"),
-);
+const AdminCategoriesTopics = lazy(() => import("./pages/admin/AdminCategoriesTopics"));
 const AdminAllTests = lazy(() => import("./pages/admin/AdminAllTests"));
-const AdminCreateMockTest = lazy(
-  () => import("./pages/admin/AdminCreateMockTest"),
-);
+const AdminCreateMockTest = lazy(() => import("./pages/admin/AdminCreateMockTest"));
 const AdminTestResults = lazy(() => import("./pages/admin/AdminTestResults"));
-const AdminPlatformOverview = lazy(
-  () => import("./pages/admin/AdminPlatformOverview"),
-);
+const AdminPlatformOverview = lazy(() => import("./pages/admin/AdminPlatformOverview"));
 const AdminUserReports = lazy(() => import("./pages/admin/AdminUserReports"));
-const AdminWeaknessAnalysis = lazy(
-  () => import("./pages/admin/AdminWeaknessAnalysis"),
-);
+const AdminWeaknessAnalysis = lazy(() => import("./pages/admin/AdminWeaknessAnalysis"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 function ProtectedRoute({ children, skeleton = <PageSkeleton /> }) {
@@ -134,12 +125,22 @@ function HomeRedirect() {
 const App = () => {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const token = localStorage.getItem("token"); // <-- Check for logged-in user
 
   // Navbar and Footer are hidden inside the test flow and on admin pages,
   // but not on the test-selection page so users can still navigate away.
   const hideLayout =
     ["/onboarding"].includes(location.pathname) ||
     location.pathname.startsWith("/practice/mock-tests/") ||
+    location.pathname === "/practice/results" ||
+    isAdminRoute;
+
+  // <-- NEW: Logic to hide the Chatbot during tests, auth pages, and admin routes
+  const hideChatbot =
+    ["/login", "/signup", "/verify", "/forgot-password", "/onboarding", "/"].includes(location.pathname) ||
+    location.pathname.startsWith("/practice/mock-tests/") ||
+    location.pathname.startsWith("/practice/topic-test") ||
+    location.pathname.startsWith("/practice/instructions") ||
     location.pathname === "/practice/results" ||
     isAdminRoute;
 
@@ -288,6 +289,10 @@ const App = () => {
         </Suspense>
       </main>
       {!hideLayout && <Footer />}
+
+      {/* <-- NEW: Render the floating chatbot here. It only shows if logged in AND not on a restricted page */}
+      {token && !hideChatbot && <FloatingChatbot />}
+      
     </div>
   );
 };
