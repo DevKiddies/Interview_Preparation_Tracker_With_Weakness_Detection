@@ -7,7 +7,7 @@ function getConfidenceColor(confidence) {
   return { stroke: "#f43f5e", badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20" };
 }
 
-export default function ConfidenceSummary({ title, confidence, childrenCount, childrenLabel, questions }) {
+export default function ReadinessSummary({ title, confidence, childrenCount, childrenLabel, questions }) {
   const normalizedConfidence = Math.max(0, Math.min(100, confidence || 0));
   const { stroke, badge } = getConfidenceColor(normalizedConfidence);
 

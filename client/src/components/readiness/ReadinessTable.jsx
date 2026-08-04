@@ -29,7 +29,6 @@ function getSortValue(item, key) {
     case "progress":
     case "confidence": return item.confidence;
     case "accuracy": return item.accuracy;
-    case "confidence": return item.confidence;
     case "questions": return item.questions;
     default: return null;
   }
@@ -74,7 +73,7 @@ function SortableHeader({ label, sortable, sortKey, sortDir, onSort }) {
   );
 }
 
-export default function ConfidenceTable({ items, childLevel, onItemClick }) {
+export default function ReadinessTable({ items, childLevel, onItemClick }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [sortKey, setSortKey] = useState(null);

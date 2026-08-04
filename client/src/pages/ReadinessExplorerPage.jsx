@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import PageHeader from "../components/confidence/PageHeader";
-import Breadcrumb from "../components/confidence/Breadcrumb";
-import ConfidenceSummary from "../components/confidence/ConfidenceSummary";
-import ConfidenceTable from "../components/confidence/ConfidenceTable";
-import EmptyState from "../components/confidence/EmptyState";
+import PageHeader from "../components/readiness/PageHeader";
+import Breadcrumb from "../components/readiness/Breadcrumb";
+import ReadinessSummary from "../components/readiness/ReadinessSummary";
+import ReadinessTable from "../components/readiness/ReadinessTable";
+import EmptyState from "../components/readiness/EmptyState";
 import API_BASE from "../utils/api";
 import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache";
 
@@ -20,14 +20,14 @@ function indexTree(tree) {
   for (const category of tree.categories) {
     index.set(`category:${category.id}`, { node: category, trail: [] });
     for (const topic of category.children || []) {
-      index.set(`topic:${topic.id}`, { node: topic, trail: [{ name: category.name, to: `/confidence/category/${category.id}` }] });
+      index.set(`topic:${topic.id}`, { node: topic, trail: [{ name: category.name, to: `/readiness/category/${category.id}` }] });
       for (const technique of topic.children || []) {
         if (technique.level === "general") continue; // leaf bucket, not navigable
         index.set(`technique:${technique.id}`, {
           node: technique,
           trail: [
-            { name: category.name, to: `/confidence/category/${category.id}` },
-            { name: topic.name, to: `/confidence/topic/${topic.id}` },
+            { name: category.name, to: `/readiness/category/${category.id}` },
+            { name: topic.name, to: `/readiness/topic/${topic.id}` },
           ],
         });
       }
@@ -36,7 +36,7 @@ function indexTree(tree) {
   return index;
 }
 
-export default function ConfidenceExplorerPage() {
+export default function ReadinessExplorerPage() {
   const { level, id } = useParams();
   const navigate = useNavigate();
 
@@ -114,7 +114,7 @@ export default function ConfidenceExplorerPage() {
 
   const handleItemClick = (item, nextLevel) => {
     if (nextLevel) {
-      navigate(`/confidence/${nextLevel}/${item.id}`);
+      navigate(`/readiness/${nextLevel}/${item.id}`);
     }
   };
 
@@ -128,7 +128,7 @@ export default function ConfidenceExplorerPage() {
           </div>
 
           <div className="mt-4">
-            <ConfidenceSummary
+            <ReadinessSummary
                 title={entity.name}
                 confidence={entity.confidence}
                 childrenCount={sortedChildren.length}
@@ -139,7 +139,7 @@ export default function ConfidenceExplorerPage() {
 
           <div className="mt-5">
             {sortedChildren.length > 0 ? (
-                <ConfidenceTable
+                <ReadinessTable
                     items={sortedChildren}
                     childLevel={childLevel}
                     onItemClick={handleItemClick}

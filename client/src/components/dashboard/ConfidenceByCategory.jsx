@@ -81,7 +81,7 @@ export default function ConfidenceByCategory({ topics = [] }) {
                         return (
                             <div
                                 key={topic.id}
-                                onClick={() => navigate(`/confidence/category/${topic.id}`)}
+                                onClick={() => navigate(`/readiness/category/${topic.id}`)}
                                 className="group flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 rounded-lg p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer relative z-10"
                             >
                                 {/* Graph Y-Axis: Topic & Label */}
