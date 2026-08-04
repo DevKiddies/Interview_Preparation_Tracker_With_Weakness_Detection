@@ -52,7 +52,8 @@ public class AdminTestResultService {
                 attempt.getTotal(),
                 timeTakenMinutes,
                 attempt.getTakenAt(),
-                scorePercent >= PASS_THRESHOLD ? "pass" : "fail"
+                scorePercent >= PASS_THRESHOLD ? "pass" : "fail",
+                attempt.getCompletionStatus() != null ? attempt.getCompletionStatus() : "COMPLETE"
         );
     }
 }

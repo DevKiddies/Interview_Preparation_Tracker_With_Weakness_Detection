@@ -6,6 +6,7 @@ import QuizQuestionCard from "../components/mock-test/QuizQuestionCard.jsx";
 import QuizSidebarNavigator from "../components/mock-test/QuizSidebarNavigator.jsx";
 import QuizFooterControls from "../components/mock-test/QuizFooterControls.jsx";
 import API_BASE from "../utils/api.js";
+import { isValidActiveTestSession, clearActiveTestSession } from "../utils/quizSession.js";
 
 export default function MockTestPage() {
   const { testId } = useParams();
@@ -65,10 +66,38 @@ export default function MockTestPage() {
   const initialTimeRef = useRef(initialTime);
   const doSubmitRef = useRef(null);
   const fetchedRef = useRef(false);
+  const sessionIdRef = useRef(null);
+  const submittedRef = useRef(false);
   const stateRef = useRef({ questions, selectedAnswers, flagged, timeLeft, switches, questionTimes });
   useEffect(() => {
     stateRef.current = { questions, selectedAnswers, flagged, timeLeft, switches, questionTimes };
   }, [questions, selectedAnswers, flagged, timeLeft, switches, questionTimes]);
+
+  // Create a test session once the questions are known, so the server can later
+  // record an ABANDONED test_attempts row (via the pagehide beacon) if the user
+  // closes the tab before submitting. Fire-and-forget — a failed start call just
+  // means no abandon row will be created, submission still works.
+  const startSession = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token || sessionIdRef.current) return;
+    fetch(`${API_BASE}/api/tests/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        testId: isTopicTest ? null : Number(testId),
+        type: isTopicTest ? "TOPIC" : "MOCK",
+        total: questions.length,
+        category: categoryLabel,
+      }),
+    })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((id) => { if (id) sessionIdRef.current = id; })
+        .catch(() => {});
+  }, [isTopicTest, testId, questions.length, categoryLabel]);
+
+  useEffect(() => {
+    if (questions.length > 0) startSession();
+  }, [questions.length, startSession]);
 
   // Per-question elapsed time: ticks every second for whichever question is
   // currently visible (mirrors the overall timer's second-granularity).
@@ -87,6 +116,16 @@ export default function MockTestPage() {
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
+
+    // Session guard: the quiz may only be entered from a deliberate entry
+    // point (Begin on the instructions page, or a Retake) that sets the
+    // active-test marker. Direct URL entry, or back/forward re-entry after a
+    // finished/abandoned test, has no marker — redirect to the library instead
+    // of silently starting a fresh run (replace keeps it out of the history).
+    if (!isValidActiveTestSession(testId)) {
+      navigate("/practice/mock-tests", { replace: true });
+      return;
+    }
 
     // Topic tests: new navigation → clear stale cache so a fresh fetch happens
     if (isTopicTest && (topicNames || categoryName)) {
@@ -134,12 +173,33 @@ export default function MockTestPage() {
     })
         .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
         .then((data) => {
+          if (data.length === 0) clearActiveTestSession();
           setQuestions(data);
           setLoading(false);
           saveToCache({ questions: data, selectedAnswers: {}, flagged: {}, currentIndex: 0, timeLeft: initialTimeRef.current, tabSwitches: 0, switches: {}, questionTimes: {}, initialTime: initialTimeRef.current });
         })
-        .catch(() => { setFetchError("Failed to load questions. Please try again."); setLoading(false); });
+        .catch(() => { clearActiveTestSession(); setFetchError("Failed to load questions. Please try again."); setLoading(false); });
   }, []);
+
+  // Trap the browser Back/Forward buttons while the quiz is active: push a
+  // duplicate of the current URL and re-push it on every popstate, so Back can
+  // never leave the running test. The duplicate must carry a copy of React
+  // Router's history state (key/idx/user state) — pushing `null` wipes it, and
+  // the next pop then re-renders the quiz with an empty location.state (losing
+  // the topic config) and desyncs the router's internal index, which lets later
+  // back presses escape. Only armed for a legitimate entry (marker present);
+  // once the marker is gone (submitted/abandoned) the handler stops re-pushing
+  // and Back proceeds normally.
+  useEffect(() => {
+    if (!isValidActiveTestSession(testId)) return;
+    window.history.pushState(window.history.state, "", window.location.href);
+    const handler = () => {
+      if (!isValidActiveTestSession(testId)) return;
+      window.history.pushState(window.history.state, "", window.location.href);
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [testId]);
 
   // Persist progress on every meaningful change
   useEffect(() => {
@@ -168,7 +228,7 @@ export default function MockTestPage() {
   }, []);
 
   useEffect(() => {
-    if (tabSwitches >= 3) doSubmitRef.current?.();
+    if (tabSwitches >= 3) doSubmitRef.current?.("ABORTED");
   }, [tabSwitches]);
 
   useEffect(() => {
@@ -178,9 +238,42 @@ export default function MockTestPage() {
     }
   }, [timeLeft, questions.length]);
 
-  const doSubmit = useCallback(async () => {
+  // If the tab/browser is closed mid-test (before a submit), fire a lightweight
+  // keepalive beacon so the server can record an ABANDONED test_attempts row.
+  // fetch + keepalive is used instead of navigator.sendBeacon because the
+  // abandon endpoint is authenticated and sendBeacon can't attach headers.
+  useEffect(() => {
+    const handler = () => {
+      if (submittedRef.current) return;
+      // The moment the tab/page unloads the attempt is abandoned: drop the
+      // marker and cached progress so a restored or reopened tab cannot resume
+      // the test — it will be redirected to the test library on remount.
+      clearActiveTestSession();
+      try { sessionStorage.removeItem(CACHE_KEY); } catch {}
+      const token = localStorage.getItem("token");
+      const sessionId = sessionIdRef.current;
+      if (!token || !sessionId) return;
+      const { timeLeft: tl } = stateRef.current;
+      const timeTaken = Math.max(0, initialTimeRef.current - tl);
+      fetch(`${API_BASE}/api/tests/abandon`, {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId, timeTaken }),
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", handler);
+    return () => window.removeEventListener("pagehide", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const doSubmit = useCallback(async (status) => {
     if (submitting) return;
+    submittedRef.current = true;
     setSubmitting(true);
+    // The quiz is no longer active once submission starts: drop the marker so
+    // back/forward or a manual URL can't re-enter this (now finished) run.
+    clearActiveTestSession();
 
     const { questions: qs, selectedAnswers: sa, flagged: fl, timeLeft: tl, switches: sw, questionTimes: qt } = stateRef.current;
     const token       = localStorage.getItem("token");
@@ -215,6 +308,8 @@ export default function MockTestPage() {
           switchCounts,
           flaggedIds,
           questionTime,
+          sessionId: sessionIdRef.current,
+          completionStatus: status === "ABORTED" ? "ABORTED" : "COMPLETE",
         }),
       });
       if (!res.ok) throw new Error();

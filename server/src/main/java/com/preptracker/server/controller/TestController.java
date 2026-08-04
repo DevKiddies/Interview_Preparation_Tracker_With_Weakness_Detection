@@ -7,6 +7,8 @@ package com.preptracker.server.controller;
 
 import com.preptracker.server.dto.AvailableTestResponse;
 import com.preptracker.server.dto.LatestTestResponse;
+import com.preptracker.server.dto.StartTestRequest;
+import com.preptracker.server.dto.AbandonTestRequest;
 import com.preptracker.server.dto.TestHistoryDTO;
 import com.preptracker.server.dto.TestResultResponse;
 import com.preptracker.server.dto.TestSubmissionRequest;
@@ -39,6 +41,24 @@ public class TestController {
     public ResponseEntity<UUID> startTest(@PathVariable Long testId) {
         UUID sessionId = testSessionService.startSession(authenticatedUserId(), testId);
         return ResponseEntity.ok(sessionId);
+    }
+
+    // Creates a test session with a snapshot of the started test (question
+    // count, type, category) so an abandoned session can be persisted as a real
+    // test_attempts row via the pagehide beacon.
+    @PostMapping("/start")
+    public ResponseEntity<UUID> startTest(@RequestBody StartTestRequest request) {
+        UUID sessionId = testSessionService.startSession(authenticatedUserId(), request);
+        return ResponseEntity.ok(sessionId);
+    }
+
+    // Handles the pagehide beacon fired when the user closes the tab/browser
+    // mid-test: records an ABANDONED test_attempts row (score 0) and closes the
+    // session. Must be an authenticated, fire-and-forget call (keepalive fetch).
+    @PostMapping("/abandon")
+    public ResponseEntity<Void> abandonTest(@RequestBody AbandonTestRequest request) {
+        testSessionService.abandonSession(authenticatedUserId(), request);
+        return ResponseEntity.noContent().build();
     }
 
     private UUID authenticatedUserId() {

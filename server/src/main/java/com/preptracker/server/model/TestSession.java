@@ -20,14 +20,29 @@ public class TestSession {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "test_id", nullable = false)
+    @Column(name = "test_id")
     private Long testId;
+
+    // Snapshot of what the started test contains, so an abandoned session can be
+    // persisted as a proper test_attempts row (score 0) even if the frontend
+    // never submitted answers.
+    @Column
+    private Integer total;
+
+    @Column(name = "type")
+    private String type = "MOCK";
+
+    @Column
+    private String category;
 
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt = LocalDateTime.now();
 
     @Column(nullable = false)
     private Boolean completed = false;
+
+    @Column(name = "completion_status", nullable = false, columnDefinition = "varchar(20) default 'ABANDONED'")
+    private String completionStatus = "ABANDONED";
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

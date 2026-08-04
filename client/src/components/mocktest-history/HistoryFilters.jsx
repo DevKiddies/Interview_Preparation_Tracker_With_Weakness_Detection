@@ -1,7 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 
-const STATUSES = ["All", "Completed", "Abandoned"];
+const STATUSES = ["All", "Completed", "Abandoned", "Aborted"];
 const TYPES = ["All", "Mock Test", "Topic Test"];
 const SORTS = ["Newest", "Oldest", "Highest Accuracy", "Highest Confidence"];
 

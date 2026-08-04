@@ -30,5 +30,9 @@ public record TestSubmissionRequest(
         Map<Long, Integer> questionTime,
         // Optional: the test session id returned by POST /api/tests/start/{testId}.
         // When present, the server marks that session completed on submission.
-        UUID sessionId
+        UUID sessionId,
+        // How the test ended: COMPLETE (normal/timeout) or ABORTED (auto-submit
+        // after too many tab switches). ABANDONED is recorded via the separate
+        // /api/tests/abandon beacon, never through submit.
+        String completionStatus
 ) {}

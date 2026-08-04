@@ -66,7 +66,7 @@ public class AdminAnalyticsService {
 
     public AdminPlatformOverviewDTO getOverview() {
         List<User> users = userRepository.findAll();
-        List<TestAttempt> attempts = testAttemptRepository.findAll();
+        List<TestAttempt> attempts = nonAbandoned(testAttemptRepository.findAll());
         LocalDateTime now = LocalDateTime.now();
 
         long totalQuestions = questionRepository.count();
@@ -100,7 +100,7 @@ public class AdminAnalyticsService {
 
     public AdminUserReportsDTO getUserReports() {
         List<User> users = userRepository.findAll();
-        List<TestAttempt> attempts = testAttemptRepository.findAll();
+        List<TestAttempt> attempts = nonAbandoned(testAttemptRepository.findAll());
         Map<UUID, UserProfile> profileByUserId = userProfileRepository.findAll().stream()
                 .collect(Collectors.toMap(UserProfile::getUserId, p -> p));
         Map<UUID, List<TestAttempt>> attemptsByUserId = attempts.stream()
@@ -142,7 +142,7 @@ public class AdminAnalyticsService {
     // Per-topic completion & score for the dashboard "Test Completion by Topic"
     // chart — mirrors the Platform Overview topic performance list.
     public List<TopicPerformanceDTO> getTopicPerformance() {
-        return topicPerformance(testAttemptRepository.findAll());
+        return topicPerformance(nonAbandoned(testAttemptRepository.findAll()));
     }
 
     // Question coverage / onboarding / email-verification percentages for the
@@ -192,7 +192,7 @@ public class AdminAnalyticsService {
     // completed test attempts, and applied bans, merged and sorted newest-first.
     public List<RecentActivityDTO> getRecentActivity(int limit) {
         List<User> users = userRepository.findAll();
-        List<TestAttempt> attempts = testAttemptRepository.findAll();
+        List<TestAttempt> attempts = nonAbandoned(testAttemptRepository.findAll());
 
         List<RecentActivityDTO> items = new ArrayList<>();
 
@@ -437,6 +437,15 @@ public class AdminAnalyticsService {
 
     private boolean inRange(LocalDateTime t, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         return t != null && !t.isBefore(startInclusive) && t.isBefore(endExclusive);
+    }
+
+    // ABANDONED sessions (score 0, closed-tab beacons) are excluded from admin
+    // aggregates so they don't skew attempts counts, accuracy, pass rates or
+    // streaks. AdminTestResultService still shows them for auditing.
+    private static List<TestAttempt> nonAbandoned(List<TestAttempt> attempts) {
+        return attempts.stream()
+                .filter(a -> !"ABANDONED".equalsIgnoreCase(a.getCompletionStatus()))
+                .toList();
     }
 
     private double avgAccuracy(List<TestAttempt> list) {

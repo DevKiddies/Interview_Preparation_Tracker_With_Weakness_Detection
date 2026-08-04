@@ -19,5 +19,6 @@ public record AdminTestResultDTO(
         int total,
         int timeTaken,  // minutes
         LocalDateTime date,
-        String status  // "pass" | "fail"
+        String status,  // "pass" | "fail"
+        String completionStatus  // "COMPLETE" | "ABANDONED" | "ABORTED"
 ) {}

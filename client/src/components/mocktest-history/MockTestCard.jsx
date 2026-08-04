@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowRight, Clock } from "lucide-react";
+import { ArrowRight, Clock, CheckCircle2 } from "lucide-react";
 
 const TYPE_LABELS = {
   MOCK: "Mock Test",
@@ -9,6 +9,19 @@ const TYPE_LABELS = {
 const ACCENT = {
   COMPLETED: "bg-emerald-500",
   ABANDONED: "bg-slate-300 dark:bg-slate-700",
+  ABORTED: "bg-amber-500",
+};
+
+const STATUS_LABELS = {
+  COMPLETED: "Completed",
+  ABANDONED: "Abandoned",
+  ABORTED: "Aborted",
+};
+
+const STATUS_STYLES = {
+  COMPLETED: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
+  ABANDONED: "bg-slate-100 text-slate-500 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700",
+  ABORTED: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30",
 };
 
 const TYPE_BADGE_STYLES = {
@@ -37,10 +50,16 @@ function StatBlock({ label, value, icon, emphasis }) {
 }
 
 function MockTestCard({ test, onViewAnalysis }) {
-  const formattedDate = useMemo(() => {
-    if (!test.completedAt) return "";
-    return new Date(test.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }, [test.completedAt]);
+  const formatTimestamp = (value) => {
+    if (!value) return "—";
+    return new Date(value).toLocaleString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  };
+
+  const startedAt = useMemo(() => formatTimestamp(test.startedAt), [test.startedAt]);
+  const completedAt = useMemo(() => formatTimestamp(test.completedAt), [test.completedAt]);
 
   return (
       <div className="group relative overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -58,8 +77,24 @@ function MockTestCard({ test, onViewAnalysis }) {
                 <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${TYPE_BADGE_STYLES[test.type] || TYPE_BADGE_STYLES.MOCK}`}>
                   {TYPE_LABELS[test.type] || test.type}
                 </span>
+                {test.status && (
+                    <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${STATUS_STYLES[test.status] || STATUS_STYLES.ABANDONED}`}>
+                      {STATUS_LABELS[test.status] || test.status}
+                    </span>
+                )}
               </div>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{formattedDate}</p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                <span className="inline-flex items-center gap-1">
+                  <Clock size={9} />
+                  Started:
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">{startedAt}</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <CheckCircle2 size={9} />
+                  Submitted:
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">{completedAt}</span>
+                </span>
+              </div>
             </div>
 
             <div className="shrink-0 flex items-baseline gap-1 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">

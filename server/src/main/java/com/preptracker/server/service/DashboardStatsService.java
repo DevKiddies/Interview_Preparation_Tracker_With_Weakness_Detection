@@ -599,7 +599,10 @@ public class DashboardStatsService {
 
         List<LocalDate> active = new ArrayList<>();
         for (ActivityDayDTO d : days) {
-            if (d.attempts() > 0)
+            // Only days with at least one actually-answered question count as
+            // study activity; NOT_ATTEMPTED rows (e.g. a submitted-but-blank
+            // test) must not keep a streak alive.
+            if (d.questions() > 0)
                 active.add(LocalDate.parse(d.date()));
         }
         Set<LocalDate> activeSet = new HashSet<>(active);

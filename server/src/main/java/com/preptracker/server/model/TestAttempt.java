@@ -49,6 +49,12 @@ public class TestAttempt {
     @Column(nullable = false)
     private String type = "MOCK";
 
+    // How the attempt ended: COMPLETE (normal/timeout submission), ABORTED
+    // (auto-submitted after too many tab switches) or ABANDONED (browser/tab
+    // closed before submission, recorded via a pagehide beacon).
+    @Column(name = "completion_status", nullable = false, columnDefinition = "varchar(20) default 'COMPLETE'")
+    private String completionStatus = "COMPLETE";
+
     @CreationTimestamp
     @Column(name = "taken_at", nullable = false, updatable = false)
     private LocalDateTime takenAt;

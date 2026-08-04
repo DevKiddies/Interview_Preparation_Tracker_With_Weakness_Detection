@@ -17,7 +17,9 @@ function MockTestTimeline({ tests, onViewAnalysis }) {
                       className={`h-3.5 w-3.5 rounded-full border-2 shadow-xs ring-4 ring-indigo-50 dark:ring-slate-950 ${
                           test.status === "COMPLETED"
                               ? "border-emerald-500 bg-emerald-500"
-                              : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800"
+                              : test.status === "ABORTED"
+                                  ? "border-amber-500 bg-amber-500"
+                                  : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800"
                       }`}
                   />
                 </div>

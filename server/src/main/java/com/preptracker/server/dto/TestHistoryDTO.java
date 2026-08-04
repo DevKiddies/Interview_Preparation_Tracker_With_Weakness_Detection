@@ -12,8 +12,9 @@ public record TestHistoryDTO(
         Long id,
         String title,
         String type,          // MOCK | TOPIC
-        LocalDateTime completedAt,
-        String status,        // COMPLETED (persisted attempts always finished)
+        LocalDateTime startedAt,
+        LocalDateTime completedAt,  // submission/abandon time
+        String status,        // COMPLETED | ABANDONED | ABORTED (from completionStatus)
         int questionCount,
         int duration,         // minutes
         int score,

@@ -92,7 +92,14 @@ public class AdminUserService {
 
     private Map<UUID, List<TestAttempt>> attemptsByUserId() {
         return testAttemptRepository.findAll().stream()
+                .filter(AdminUserService::notAbandoned)
                 .collect(Collectors.groupingBy(TestAttempt::getUserId));
+    }
+
+    // ABANDONED sessions (score 0, closed tab) are excluded from user stats so
+    // they don't skew tests-attempted, average accuracy or streaks.
+    private static boolean notAbandoned(TestAttempt a) {
+        return !"ABANDONED".equalsIgnoreCase(a.getCompletionStatus());
     }
 
     private boolean hasActiveBan(User user) {
