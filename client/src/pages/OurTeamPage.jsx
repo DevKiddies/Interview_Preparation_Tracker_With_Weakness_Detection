@@ -2,6 +2,11 @@
 // Update the 'team' array below when new members join or roles change.
 
 import { ExternalLink, Globe, Mail } from "lucide-react";
+import suhaniPhoto from "../assets/team/Suhani.PNG";
+import utkarshPhoto from "../assets/team/utkarsh.jpg";
+import varadPhoto from "../assets/team/varad.jpeg";
+import tanishqPhoto from "../assets/team/tanishq.jpeg";
+import saurabhPhoto from "../assets/team/saurabh.jpeg";
 
 const team = [
   {
@@ -9,6 +14,7 @@ const team = [
     role: "Full Stack Developer",
     bio: "Drives end-to-end feature delivery with a sharp eye for UI polish and data flow. Suhani bridges React frontends with robust Spring Boot services, making complex features feel effortless to users.",
     avatar: "ST",
+    photo: suhaniPhoto,
     color: "bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-400",
     github: "#",
     linkedin: "#",
@@ -19,6 +25,7 @@ const team = [
     role: "Full Stack Developer",
     bio: "Architects the core backend infrastructure and authentication systems. Utkarsh specialises in JWT-secured APIs, database design, and keeping the platform fast, safe, and scalable under pressure.",
     avatar: "UK",
+    photo: utkarshPhoto,
     color: "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400",
     github: "#",
     linkedin: "#",
@@ -29,6 +36,7 @@ const team = [
     role: "Full Stack Developer",
     bio: "Owns the intelligence layer — from weakness detection algorithms to AI interview simulations. Varad turns raw performance data into actionable insights that help users improve where it counts most.",
     avatar: "VI",
+    photo: varadPhoto,
     color: "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400",
     github: "#",
     linkedin: "#",
@@ -39,6 +47,7 @@ const team = [
     role: "Full Stack Developer",
     bio: "Leads the practice and assessment engine — curating question banks, building timed mock tests, and wiring up the scoring pipeline. Tanishq ensures every test mirrors the pressure of a real interview.",
     avatar: "TB",
+    photo: tanishqPhoto,
     color: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400",
     github: "#",
     linkedin: "#",
@@ -49,6 +58,7 @@ const team = [
     role: "Full Stack Developer",
     bio: "Handles deployment pipelines, cloud infrastructure, and system reliability. Saurabh ensures PrepEdge stays live, responsive, and secure — so the rest of the team can ship confidently.",
     avatar: "SY",
+    photo: saurabhPhoto,
     color: "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400",
     github: "#",
     linkedin: "#",
@@ -56,14 +66,22 @@ const team = [
   },
 ];
 
-function TeamCard({ name, role, bio, avatar, color, github, linkedin, email }) {
+function TeamCard({ name, role, bio, avatar, photo, color, github, linkedin, email }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow duration-200 p-6 flex flex-col items-center text-center">
-      <div
-        className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-extrabold mb-4 ${color}`}
-      >
-        {avatar}
-      </div>
+      {photo ? (
+        <img
+          src={photo}
+          alt={name}
+          className="w-16 h-16 rounded-2xl object-cover object-top mb-4"
+        />
+      ) : (
+        <div
+          className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-extrabold mb-4 ${color}`}
+        >
+          {avatar}
+        </div>
+      )}
       <p className="font-bold text-slate-900 dark:text-white text-base">{name}</p>
       <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5 mb-3">
         {role}
