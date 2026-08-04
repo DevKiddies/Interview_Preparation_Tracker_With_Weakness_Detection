@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Service
@@ -101,7 +102,7 @@ public class UserService {
                     p.setUserId(userId);
                     return p;
                 });
-        profile.setInterviewDate(request.getInterviewDate());
+        profile.setInterviewDate(parseDate(request.getInterviewDate()));
         return userProfileRepository.save(profile);
     }
 
@@ -111,7 +112,7 @@ public class UserService {
 
         profile.setUserId(userId);
         profile.setTargetCompany(request.getTargetCompany());
-        profile.setInterviewDate(request.getInterviewDate());
+        profile.setInterviewDate(parseDate(request.getInterviewDate()));
         profile.setExperienceLevel(request.getExperienceLevel());
         profile.setFocusTopics(String.join(",", request.getFocusTopics()));
         userProfileRepository.save(profile);
@@ -145,5 +146,9 @@ public class UserService {
         notificationService.create(userId, "ONBOARDING", "You're all set!",
                 "Your profile is ready — dive into a mock test tailored to your focus areas.",
                 "/practice/mock-tests");
+    }
+
+    private LocalDate parseDate(String value) {
+        return value != null && !value.isBlank() ? LocalDate.parse(value) : null;
     }
 }

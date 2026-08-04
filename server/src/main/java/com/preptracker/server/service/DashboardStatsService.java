@@ -1,9 +1,11 @@
 package com.preptracker.server.service;
 
 // Builds the aggregate numbers behind the four dashboard stat cards from the
-// current user's persisted attempts. The heavy lifting (confidence, accuracy,
-// counts, week-over-week deltas) happens inside a single GROUP BY query so only
-// one small result row crosses the wire; the study streak is derived from the
+// current user's persisted attempts. Accuracy, counts and week-over-week deltas
+// come from a single GROUP BY query; the overall confidence card is derived from
+// the same evidence-weighted, coverage-aware per-topic stats that feed the
+// "Confidence by Category" chart (see overallConfidence), so the card and the
+// chart always tell the same story; the study streak is derived from the
 // distinct dates the user took any test.
 
 import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
@@ -96,17 +98,23 @@ public class DashboardStatsService {
 
         Object[] row = rows.get(0);
 
-        Integer confidence = round(row[0]);
-        Integer accuracy = round100(row[1]);
+        // Overall confidence uses the SAME methodology as the "Confidence by
+        // Category" chart: mean across every topic (attempted or not), where each
+        // topic's confidence is evidence-weighted and unattempted topics count as
+        // 0%. A raw question-weighted average (row[0] of findDashboardStats)
+        // looked wildly higher than the chart, e.g. 94% card vs single-digit
+        // category bars, because it ignored coverage and evidence.
+        Integer confidence = overallConfidence(userId);
+        Integer accuracy = round100(row[0]);
 
-        int testsAttempted = ((Number) row[2]).intValue();
-        int solved = ((Number) row[3]).intValue();
-        int solvedThisWeek = ((Number) row[4]).intValue();
+        int testsAttempted = ((Number) row[1]).intValue();
+        int solved = ((Number) row[2]).intValue();
+        int solvedThisWeek = ((Number) row[3]).intValue();
 
-        Integer recentConf = round(row[5]);
-        Integer prevConf = round(row[6]);
-        Integer recentAcc = round100(row[7]);
-        Integer prevAcc = round100(row[8]);
+        Integer recentConf = round(row[4]);
+        Integer prevConf = round(row[5]);
+        Integer recentAcc = round100(row[6]);
+        Integer prevAcc = round100(row[7]);
 
         return new DashboardStatsDTO(
                 confidence,
@@ -203,6 +211,24 @@ public class DashboardStatsService {
             sum += conf == null ? 0 : conf;
         }
         return (int) Math.round(sum / topicIds.size());
+    }
+
+    // Overall confidence for the stat card, aggregated from the exact same
+    // evidence-weighted per-topic values the Confidence by Category chart uses:
+    // mean across every topic in the system, so a user's overall number reflects
+    // how much of the syllabus is actually covered and backed by evidence.
+    private Integer overallConfidence(UUID userId) {
+        Map<Long, Integer> topicConfidence = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            int distinct = ((Number) r[4]).intValue();
+            topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
+        }
+        List<Long> allTopicIds = new ArrayList<>();
+        for (Object[] r : topicRepository.findAllWithCategory()) {
+            allTopicIds.add(((Number) r[0]).longValue());
+        }
+        return coverageConfidence(allTopicIds, topicConfidence);
     }
 
     // Scales a raw behavioral confidence down until the user has enough evidence

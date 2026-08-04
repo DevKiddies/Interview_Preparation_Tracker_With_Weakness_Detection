@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -34,13 +35,14 @@ public class UserProfile {
     private String targetCompany;
 
     @Column
-    private String interviewDate;
+    private LocalDate interviewDate;
 
     @Column
     private String experienceLevel;
 
-    // comma-separated list e.g. "DSA,System Design,OS" — split on the frontend before rendering
-    @Column
+    // comma-separated list e.g. "DSA,System Design,OS" — split on the frontend before rendering.
+    // TEXT so there's no implicit cap on how many focus topics a user can select.
+    @Column(columnDefinition = "TEXT")
     private String focusTopics;
 
     @CreationTimestamp
