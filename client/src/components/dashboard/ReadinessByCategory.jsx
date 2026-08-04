@@ -10,7 +10,7 @@ const TREND_ICON = {
 
 const TABS = ["Readiness", "Accuracy"];
 
-export default function ConfidenceByCategory({ topics = [] }) {
+export default function ReadinessByCategory({ topics = [] }) {
     const navigate = useNavigate();
     const [tab, setTab] = useState("Readiness");
     const isAccuracy = tab === "Accuracy";

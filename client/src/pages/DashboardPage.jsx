@@ -15,7 +15,7 @@ import API_BASE from "../utils/api.js";
 import { getInterviewClosed } from "../utils/interviewState";
 import { getCachedProfile, setCachedProfile } from "../utils/profileCache";
 import { getCachedDashboard, setCachedDashboard } from "../utils/dashboardCache";
-import ConfidenceByCategory from "../components/dashboard/ConfidenceByCategory";
+import ReadinessByCategory from "../components/dashboard/ReadinessByCategory";
 import ConfidenceTrend from "../components/dashboard/ConfidenceTrend";
 import BlindSpotAnalysis from "../components/dashboard/BlindSpotAnalysis";
 import AccuracyHeatmap from "../components/dashboard/AccuracyHeatmap";
@@ -218,7 +218,7 @@ export default function DashboardPage() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ConfidenceByCategory topics={categories} />
+              <ReadinessByCategory topics={categories} />
               <ConfidenceTrend data={trend ?? {}} />
             </div>
 
