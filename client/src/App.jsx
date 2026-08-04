@@ -8,6 +8,10 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import BanGuard from "./components/BanGuard";
+import FloatingChatbot from "./components/chat/FloatingChatbot";
+import PageSkeleton from "./components/ui/PageSkeleton";
+import DashboardSkeleton from "./components/dashboard/DashboardSkeleton";
+import API_BASE from "./utils/api";
 
 // All pages are lazy-loaded — React only downloads the JS for a page when
 // the user navigates to it, keeping the initial bundle small.
