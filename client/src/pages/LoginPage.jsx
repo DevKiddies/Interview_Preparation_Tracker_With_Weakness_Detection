@@ -156,9 +156,6 @@ function LoginPage() {
         <div className="my-1 text-center justify-center">
           {redirectedFrom ? (
             <>
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-500/10 mb-3">
-                <LogIn size={22} className="text-indigo-600 dark:text-indigo-400" />
-              </div>
               <h2 className="text-xl font-bold dark:text-white">Login to Continue</h2>
               <p className="text-xs text-gray-400 dark:text-slate-500 font-light mb-6">
                 Sign in to access this feature and track your progress.

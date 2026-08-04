@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   { label: "Mock Tests", icon: ClipboardList,   to: "/practice/mock-tests", exact: false },
   { label: "History",    icon: History,         to: "/interview-history",   exact: false },
   { label: "Profile",    icon: User,            to: "/profile/settings",    exact: false },
-  { label: "Help Center",icon: HelpCircle,      to: "/help/faqs",           exact: false },
+  { label: "Help",icon: HelpCircle,      to: "/help/faqs",           exact: false },
 ];
 
 export const MOBILE_NAV_HEIGHT = "4rem";

@@ -1,13 +1,24 @@
 // OnBoardingPage.jsx — 5-step wizard that collects the user's target company,
 // interview date, experience level, focus topics, and profile (username + avatar).
-// Data is saved via /api/users/onboarding and the user is then sent to the dashboard.
-// The "Next" button stays disabled until the current step has a valid selection.
+// Each step is saved to the database the moment "Next" is clicked (POST
+// /api/users/onboarding with completed=false), so a refresh or accidental close
+// never loses progress — the wizard resumes from the first incomplete step.
+// The final step submits with completed=true, which marks the user onboarded.
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import FormStepper from "../components/ui/FormStepper.jsx";
 import API_BASE from "../utils/api.js";
 import { setCachedProfile } from "../utils/profileCache";
+
+// First incomplete step based on the fields already persisted in the profile.
+function resumeStep(profile) {
+  if (!profile?.targetCompany) return 0;
+  if (!profile?.interviewDate) return 1;
+  if (!profile?.experienceLevel) return 2;
+  if (!profile?.focusTopics || profile.focusTopics.length === 0) return 3;
+  return 4;
+}
 
 function OnBoardingPage() {
   const steps = [
@@ -20,6 +31,8 @@ function OnBoardingPage() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -31,26 +44,42 @@ function OnBoardingPage() {
     avatarUrl: localStorage.getItem("avatarUrl") || "",
   });
 
-  const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      handleFinalSubmit();
-    }
-  };
+  // Rehydrate from the profile so a mid-flow refresh resumes where the user left
+  // off instead of restarting the whole wizard.
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          if (data.onboarded) {
+            navigate("/dashboard", { replace: true });
+            return;
+          }
+          setFormData({
+            targetCompany: data.targetCompany || "",
+            interviewDate: data.interviewDate || "",
+            experienceLevel: data.experienceLevel || "",
+            focusTopics: data.focusTopics || [],
+            username: data.username || localStorage.getItem("username") || "",
+            avatarUrl: data.avatarUrl || localStorage.getItem("avatarUrl") || "",
+          });
+          setCurrentStep(resumeStep(data));
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+  }, [navigate]);
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
-    }
-  };
-
-  const handleFinalSubmit = async () => {
+  const saveStep = async (completed) => {
     const token = localStorage.getItem("token");
     if (!token) {
       navigate("/login");
-      return;
+      return false;
     }
+    setSaving(true);
+    setError("");
     try {
       const response = await fetch(`${API_BASE}/api/users/onboarding`, {
         method: "POST",
@@ -65,29 +94,54 @@ function OnBoardingPage() {
           focusTopics: formData.focusTopics,
           username: formData.username.trim(),
           avatarUrl: formData.avatarUrl,
+          completed,
         }),
       });
-      if (response.ok) {
-        if (formData.username.trim()) localStorage.setItem("username", formData.username.trim());
-        if (formData.avatarUrl) localStorage.setItem("avatarUrl", formData.avatarUrl);
-        setCachedProfile({
-          username: formData.username.trim(),
-          avatarUrl: formData.avatarUrl,
-          targetCompany: formData.targetCompany,
-          interviewDate: formData.interviewDate,
-          experienceLevel: formData.experienceLevel,
-          focusTopics: formData.focusTopics,
-          onboarded: true,
-        });
-        window.dispatchEvent(new CustomEvent("user-profile-updated"));
-        navigate("/dashboard");
-      } else {
+      if (!response.ok) {
         const msg = await response.text();
         setError(msg || "Failed to save onboarding data. Please try again.");
+        return false;
       }
+      return true;
     } catch {
       setError("Something went wrong. Please check your connection.");
+      return false;
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleNext = async () => {
+    if (currentStep < steps.length - 1) {
+      const ok = await saveStep(false);
+      if (ok) setCurrentStep((prev) => prev + 1);
+    } else {
+      await handleFinalSubmit();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => prev - 1);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    const ok = await saveStep(true);
+    if (!ok) return;
+    if (formData.username.trim()) localStorage.setItem("username", formData.username.trim());
+    if (formData.avatarUrl) localStorage.setItem("avatarUrl", formData.avatarUrl);
+    setCachedProfile({
+      username: formData.username.trim(),
+      avatarUrl: formData.avatarUrl,
+      targetCompany: formData.targetCompany,
+      interviewDate: formData.interviewDate,
+      experienceLevel: formData.experienceLevel,
+      focusTopics: formData.focusTopics,
+      onboarded: true,
+    });
+    window.dispatchEvent(new CustomEvent("user-profile-updated"));
+    navigate("/dashboard");
   };
 
   const _t = new Date();
@@ -105,6 +159,12 @@ function OnBoardingPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-slate-950 transition-colors duration-200">
 
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        </div>
+      ) : (
+      <>
       {/* Stepper */}
       <div className="w-full max-w-2xl mx-auto px-6 pt-6 pb-0 shrink-0">
         <FormStepper steps={steps} currentStep={currentStep} />
@@ -139,27 +199,33 @@ function OnBoardingPage() {
           <div className="shrink-0 flex justify-between items-center px-6 py-4 border-t border-gray-100 dark:border-slate-700">
             <button
               onClick={handleBack}
-              disabled={currentStep === 0}
+              disabled={currentStep === 0 || saving}
               className="text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               &lt; Back
             </button>
             <button
               onClick={handleNext}
-              disabled={isNextDisabled()}
+              disabled={saving || isNextDisabled()}
               className={`text-sm font-medium text-white px-6 py-2 rounded-lg transition-all ${
                 currentStep === steps.length - 1
                   ? "bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-100"
                   : "bg-indigo-600 hover:bg-indigo-700"
               } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
-              {currentStep === steps.length - 1 ? "Go to Dashboard ✓" : "Next >"}
+              {saving
+                ? "Saving…"
+                : currentStep === steps.length - 1
+                  ? "Go to Dashboard ✓"
+                  : "Next >"}
             </button>
           </div>
 
         </div>
       </div>
 
+      </>
+      )}
     </div>
   );
 }

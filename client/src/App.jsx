@@ -1,13 +1,14 @@
 // App.jsx — root component that owns all route definitions.
 // Navbar and Footer are conditionally hidden on full-screen pages (quiz, onboarding, admin).
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import BanGuard from "./components/BanGuard";
+import API_BASE from "./utils/api";
 
 // All pages are lazy-loaded — React only downloads the JS for a page when
 // the user navigates to it, keeping the initial bundle small.
@@ -74,11 +75,44 @@ const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
   const location = useLocation();
-  return token ? (
-    children
-  ) : (
-    <Navigate to="/login" state={{ from: location.pathname }} replace />
-  );
+  const [valid, setValid] = useState(token ? null : false);
+
+  // Verify the token against the server before letting the page render, so a
+  // missing, expired, or forged token can never enter a protected route.
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!active) return;
+        if (res.ok) {
+          setValid(true);
+        } else {
+          localStorage.removeItem("token");
+          localStorage.removeItem("username");
+          localStorage.removeItem("avatarUrl");
+          setValid(false);
+        }
+      })
+      .catch(() => {
+        // Network hiccup — don't lock a signed-in user out; the page will
+        // surface its own errors and BanGuard retries periodically.
+        if (active) setValid(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  if (!token || valid === false) {
+    return (
+      <Navigate to="/login" state={{ from: location.pathname }} replace />
+    );
+  }
+  if (valid === null) return null; // validating — brief blank frame
+  return children;
 }
 
 function AdminProtectedRoute({ children }) {
@@ -111,11 +145,11 @@ const App = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/verify" element={<UserVerificationPage />} />
-            <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/onboarding" element={<ProtectedRoute><OnBoardingPage /></ProtectedRoute>} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/profile/settings" element={<ProfilePage />} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/profile/settings" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/interview-settings" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
             <Route path="/interview-history" element={<ProtectedRoute><InterviewHistoryPage /></ProtectedRoute>} />
             <Route path="/history/interview/:interviewId/tests" element={<ProtectedRoute><MockTestHistoryPage /></ProtectedRoute>} />
