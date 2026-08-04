@@ -54,9 +54,12 @@ public class TestSessionService {
      * Marks a test session as completed.
      */
     @Transactional
-    public void completeSession(UUID sessionId) {
+    public void completeSession(UUID userId, UUID sessionId) {
         TestSession session = testSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Test session not found"));
+        if (!userId.equals(session.getUserId())) {
+            throw new RuntimeException("Test session does not belong to this user");
+        }
         session.setCompleted(true);
         session.setCompletedAt(LocalDateTime.now());
         testSessionRepository.save(session);

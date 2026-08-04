@@ -72,7 +72,7 @@ public class TestController {
         TestResultResponse result = testService.submitTest(request);
         // Mark the test session as completed when the submission carries one
         if (request.sessionId() != null) {
-            testSessionService.completeSession(request.sessionId());
+            testSessionService.completeSession(authenticatedUserId(), request.sessionId());
         }
         return ResponseEntity.ok(result);
     }
