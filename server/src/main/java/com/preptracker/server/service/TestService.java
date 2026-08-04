@@ -149,6 +149,10 @@ public class TestService {
             attempt.setAccuracy(accuracy);
             attempt.setTimeTakenSeconds(request.timeTaken());
             attempt.setType(request.type() != null && !request.type().isBlank() ? request.type() : "MOCK");
+            // How the attempt ended: COMPLETE (normal/timeout) or ABORTED (auto
+            // submit after too many tab switches). ABANDONED never reaches submit.
+            attempt.setCompletionStatus(
+                    request.completionStatus() != null ? request.completionStatus() : "COMPLETE");
             // Dominant category = the one with the most questions in this attempt
             // (a test can mix categories, so this isn't necessarily the only one).
             catMap.entrySet().stream()

@@ -1,13 +1,16 @@
 // App.jsx — root component that owns all route definitions.
 // Navbar and Footer are conditionally hidden on full-screen pages (quiz, onboarding, admin).
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import BanGuard from "./components/BanGuard";
+import PageSkeleton from "./components/ui/PageSkeleton";
+import DashboardSkeleton from "./components/dashboard/DashboardSkeleton";
+import API_BASE from "./utils/api";
 
 // All pages are lazy-loaded — React only downloads the JS for a page when
 // the user navigates to it, keeping the initial bundle small.
@@ -44,7 +47,7 @@ const ProfilePage            = lazy(() => import("./pages/ProfilePage"));
 const InterviewPage          = lazy(() => import("./pages/InterviewPage"));
 const InterviewHistoryPage   = lazy(() => import("./pages/InterviewHistoryPage"));
 const MockTestHistoryPage    = lazy(() => import("./pages/MockTestHistoryPage"));
-const ConfidenceExplorerPage = lazy(() => import("./pages/ConfidenceExplorerPage"));
+const ReadinessExplorerPage = lazy(() => import("./pages/ReadinessExplorerPage"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminComingSoon = lazy(() => import("./pages/admin/AdminComingSoon"));
@@ -71,20 +74,61 @@ const AdminWeaknessAnalysis = lazy(
 );
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, skeleton = <PageSkeleton /> }) {
   const token = localStorage.getItem("token");
   const location = useLocation();
-  return token ? (
-    children
-  ) : (
-    <Navigate to="/login" state={{ from: location.pathname }} replace />
-  );
+  const [valid, setValid] = useState(token ? null : false);
+
+  // Verify the token against the server before letting the page render, so a
+  // missing, expired, or forged token can never enter a protected route.
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    fetch(`${API_BASE}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!active) return;
+        if (res.ok) {
+          setValid(true);
+        } else {
+          localStorage.removeItem("token");
+          localStorage.removeItem("username");
+          localStorage.removeItem("avatarUrl");
+          setValid(false);
+        }
+      })
+      .catch(() => {
+        // Network hiccup — don't lock a signed-in user out; the page will
+        // surface its own errors and BanGuard retries periodically.
+        if (active) setValid(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  if (!token || valid === false) {
+    return (
+      <Navigate to="/login" state={{ from: location.pathname }} replace />
+    );
+  }
+  if (valid === null) return skeleton; // validating — show a skeleton, not a blank frame
+  return children;
 }
 
 function AdminProtectedRoute({ children }) {
   const adminToken = localStorage.getItem("adminToken");
   const location = useLocation();
   return adminToken ? children : <Navigate to="/admin/login" state={{ from: location.pathname }} replace />;
+}
+
+// Signed-in visitors hitting the root should land on the dashboard, not the
+// marketing landing page. The token is validated by ProtectedRoute once they
+// reach /dashboard, so a stale token just bounces them to /login.
+function HomeRedirect() {
+  const token = localStorage.getItem("token");
+  return token ? <Navigate to="/dashboard" replace /> : <LandingPage />;
 }
 
 const App = () => {
@@ -105,17 +149,26 @@ const App = () => {
       {!isAdminRoute && <BanGuard />}
       {!hideLayout && <Navbar />}
       <main className="grow">
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageSkeleton />}>
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/verify" element={<UserVerificationPage />} />
-            <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/onboarding" element={<ProtectedRoute><OnBoardingPage /></ProtectedRoute>} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/profile/settings" element={<ProfilePage />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute skeleton={<DashboardSkeleton />}>
+                  <Suspense fallback={<DashboardSkeleton />}>
+                    <DashboardPage />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/profile/settings" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/interview-settings" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
             <Route path="/interview-history" element={<ProtectedRoute><InterviewHistoryPage /></ProtectedRoute>} />
             <Route path="/history/interview/:interviewId/tests" element={<ProtectedRoute><MockTestHistoryPage /></ProtectedRoute>} />
@@ -162,10 +215,10 @@ const App = () => {
             />
 
             <Route
-              path="/confidence/:level/:id"
+              path="/readiness/:level/:id"
               element={
                 <ProtectedRoute>
-                  <ConfidenceExplorerPage />
+                  <ReadinessExplorerPage />
                 </ProtectedRoute>
               }
             />

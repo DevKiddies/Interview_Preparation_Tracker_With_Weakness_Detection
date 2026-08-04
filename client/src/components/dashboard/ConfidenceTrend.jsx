@@ -9,47 +9,134 @@ import {
     Tooltip,
 } from "recharts";
 
+function CalibrationBadge({ gap }) {
+    if (gap == null) {
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">No Data</span>;
+    }
+
+    const abs = Math.abs(gap);
+    if (abs <= 5) {
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">Well Calibrated</span>;
+    }
+    if (gap > 5) {
+        if (abs <= 12) {
+            return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">Slightly Overconfident</span>;
+        }
+        if (abs <= 20) {
+            return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">Overconfident</span>;
+        }
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">Severely Overconfident</span>;
+    }
+    if (abs <= 12) {
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">Slightly Underconfident</span>;
+    }
+    if (abs <= 20) {
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400">Underconfident</span>;
+    }
+    return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">Severely Underconfident</span>;
+}
+
+// Horizontal bar for a single metric, with the value pinned to its right end.
+function MetricBar({ label, value, color, dotClass, trackClass }) {
+    const clamped = value == null ? 0 : Math.max(0, Math.min(100, value));
+    return (
+        <div className="space-y-1">
+            <div className="flex items-center justify-between gap-4">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${dotClass}`} /> {label}
+                </span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums">
+                    {value != null ? `${value}%` : "—"}
+                </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${trackClass}`} style={{ width: `${clamped}%` }} />
+            </div>
+        </div>
+    );
+}
+
+// A small center-zero gauge: gap > 0 means overconfident (confidence above accuracy),
+// gap < 0 means underconfident. The dot slides toward whichever side confidence leans.
+function CalibrationGauge({ gap }) {
+    if (gap == null) return null;
+
+    const clamped = Math.max(-25, Math.min(25, gap));
+    const position = ((clamped + 25) / 50) * 100;
+
+    const abs = Math.abs(gap);
+    let dotColor = "bg-emerald-500";
+    if (abs > 5) dotColor = "bg-amber-500";
+    if (abs > 12) dotColor = "bg-orange-500";
+    if (abs > 20) dotColor = "bg-rose-500";
+
+    return (
+        <div className="space-y-1">
+            <div className="relative h-1.5 rounded-full bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-400">
+                <span
+                    className={`absolute -top-[3px] h-3 w-3 rounded-full border-2 border-white shadow dark:border-slate-950 ${dotColor} transition-all duration-200`}
+                    style={{ left: `calc(${position}% - 6px)` }}
+                />
+            </div>
+            <div className="flex justify-between text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                <span>Under</span>
+                <span className="text-emerald-500">Balanced</span>
+                <span>Over</span>
+            </div>
+        </div>
+    );
+}
+
 function CustomTooltip({ active, payload, label }) {
     if (!active || !payload || !payload.length) return null;
 
-    const confidence = payload[0].value;
-    const accuracy = payload[1].value;
+    const confidence = payload.find((p) => p?.dataKey === "confidence")?.value;
+    const accuracy = payload.find((p) => p?.dataKey === "accuracy")?.value;
 
-    let status = "Well Calibrated";
-    let statusColor = "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10";
+    const gap = confidence != null && accuracy != null ? confidence - accuracy : null;
+    const gapText = gap == null ? "—" : `${gap > 0 ? "+" : ""}${Math.round(gap)} pts`;
 
-    if (confidence != null && accuracy != null) {
-        const gap = confidence - accuracy;
-        if (gap > 5) {
-            status = "Overconfident";
-            statusColor = "text-rose-500 bg-rose-50 dark:bg-rose-500/10";
-        } else if (gap < -5) {
-            status = "Underconfident";
-            statusColor = "text-amber-500 bg-amber-50 dark:bg-amber-500/10";
-        }
+    let insight = "Complete attempts to see how your confidence aligns with accuracy.";
+    if (gap != null) {
+        const abs = Math.abs(gap);
+        if (abs <= 5) insight = "Confidence matches accuracy — your self-assessment is on point.";
+        else if (gap > 0) insight = `You feel ${abs} pts more confident than you perform. Review flagged questions and note where your confidence overshot.`;
+        else insight = `You perform ${abs} pts better than you feel. Trust your preparation and answer more decisively.`;
     }
 
     return (
-        <div className="rounded-xl border border-slate-100 bg-white/95 p-3 shadow-xl backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 min-w-44">
-            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{label}</p>
-            <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between gap-4">
-          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-indigo-500" /> Confidence
-          </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{confidence != null ? `${confidence}%` : "—"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" /> Accuracy
-          </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{accuracy != null ? `${accuracy}%` : "—"}</span>
-                </div>
+        <div className="rounded-xl border border-slate-100 bg-white/95 p-3 shadow-xl backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 w-60">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                    Gap <span className={gap != null && Math.abs(gap) > 5 ? (gap > 0 ? "text-amber-500" : "text-amber-500") : "text-emerald-500"}>{gapText}</span>
+                </span>
+            </div>
+
+            <div className="space-y-2 text-xs">
+                <MetricBar
+                    label="Confidence"
+                    value={confidence}
+                    dotClass="bg-indigo-500"
+                    trackClass="bg-indigo-500"
+                />
+                <MetricBar
+                    label="Accuracy"
+                    value={accuracy}
+                    dotClass="bg-emerald-500"
+                    trackClass="bg-emerald-500"
+                />
+
                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+
                 <div className="flex items-center justify-between text-[11px] font-semibold">
                     <span className="text-slate-400">Calibration</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusColor}`}>{status}</span>
+                    <CalibrationBadge gap={gap} />
                 </div>
+
+                <CalibrationGauge gap={gap} />
+
+                <p className="text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">{insight}</p>
             </div>
         </div>
     );

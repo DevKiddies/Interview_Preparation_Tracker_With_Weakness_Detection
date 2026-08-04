@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, PlayCircle, FileText, Clock, HelpCircle, BarChart2 } from "lucide-react";
+import { startActiveTestSession } from "../utils/quizSession.js";
 
 const RULES = [
   "The timer begins immediately upon start and cannot be paused.",
@@ -58,7 +59,12 @@ export default function TestInstructionsPage() {
 
   const handleBegin = () => {
     if (!agreed) return;
-    navigate(nextUrl, nextState ? { state: nextState } : undefined);
+    // Mark this test as the active session so the quiz page accepts the entry.
+    // Cleared when the test is submitted (or on a Retake, which re-marks it).
+    startActiveTestSession(nextUrl.split("/").pop());
+    // Replace this instructions entry with the quiz so browser Back on the quiz
+    // can never land back here — the quiz page itself traps Back/Forward.
+    navigate(nextUrl, nextState ? { state: nextState, replace: true } : { replace: true });
   };
 
   return (

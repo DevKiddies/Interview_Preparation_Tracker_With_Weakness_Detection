@@ -1,9 +1,11 @@
 package com.preptracker.server.service;
 
 // Builds the aggregate numbers behind the four dashboard stat cards from the
-// current user's persisted attempts. The heavy lifting (confidence, accuracy,
-// counts, week-over-week deltas) happens inside a single GROUP BY query so only
-// one small result row crosses the wire; the study streak is derived from the
+// current user's persisted attempts. Accuracy, counts and week-over-week deltas
+// come from a single GROUP BY query; the overall confidence card is derived from
+// the same evidence-weighted, coverage-aware per-topic stats that feed the
+// "Confidence by Category" chart (see overallConfidence), so the card and the
+// chart always tell the same story; the study streak is derived from the
 // distinct dates the user took any test.
 
 import com.preptracker.server.dto.AccuracyHeatmapRowDTO;
@@ -18,11 +20,13 @@ import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
 import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.CategoryRepository;
+import com.preptracker.server.repository.InterviewRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TopicRepository;
 import com.preptracker.server.repository.UserAttemptRepository;
 import com.preptracker.server.repository.UserProfileRepository;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,14 +39,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
-@RequiredArgsConstructor
 public class DashboardStatsService {
 
     private static final int WEEK_DAYS = 7;
@@ -55,38 +62,101 @@ public class DashboardStatsService {
     // questions to a topic never lowers a user's displayed confidence.
     private static final int EVIDENCE_TARGET = 10;
 
+    // Supabase sits at ~264ms per round-trip, so independent queries run in
+    // parallel on this pool to collapse N sequential round-trips into one.
+    private final ExecutorService queryPool = Executors.newFixedThreadPool(6);
+
     private final UserAttemptRepository userAttemptRepository;
     private final TestAttemptRepository testAttemptRepository;
     private final CategoryRepository categoryRepository;
     private final TopicRepository topicRepository;
     private final TechniqueTopicRepository techniqueTopicRepository;
     private final UserProfileRepository userProfileRepository;
+    private final InterviewRepository interviewRepository;
+
+    public DashboardStatsService(UserAttemptRepository userAttemptRepository,
+            TestAttemptRepository testAttemptRepository,
+            CategoryRepository categoryRepository,
+            TopicRepository topicRepository,
+            TechniqueTopicRepository techniqueTopicRepository,
+            UserProfileRepository userProfileRepository,
+            InterviewRepository interviewRepository) {
+        this.userAttemptRepository = userAttemptRepository;
+        this.testAttemptRepository = testAttemptRepository;
+        this.categoryRepository = categoryRepository;
+        this.topicRepository = topicRepository;
+        this.techniqueTopicRepository = techniqueTopicRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.interviewRepository = interviewRepository;
+    }
+
+    @PreDestroy
+    void shutdownQueryPool() {
+        queryPool.shutdown();
+    }
 
     public DashboardStatsDTO getStats(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
         LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
-        List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
-        List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
+        // Resolve which subset of topics readiness is measured against (the
+        // whole syllabus by default, or just the active interview's focus topics).
+        ReadinessScope scope = resolveReadinessScope(userId);
+
+        CompletableFuture<List<Object[]>> rowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findDashboardStats(userId, thisStart, prevStart), queryPool);
+        CompletableFuture<List<LocalDateTime>> timestampsF = CompletableFuture.supplyAsync(
+                () -> testAttemptRepository.findDistinctAttemptTimestamps(userId), queryPool);
+        CompletableFuture<Integer> confidenceF = CompletableFuture.supplyAsync(
+                () -> overallConfidence(userId, scope.topicIds()), queryPool);
+
+        List<Object[]> rows = rowsF.join();
+        List<LocalDateTime> attemptTimestamps = timestampsF.join();
+        Integer confidence = confidenceF.join();
 
         if (rows == null || rows.isEmpty()) {
-            return new DashboardStatsDTO(null, null, 0, computeStreak(attemptTimestamps), null, null, 0);
+            return new DashboardStatsDTO(
+                    null,
+                    null,
+                    0, // testsAttempted
+                    0, // questionsSolved
+                    computeStreak(attemptTimestamps),
+                    null,
+                    null,
+                    0,
+                    scope.label());
         }
 
         Object[] row = rows.get(0);
-        Integer confidence = round(row[0]);
-        Integer accuracy = round100(row[1]);
+
+        // Overall confidence uses the SAME methodology as the "Confidence by
+        // Category" chart: mean across every topic (attempted or not), where each
+        // topic's confidence is evidence-weighted and unattempted topics count as
+        // 0%. A raw question-weighted average (row[0] of findDashboardStats)
+        // looked wildly higher than the chart, e.g. 94% card vs single-digit
+        // category bars, because it ignored coverage and evidence.
+        Integer accuracy = round100(row[0]);
+
+        int testsAttempted = ((Number) row[1]).intValue();
         int solved = ((Number) row[2]).intValue();
         int solvedThisWeek = ((Number) row[3]).intValue();
+
         Integer recentConf = round(row[4]);
         Integer prevConf = round(row[5]);
         Integer recentAcc = round100(row[6]);
         Integer prevAcc = round100(row[7]);
 
         return new DashboardStatsDTO(
-                confidence, accuracy, solved, computeStreak(attemptTimestamps),
-                delta(recentConf, prevConf), delta(recentAcc, prevAcc), solvedThisWeek);
+                confidence,
+                accuracy,
+                testsAttempted,
+                solved,
+                computeStreak(attemptTimestamps),
+                delta(recentConf, prevConf),
+                delta(recentAcc, prevAcc),
+                solvedThisWeek,
+                scope.label());
     }
 
     public List<CategoryConfidenceDTO> getCategoryConfidence(UUID userId) {
@@ -94,15 +164,29 @@ public class DashboardStatsService {
         LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
         LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
+        // The readiness scope decides which topics are visible and which ones
+        // count in each category's coverage denominator (see coverageConfidence).
+        ReadinessScope scope = resolveReadinessScope(userId);
+        Set<Long> scopeSet = new HashSet<>(scope.topicIds());
+
         // Per-topic confidence across all attempts, plus the full topic→category
         // mapping, so a category's confidence can reflect how much of the
         // category the user has actually covered (see coverageConfidence). Topic
         // confidence here is already evidence-weighted so the category mean
-        // matches what the Confidence Explorer tree shows.
+        // matches what the Readiness Explorer tree shows.
+        CompletableFuture<List<Object[]>> topicStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTopicStats(userId), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+        CompletableFuture<List<Object[]>> categoryRowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart, scope.topicIds()), queryPool);
+        CompletableFuture<List<Category>> categoriesF = CompletableFuture.supplyAsync(
+                categoryRepository::findAll, queryPool);
+
         Map<Long, Integer> topicConfidence = new HashMap<>();
         Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+        for (Object[] r : topicStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             int distinct = ((Number) r[4]).intValue();
             topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
@@ -110,12 +194,15 @@ public class DashboardStatsService {
             topicQuestions.put(topicId, ((Number) r[3]).intValue());
         }
         Map<Long, List<Long>> topicsByCategory = new HashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
+            Long topicId = ((Number) r[0]).longValue();
+            if (!scopeSet.contains(topicId))
+                continue;
             topicsByCategory.computeIfAbsent(((Number) r[2]).longValue(), k -> new ArrayList<>())
-                    .add(((Number) r[0]).longValue());
+                    .add(topicId);
         }
 
-        List<Object[]> rows = userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart);
+        List<Object[]> rows = categoryRowsF.join();
 
         // Aggregate rows only cover categories the user has attempts in, but the
         // chart shows EVERY category, so merge per-category aggregates into a map
@@ -126,20 +213,25 @@ public class DashboardStatsService {
         }
 
         List<CategoryConfidenceDTO> out = new ArrayList<>();
-        for (Category category : categoryRepository.findAll()) {
+        for (Category category : categoriesF.join()) {
             Long id = category.getId();
+            // Only categories with topics in the current readiness scope appear
+            // (in INTERVIEW scope, categories with no focus topics are dropped).
+            List<Long> catTopics = topicsByCategory.getOrDefault(id, List.of());
+            if (catTopics.isEmpty())
+                continue;
             Object[] r = aggregateById.get(id);
             int weakTopics = r == null ? 0 : ((Number) r[3]).intValue();
             int questionCount = r == null ? 0 : ((Number) r[4]).intValue();
             Integer recentConf = r == null ? null : round(r[5]);
             Integer prevConf = r == null ? null : round(r[6]);
 
-            // Category accuracy mirrors the Confidence Explorer tree: weighted by
-            // attempts across EVERY topic in the category (attempted or not), null
-            // when the category has no attempts yet.
+            // Category accuracy mirrors the Readiness Explorer tree: weighted by
+            // attempts across EVERY topic in the (scoped) category, null when the
+            // category has no attempts yet.
             double accWeighted = 0;
             int accCount = 0;
-            for (Long topicId : topicsByCategory.getOrDefault(id, List.of())) {
+            for (Long topicId : catTopics) {
                 Integer acc = topicAccuracy.get(topicId);
                 int q = topicQuestions.getOrDefault(topicId, 0);
                 if (acc != null) {
@@ -150,7 +242,7 @@ public class DashboardStatsService {
             Integer accuracy = accCount == 0 ? null : (int) Math.round(accWeighted / accCount);
 
             out.add(new CategoryConfidenceDTO(id, category.getName(),
-                    coverageConfidence(topicsByCategory.getOrDefault(id, List.of()), topicConfidence),
+                    coverageConfidence(catTopics, topicConfidence),
                     accuracy,
                     weakTopics, trendOf(recentConf, prevConf), questionCount));
         }
@@ -165,13 +257,89 @@ public class DashboardStatsService {
     // Claiming 90% confidence in a category should require ~90% topic coverage,
     // not just high scores on the handful of topics that were attempted.
     private Integer coverageConfidence(List<Long> topicIds, Map<Long, Integer> topicConfidence) {
-        if (topicIds.isEmpty()) return null;
+        if (topicIds.isEmpty())
+            return null;
         double sum = 0;
         for (Long topicId : topicIds) {
             Integer conf = topicConfidence.get(topicId);
             sum += conf == null ? 0 : conf;
         }
         return (int) Math.round(sum / topicIds.size());
+    }
+
+    // Overall confidence for the stat card, aggregated from the exact same
+    // evidence-weighted per-topic values the "Readiness by Category" chart uses:
+    // mean across every topic in the provided scope, so a user's overall number
+    // reflects how much of that scope's topics are actually covered and backed by
+    // evidence. The scope (all topics, or just the active interview's focus
+    // topics) is resolved by the caller — this method never decides it.
+    private Integer overallConfidence(UUID userId, List<Long> scopeTopicIds) {
+        Map<Long, Integer> topicConfidence = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            int distinct = ((Number) r[4]).intValue();
+            topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
+        }
+        return coverageConfidence(scopeTopicIds, topicConfidence);
+    }
+
+    // ── readiness scope ────────────────────────────────────────────────────────
+    // The one place that knows WHY a scope exists. Everything downstream
+    // (coverageConfidence, overallConfidence, the category lists, the explorer
+    // tree) just receives a plain list of topic ids and never re-derives the
+    // scope. This is what lets new scopes (role-, company- or plan-specific)
+    // be added later without touching the calculation logic.
+
+    // Short-lived value object: which topics readiness is measured against, and
+    // the label the API reports so the UI can name the readout.
+    private record ReadinessScope(List<Long> topicIds, String label) {}
+
+    // OVERALL by default (every topic in the system). If the user has an active
+    // interview AND their focus topics resolve to at least one real topic,
+    // readiness is measured against just those topics (INTERVIEW scope).
+    private ReadinessScope resolveReadinessScope(UUID userId) {
+        List<Long> allTopicIds = new ArrayList<>();
+        for (Object[] r : topicRepository.findAllWithCategory()) {
+            allTopicIds.add(((Number) r[0]).longValue());
+        }
+
+        boolean hasActiveInterview = interviewRepository
+                .findFirstByUserIdAndStatusOrderByStartDateDesc(userId, "ACTIVE").isPresent();
+        if (!hasActiveInterview || allTopicIds.isEmpty()) {
+            return new ReadinessScope(allTopicIds, "OVERALL");
+        }
+
+        Set<Long> focusIds = focusTopicIds(userId);
+        if (focusIds.isEmpty()) {
+            return new ReadinessScope(allTopicIds, "OVERALL");
+        }
+
+        return new ReadinessScope(List.copyOf(focusIds), "INTERVIEW");
+    }
+
+    // Maps the focus topics the user picked during onboarding (stored by name in
+    // UserProfile) back to topic ids, ignoring any name with no matching topic.
+    private Set<Long> focusTopicIds(UUID userId) {
+        UserProfile profile = userProfileRepository.findByUserId(userId).orElse(null);
+        String raw = profile == null ? null : profile.getFocusTopics();
+        if (raw == null || raw.isBlank()) {
+            return Set.of();
+        }
+
+        Map<String, Long> idByName = new HashMap<>();
+        for (Object[] r : topicRepository.findAllWithCategory()) {
+            Long topicId = ((Number) r[0]).longValue();
+            idByName.putIfAbsent((String) r[1], topicId);
+        }
+
+        Set<Long> ids = new LinkedHashSet<>();
+        for (String name : raw.split(",")) {
+            Long id = idByName.get(name.trim());
+            if (id != null) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     // Scales a raw behavioral confidence down until the user has enough evidence
@@ -181,7 +349,8 @@ public class DashboardStatsService {
     // to EVIDENCE_TARGET: smooth, no arbitrary bands, never above the raw value,
     // and independent of how many questions exist in the topic's bank.
     private Integer weightConfidence(Integer rawConfidence, int distinctAnswered) {
-        if (rawConfidence == null) return null;
+        if (rawConfidence == null)
+            return null;
         double weight = Math.min(1.0, distinctAnswered / (double) EVIDENCE_TARGET);
         return (int) Math.round(rawConfidence * weight);
     }
@@ -190,11 +359,23 @@ public class DashboardStatsService {
     // and question counts, for the Confidence Explorer. Built from three small
     // aggregate queries plus the (tiny) reference tables, all merged in memory.
     public ConfidenceTreeDTO getConfidenceTree(UUID userId) {
+        ReadinessScope scope = resolveReadinessScope(userId);
+        Set<Long> scopeSet = new HashSet<>(scope.topicIds());
+
+        CompletableFuture<List<Object[]>> topicStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTopicStats(userId), queryPool);
+        CompletableFuture<List<Object[]>> techniqueStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTechniqueStatsByTopic(userId), queryPool);
+        CompletableFuture<List<Object[]>> techniqueTopicsF = CompletableFuture.supplyAsync(
+                () -> techniqueTopicRepository.findAllWithTopicAndName(), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+
         Map<Long, Integer> topicConfidence = new HashMap<>();
         Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
         Map<Long, Integer> topicDistinctAnswered = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+        for (Object[] r : topicStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             topicConfidence.put(topicId, round(r[1]));
             topicAccuracy.put(topicId, round100(r[2]));
@@ -205,7 +386,7 @@ public class DashboardStatsService {
         // topicId -> (techniqueId -> [confidence, accuracy, questionCount,
         // distinctAnswered]) scoped to the topic the attempt actually happened in.
         Map<Long, Map<Long, double[]>> techniqueStatsByTopic = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTechniqueStatsByTopic(userId)) {
+        for (Object[] r : techniqueStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             Long techniqueId = ((Number) r[1]).longValue();
             double conf = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue();
@@ -213,14 +394,14 @@ public class DashboardStatsService {
             int count = ((Number) r[4]).intValue();
             int distinct = ((Number) r[5]).intValue();
             techniqueStatsByTopic.computeIfAbsent(topicId, k -> new HashMap<>())
-                    .put(techniqueId, new double[]{conf, acc, count, distinct});
+                    .put(techniqueId, new double[] { conf, acc, count, distinct });
         }
 
         // technique_id -> topic_id (a technique can hang under several topics,
         // keep the first encountered as the canonical parent for the explorer).
         Map<Long, Long> techniqueParent = new HashMap<>();
         Map<Long, String> techniqueNames = new HashMap<>();
-        for (Object[] r : techniqueTopicRepository.findAllWithTopicAndName()) {
+        for (Object[] r : techniqueTopicsF.join()) {
             Long techniqueId = ((Number) r[0]).longValue();
             techniqueParent.putIfAbsent(techniqueId, ((Number) r[1]).longValue());
             techniqueNames.putIfAbsent(techniqueId, (String) r[2]);
@@ -228,8 +409,10 @@ public class DashboardStatsService {
 
         // category_id -> list of [topicId, topicName]
         Map<Long, List<ConfidenceNodeDTO>> topicsByCategory = new HashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
+            if (!scopeSet.contains(topicId))
+                continue;
             String topicName = (String) r[1];
             Long categoryId = ((Number) r[2]).longValue();
 
@@ -248,7 +431,8 @@ public class DashboardStatsService {
             Map<Long, double[]> topicTechniqueStats = techniqueStatsByTopic.getOrDefault(topicId, Map.of());
             List<Long> attachedTechniques = new ArrayList<>();
             for (Map.Entry<Long, Long> e : techniqueParent.entrySet()) {
-                if (e.getValue().equals(topicId)) attachedTechniques.add(e.getKey());
+                if (e.getValue().equals(topicId))
+                    attachedTechniques.add(e.getKey());
             }
 
             int techniqueQuestions = 0;
@@ -287,14 +471,16 @@ public class DashboardStatsService {
                     if (techniqueConfCount == topicTotal) {
                         generalRawConf = topicConf; // degenerate: only listed techniques
                     } else {
-                        generalRawConf = (int) Math.round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
+                        generalRawConf = (int) Math
+                                .round((topicConf * topicTotal - techniqueConfWeighted) / generalQuestions);
                     }
                 }
                 if (topicAcc != null) {
                     if (techniqueAccCount == topicTotal) {
                         generalAcc = topicAcc; // degenerate: only listed techniques
                     } else {
-                        generalAcc = (int) Math.round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
+                        generalAcc = (int) Math
+                                .round((topicAcc * topicTotal - techniqueAccWeighted) / generalQuestions);
                     }
                 }
             }
@@ -342,6 +528,9 @@ public class DashboardStatsService {
         List<ConfidenceNodeDTO> categories = new ArrayList<>();
         for (Category c : categoryRepository.findAll()) {
             List<ConfidenceNodeDTO> topics = topicsByCategory.getOrDefault(c.getId(), new ArrayList<>());
+            // Skip categories with no topics in the current readiness scope.
+            if (topics.isEmpty())
+                continue;
             Integer confidence = null;
             if (!topics.isEmpty()) {
                 double sum = 0;
@@ -377,7 +566,7 @@ public class DashboardStatsService {
             double confidence = r[1] == null ? Double.NaN : ((Number) r[1]).doubleValue();
             double accuracy = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue() * 100;
             int count = ((Number) r[3]).intValue();
-            byDay.put(day, new double[]{confidence, accuracy, count});
+            byDay.put(day, new double[] { confidence, accuracy, count });
         }
 
         Map<String, List<TrendPointDTO>> trend = new LinkedHashMap<>();
@@ -412,8 +601,8 @@ public class DashboardStatsService {
         LocalDate lastMonday = end.minusDays(daysBack).plusDays(7);
         List<TrendPointDTO> out = new ArrayList<>();
         for (int w = weeks - 1; w >= 0; w--) {
-            LocalDate weekEnd = lastMonday.minusDays(7L * w);       // exclusive
-            LocalDate weekStart = weekEnd.minusDays(7);              // inclusive
+            LocalDate weekEnd = lastMonday.minusDays(7L * w); // exclusive
+            LocalDate weekStart = weekEnd.minusDays(7); // inclusive
             double[] v = aggregate(byDay, weekStart, weekEnd);
             out.add(new TrendPointDTO("W" + (weeks - w),
                     Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
@@ -430,8 +619,8 @@ public class DashboardStatsService {
         LocalDate end = LocalDate.now().withDayOfMonth(1).plusMonths(1);
         List<TrendPointDTO> out = new ArrayList<>();
         for (int m = months - 1; m >= 0; m--) {
-            LocalDate monthEnd = end.minusMonths(m);          // exclusive
-            LocalDate monthStart = monthEnd.minusMonths(1);   // inclusive
+            LocalDate monthEnd = end.minusMonths(m); // exclusive
+            LocalDate monthStart = monthEnd.minusMonths(1); // inclusive
             double[] v = aggregate(byDay, monthStart, monthEnd);
             out.add(new TrendPointDTO("M" + (months - m),
                     Double.isNaN(v[0]) ? null : (int) Math.round(v[0]),
@@ -447,11 +636,18 @@ public class DashboardStatsService {
         int confWeight = 0, accWeight = 0;
         for (LocalDate d = start; d.isBefore(end); d = d.plusDays(1)) {
             double[] v = byDay.get(d);
-            if (v == null) continue;
-            if (!Double.isNaN(v[0])) { confSum += v[0] * v[2]; confWeight += v[2]; }
-            if (!Double.isNaN(v[1])) { accSum += v[1] * v[2]; accWeight += v[2]; }
+            if (v == null)
+                continue;
+            if (!Double.isNaN(v[0])) {
+                confSum += v[0] * v[2];
+                confWeight += v[2];
+            }
+            if (!Double.isNaN(v[1])) {
+                accSum += v[1] * v[2];
+                accWeight += v[2];
+            }
         }
-        return new double[]{
+        return new double[] {
                 confWeight == 0 ? Double.NaN : confSum / confWeight,
                 accWeight == 0 ? Double.NaN : accSum / accWeight,
         };
@@ -473,38 +669,49 @@ public class DashboardStatsService {
     // onboarding (falling back to every topic if none were selected) so the
     // heatmap reflects what the user actually cares about.
     public List<AccuracyHeatmapRowDTO> getAccuracyHeatmap(UUID userId) {
+        // All three queries are independent, so they run in parallel on the pool
+        // and collapse 2-3 sequential Supabase round-trips into one.
+        CompletableFuture<List<Object[]>> accRowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findAccuracyByDifficulty(userId), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+        CompletableFuture<java.util.Optional<UserProfile>> profileF = CompletableFuture.supplyAsync(
+                () -> userProfileRepository.findByUserId(userId), queryPool);
+
         // topicId -> accuracy per difficulty (0-100); only difficulties that
         // actually appear in the user's attempts are present.
         Map<Long, double[]> accByTopic = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findAccuracyByDifficulty(userId)) {
+        for (Object[] r : accRowsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             String difficulty = (String) r[1];
             double accuracy = ((Number) r[2]).doubleValue() * 100;
-            double[] bucket = accByTopic.computeIfAbsent(topicId, k -> new double[]{-1, -1, -1});
+            double[] bucket = accByTopic.computeIfAbsent(topicId, k -> new double[] { -1, -1, -1 });
             switch (difficulty) {
                 case "easy" -> bucket[0] = accuracy;
                 case "medium" -> bucket[1] = accuracy;
                 case "hard" -> bucket[2] = accuracy;
-                default -> { }
+                default -> {
+                }
             }
         }
 
         // All topics, ordered by category then name (mirrors the heatmap layout).
         Map<Long, String> topicName = new LinkedHashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
             topicName.put(((Number) r[0]).longValue(), (String) r[1]);
         }
 
         // Keep only topics the user picked during onboarding, preserving the
         // canonical category/name order.
         java.util.Set<Long> focusIds = new java.util.LinkedHashSet<>();
-        userProfileRepository.findByUserId(userId).ifPresent(p -> {
+        profileF.join().ifPresent(p -> {
             String raw = p.getFocusTopics();
             if (raw != null && !raw.isBlank()) {
                 for (String name : raw.split(",")) {
                     String trimmed = name.trim();
                     topicName.forEach((id, n) -> {
-                        if (n.equals(trimmed)) focusIds.add(id);
+                        if (n.equals(trimmed))
+                            focusIds.add(id);
                     });
                 }
             }
@@ -512,7 +719,8 @@ public class DashboardStatsService {
 
         List<AccuracyHeatmapRowDTO> out = new ArrayList<>();
         for (Map.Entry<Long, String> e : topicName.entrySet()) {
-            if (!focusIds.isEmpty() && !focusIds.contains(e.getKey())) continue;
+            if (!focusIds.isEmpty() && !focusIds.contains(e.getKey()))
+                continue;
             double[] bucket = accByTopic.get(e.getKey());
             out.add(new AccuracyHeatmapRowDTO(
                     e.getValue(),
@@ -530,8 +738,13 @@ public class DashboardStatsService {
     public ActivityHeatmapDTO getActivityHeatmap(UUID userId) {
         LocalDateTime start = LocalDate.now().minusYears(3).atStartOfDay();
 
+        CompletableFuture<List<Object[]>> dailyActivityF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findDailyActivity(userId, start), queryPool);
+        CompletableFuture<List<Object[]>> dailyStudyF = CompletableFuture.supplyAsync(
+                () -> testAttemptRepository.findDailyStudyTime(userId, start), queryPool);
+
         Map<LocalDate, ActivityDayDTO> byDay = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findDailyActivity(userId, start)) {
+        for (Object[] r : dailyActivityF.join()) {
             LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
             int attempts = ((Number) r[1]).intValue();
             int answered = ((Number) r[2]).intValue();
@@ -539,7 +752,7 @@ public class DashboardStatsService {
             Integer accuracy = r[4] == null ? null : (int) Math.round(((Number) r[4]).doubleValue() * 100);
             byDay.put(day, new ActivityDayDTO(day.toString(), attempts, answered, confidence, accuracy, 0));
         }
-        for (Object[] r : testAttemptRepository.findDailyStudyTime(userId, start)) {
+        for (Object[] r : dailyStudyF.join()) {
             LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
             int studySeconds = ((Number) r[1]).intValue();
             ActivityDayDTO dto = byDay.get(day);
@@ -554,7 +767,11 @@ public class DashboardStatsService {
 
         List<LocalDate> active = new ArrayList<>();
         for (ActivityDayDTO d : days) {
-            if (d.attempts() > 0) active.add(LocalDate.parse(d.date()));
+            // Only days with at least one actually-answered question count as
+            // study activity; NOT_ATTEMPTED rows (e.g. a submitted-but-blank
+            // test) must not keep a streak alive.
+            if (d.questions() > 0)
+                active.add(LocalDate.parse(d.date()));
         }
         Set<LocalDate> activeSet = new HashSet<>(active);
 
@@ -562,7 +779,8 @@ public class DashboardStatsService {
         if (!activeSet.isEmpty()) {
             // A streak stays alive if the user practiced yesterday but not yet today.
             LocalDate cursor = LocalDate.now();
-            if (!activeSet.contains(cursor)) cursor = cursor.minusDays(1);
+            if (!activeSet.contains(cursor))
+                cursor = cursor.minusDays(1);
             while (activeSet.contains(cursor)) {
                 current++;
                 cursor = cursor.minusDays(1);
@@ -573,9 +791,12 @@ public class DashboardStatsService {
         LocalDate prev = null;
         int run = 0;
         for (LocalDate d : active) {
-            if (prev != null && d.equals(prev.plusDays(1))) run++;
-            else run = 1;
-            if (run > longest) longest = run;
+            if (prev != null && d.equals(prev.plusDays(1)))
+                run++;
+            else
+                run = 1;
+            if (run > longest)
+                longest = run;
             prev = d;
         }
 
@@ -583,22 +804,28 @@ public class DashboardStatsService {
     }
 
     private String trendOf(Integer recent, Integer prev) {
-        if (recent == null || prev == null) return "flat";
+        if (recent == null || prev == null)
+            return "flat";
         int diff = recent - prev;
-        if (diff > 1) return "up";
-        if (diff < -1) return "down";
+        if (diff > 1)
+            return "up";
+        if (diff < -1)
+            return "down";
         return "flat";
     }
 
     private int computeStreak(List<LocalDateTime> attemptTimestamps) {
-        if (attemptTimestamps == null || attemptTimestamps.isEmpty()) return 0;
+        if (attemptTimestamps == null || attemptTimestamps.isEmpty())
+            return 0;
 
         Map<LocalDate, Boolean> days = new HashMap<>();
-        for (LocalDateTime ts : attemptTimestamps) days.put(ts.toLocalDate(), Boolean.TRUE);
+        for (LocalDateTime ts : attemptTimestamps)
+            days.put(ts.toLocalDate(), Boolean.TRUE);
 
         LocalDate cursor = LocalDate.now();
         // A streak stays alive if the user practiced yesterday but not yet today.
-        if (!days.containsKey(cursor)) cursor = cursor.minusDays(1);
+        if (!days.containsKey(cursor))
+            cursor = cursor.minusDays(1);
 
         int streak = 0;
         while (days.containsKey(cursor)) {
@@ -609,17 +836,20 @@ public class DashboardStatsService {
     }
 
     private Integer delta(Integer recent, Integer prev) {
-        if (recent == null || prev == null) return null;
+        if (recent == null || prev == null)
+            return null;
         return recent - prev;
     }
 
     private Integer round(Object value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         return (int) Math.round(((Number) value).doubleValue());
     }
 
     private Integer round100(Object value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         return (int) Math.round(((Number) value).doubleValue() * 100);
     }
 }

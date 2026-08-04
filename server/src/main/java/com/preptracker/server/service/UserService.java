@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Service
@@ -101,24 +102,38 @@ public class UserService {
                     p.setUserId(userId);
                     return p;
                 });
-        profile.setInterviewDate(request.getInterviewDate());
+        profile.setInterviewDate(parseDate(request.getInterviewDate()));
         return userProfileRepository.save(profile);
     }
 
+    // Called once per completed onboarding step. Only non-null fields in the request
+    // are written, so a stepwise save never wipes out fields collected by earlier
+    // steps — and going back to change a value simply overwrites it on the next save.
+    // The 'completed' flag gates everything that should happen exactly once: marking
+    // the user onboarded, syncing the interview track, and firing the welcome
+    // notification.
     public void completeOnboarding(UUID userId, OnboardingRequest request) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElse(new UserProfile());
 
         profile.setUserId(userId);
-        profile.setTargetCompany(request.getTargetCompany());
-        profile.setInterviewDate(request.getInterviewDate());
-        profile.setExperienceLevel(request.getExperienceLevel());
-        profile.setFocusTopics(String.join(",", request.getFocusTopics()));
+
+        if (request.getTargetCompany() != null && !request.getTargetCompany().isBlank()) {
+            profile.setTargetCompany(request.getTargetCompany());
+        }
+        if (request.getInterviewDate() != null && !request.getInterviewDate().isBlank()) {
+            profile.setInterviewDate(parseDate(request.getInterviewDate()));
+        }
+        if (request.getExperienceLevel() != null && !request.getExperienceLevel().isBlank()) {
+            profile.setExperienceLevel(request.getExperienceLevel());
+        }
+        if (request.getFocusTopics() != null) {
+            profile.setFocusTopics(String.join(",", request.getFocusTopics()));
+        }
         userProfileRepository.save(profile);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
-        user.setIsOnboarded(true);
 
         if (request.getUsername() != null && !request.getUsername().isBlank()) {
             String newUsername = request.getUsername().trim();
@@ -136,14 +151,27 @@ public class UserService {
 
         userRepository.save(user);
 
-        // Keep interview history in sync with the onboarding goal — without this
-        // the active track would never appear on the Interview History page.
+        // Keep interview history in sync with the goal on every save (not just the
+        // final onboarding step): onboarding steps, the interview-settings "Finish"
+        // button, and "Delete" all POST here — the upsert either creates/updates the
+        // active track or archives it when the goal is cleared.
         interviewService.upsertFromOnboarding(userId,
-                request.getTargetCompany(), request.getExperienceLevel(),
-                request.getInterviewDate());
+                profile.getTargetCompany(), profile.getExperienceLevel(),
+                profile.getInterviewDate() != null ? profile.getInterviewDate().toString() : null);
+
+        if (!request.isCompleted()) {
+            return;
+        }
+
+        user.setIsOnboarded(true);
+        userRepository.save(user);
 
         notificationService.create(userId, "ONBOARDING", "You're all set!",
                 "Your profile is ready — dive into a mock test tailored to your focus areas.",
                 "/practice/mock-tests");
+    }
+
+    private LocalDate parseDate(String value) {
+        return value != null && !value.isBlank() ? LocalDate.parse(value) : null;
     }
 }

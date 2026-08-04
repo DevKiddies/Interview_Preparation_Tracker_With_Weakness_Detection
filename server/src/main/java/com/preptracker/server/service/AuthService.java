@@ -40,11 +40,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
+    private final UserSessionService userSessionService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final VerificationTokenRepository verificationTokenRepository;
@@ -64,15 +66,15 @@ public class AuthService {
     @Value("${github.client-secret}")
     private String githubClientSecret;
 
-    @Value("${jwt.expiration}")
-    private long expirationMs;
-
     /**
-     * A user can sign up with LOCAL credentials and later log in via Google or GitHub.
-     * We store all linked providers as a comma-separated string (e.g. "LOCAL,GOOGLE")
+     * A user can sign up with LOCAL credentials and later log in via Google or
+     * GitHub.
+     * We store all linked providers as a comma-separated string (e.g.
+     * "LOCAL,GOOGLE")
      * so we can detect and handle account-linking without a separate join table.
      */
-    // Returns true when the user has uploaded their own photo (stored as a base64 data URI).
+    // Returns true when the user has uploaded their own photo (stored as a base64
+    // data URI).
     // In that case OAuth logins should not overwrite it with the platform avatar.
     private boolean hasCustomAvatar(User user) {
         String url = user.getAvatarUrl();
@@ -138,14 +140,22 @@ public class AuthService {
         enforceNotBanned(user);
         user.setLastActiveAt(LocalDateTime.now());
         userRepository.save(user);
+
+        /* NEW LINE ADDED(no code replaced) */
+        // Start a new login session to save it in user_sessions table.
+        // This is used to calculate average session duration for admin dashboard.
+        userSessionService.startSession(user.getId());
+
         String token = jwtUtil.generateToken(user);
         return new AuthResponse(token);
     }
 
     // Blocks login for banned users. A temporary ban past its expiry is treated as
-    // lifted automatically (self-healing) rather than requiring an admin to unban it.
+    // lifted automatically (self-healing) rather than requiring an admin to unban
+    // it.
     private void enforceNotBanned(User user) {
-        if (!Boolean.TRUE.equals(user.getIsBanned())) return;
+        if (!Boolean.TRUE.equals(user.getIsBanned()))
+            return;
 
         boolean expired = user.getBanExpiresAt() != null && user.getBanExpiresAt().isBefore(LocalDateTime.now());
         if (expired) {
@@ -173,12 +183,34 @@ public class AuthService {
             throw new UnauthorizedException("OTP already used");
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now()))
             throw new UnauthorizedException("OTP expired");
+        /* OLD CODE */
+        // verificationToken.setUsed(true);
+        // user.setIsVerified(true);
+        // String token = jwtUtil.generateToken(user);
+        // verificationTokenRepository.save(verificationToken);
+        // userRepository.save(user);
+        // //Save the login session for the user after successful OTP verification and
+        // login.
+        // // This enters a new record in the user_sessions table with loginTime set to
+        // now and logoutTime as null.
+        // userSessionService.startSession(user.getId());
+        // return new AuthResponse(token);
 
+        // Mark the OTP as used and activate the account.
+        // Since OTP verification also logs the user in, update lastActiveAt before
+        // creating a new login session.
         verificationToken.setUsed(true);
+
         user.setIsVerified(true);
-        String token = jwtUtil.generateToken(user);
+        user.setLastActiveAt(LocalDateTime.now());
+
         verificationTokenRepository.save(verificationToken);
         userRepository.save(user);
+
+        // Save the login session for the user after successful OTP verification.
+        userSessionService.startSession(user.getId());
+
+        String token = jwtUtil.generateToken(user);
 
         notificationService.create(user.getId(), "WELCOME", "Welcome to PrepEdge!",
                 "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
@@ -196,7 +228,8 @@ public class AuthService {
             throw new RuntimeException("Account is already verified");
         }
 
-        // Invalidate all previous OTPs before issuing a new one to prevent replay attacks
+        // Invalidate all previous OTPs before issuing a new one to prevent replay
+        // attacks
         List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
         existing.forEach(t -> t.setUsed(true));
         verificationTokenRepository.saveAll(existing);
@@ -217,7 +250,17 @@ public class AuthService {
             throw new RuntimeException("Invalid Authorization Header");
         }
         String token = authHeader.substring(7);
-        tokenBlackListService.blacklistToken(token, expirationMs);
+
+        // Close the active session
+        UUID userId = UUID.fromString(jwtUtil.extractUserId(token));
+        userSessionService.endSession(userId);
+
+        // Blacklist the token only for its REMAINING lifetime, not the full 24h.
+        // Once the token would have expired anyway, the signature/expiry check
+        // rejects it and the Redis entry (which would otherwise linger uselessly)
+        // is allowed to expire at the same moment.
+        long remainingMs = Math.max(0, jwtUtil.extractExpiration(token).getTime() - System.currentTimeMillis());
+        tokenBlackListService.blacklistToken(token, remainingMs);
         return new AuthResponse("Logged Out Successfully");
     }
 
@@ -276,7 +319,8 @@ public class AuthService {
                     "https://www.googleapis.com/oauth2/v3/userinfo",
                     HttpMethod.GET,
                     entity,
-                    new ParameterizedTypeReference<Map<String, Object>>() {});
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             Map<String, Object> userInfo = googleResponse.getBody();
             if (userInfo == null) {
@@ -299,20 +343,39 @@ public class AuthService {
                 enforceNotBanned(user);
                 // Only apply the platform avatar when the user hasn't uploaded a custom photo.
                 // Custom uploads are stored as base64 data URIs; platform URLs are plain https.
-                if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
+                if (picture != null && !hasCustomAvatar(user))
+                    user.setAvatarUrl(picture);
+
+                // Update lastActiveAt to reflect that the user has logged in via Google.
+                user.setLastActiveAt(LocalDateTime.now());
+
                 userRepository.save(user);
+
+                // Start a new login session for the user after successful Google login.
+                userSessionService.startSession(user.getId());
+
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
 
-            // Account-linking: same email already exists (e.g. registered with LOCAL) — link Google to it
+            // Account-linking: same email already exists (e.g. registered with LOCAL) —
+            // link Google to it
             Optional<User> existingByEmail = userRepository.findByEmail(email);
             if (existingByEmail.isPresent()) {
                 User user = existingByEmail.get();
                 enforceNotBanned(user);
                 user.setGoogleId(googleId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GOOGLE"));
-                if (picture != null && !hasCustomAvatar(user)) user.setAvatarUrl(picture);
+                if (picture != null && !hasCustomAvatar(user))
+                    user.setAvatarUrl(picture);
+
+                // Update lastActiveAt to reflect that the user has logged in via Google.
+                user.setLastActiveAt(LocalDateTime.now());
+
                 userRepository.save(user);
+
+                // Start a new login session for the user after successful Google login.
+                userSessionService.startSession(user.getId());
+
                 return new AuthResponse(jwtUtil.generateToken(user));
             }
 
@@ -324,7 +387,14 @@ public class AuthService {
             newUser.setAuthProvider("GOOGLE");
             newUser.setIsVerified(true);
             newUser.setAvatarUrl(picture);
+
+            // Update last active time for the newly created user.
+            newUser.setLastActiveAt(LocalDateTime.now());
+
             userRepository.save(newUser);
+
+            // Start a new login session for the user after successful Google login.
+            userSessionService.startSession(newUser.getId());
 
             notificationService.create(newUser.getId(), "WELCOME", "Welcome to PrepEdge!",
                     "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
@@ -352,7 +422,8 @@ public class AuthService {
 
             ResponseEntity<Map<String, Object>> tokenResponse = restTemplate.exchange(
                     tokenUrl, HttpMethod.POST, tokenEntity,
-                    new ParameterizedTypeReference<Map<String, Object>>() {});
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             String accessToken = (String) tokenResponse.getBody().get("access_token");
             if (accessToken == null) {
@@ -366,7 +437,8 @@ public class AuthService {
             ResponseEntity<Map<String, Object>> userResponse = restTemplate.exchange(
                     "https://api.github.com/user",
                     HttpMethod.GET, userEntity,
-                    new ParameterizedTypeReference<Map<String, Object>>() {});
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             Map<String, Object> userInfo = userResponse.getBody();
             String githubId = String.valueOf(userInfo.get("id"));
@@ -381,7 +453,8 @@ public class AuthService {
                 ResponseEntity<List<Map<String, Object>>> emailResponse = restTemplate.exchange(
                         "https://api.github.com/user/emails",
                         HttpMethod.GET, userEntity,
-                        new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                        new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                        });
                 List<Map<String, Object>> emails = emailResponse.getBody();
                 email = emails.stream()
                         .filter(e -> Boolean.TRUE.equals(e.get("primary")))
@@ -394,8 +467,17 @@ public class AuthService {
             if (existingByGithubId.isPresent()) {
                 User user = existingByGithubId.get();
                 enforceNotBanned(user);
-                if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
+                if (githubAvatar != null && !hasCustomAvatar(user))
+                    user.setAvatarUrl(githubAvatar);
+
+                // Update lastActiveAt to reflect that the user has logged in via GitHub.
+                user.setLastActiveAt(LocalDateTime.now());
+
                 userRepository.save(user);
+
+                // Start a new login session for the user after successful GitHub login.
+                userSessionService.startSession(user.getId());
+
                 return jwtUtil.generateToken(user);
             }
 
@@ -405,8 +487,17 @@ public class AuthService {
                 enforceNotBanned(user);
                 user.setGithubId(githubId);
                 user.setAuthProvider(appendProvider(user.getAuthProvider(), "GITHUB"));
-                if (githubAvatar != null && !hasCustomAvatar(user)) user.setAvatarUrl(githubAvatar);
+                if (githubAvatar != null && !hasCustomAvatar(user))
+                    user.setAvatarUrl(githubAvatar);
+
+                // Update lastActiveAt to reflect that the user has logged in via GitHub.
+                user.setLastActiveAt(LocalDateTime.now());
+
                 userRepository.save(user);
+                
+                // Start a new login session for the user after successful GitHub login.
+                userSessionService.startSession(user.getId());
+                
                 return jwtUtil.generateToken(user);
             }
 
@@ -418,7 +509,14 @@ public class AuthService {
             newUser.setAuthProvider("GITHUB");
             newUser.setIsVerified(true);
             newUser.setAvatarUrl(githubAvatar);
+            
+            // Update last active time for the newly created user.
+            newUser.setLastActiveAt(LocalDateTime.now());
+
             userRepository.save(newUser);
+
+            // Start a new login session for the user after successful GitHub login.
+            userSessionService.startSession(newUser.getId());
 
             notificationService.create(newUser.getId(), "WELCOME", "Welcome to PrepEdge!",
                     "Your account is verified. Start with a mock test or explore the coding problems to build your prep streak.",
@@ -433,7 +531,8 @@ public class AuthService {
         }
     }
 
-    // Derives a username from the OAuth display name and appends a numeric suffix if it's taken.
+    // Derives a username from the OAuth display name and appends a numeric suffix
+    // if it's taken.
     private String generateUniqueUsername(String name) {
         String base = name != null ? name.toLowerCase().replaceAll("\\s+", "") : "user";
         String username = base;

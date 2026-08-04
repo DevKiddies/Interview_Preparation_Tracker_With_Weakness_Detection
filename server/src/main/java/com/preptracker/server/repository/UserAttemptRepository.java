@@ -16,15 +16,19 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
     List<UserAttempt> findByTestAttemptIdOrderBySelectionSequenceAsc(Long testAttemptId);
     List<UserAttempt> findByTestAttemptIdIn(Collection<Long> testAttemptIds);
 
-    // One row: [overallConfidence, overallAccuracy, questionsSolved,
-    // solvedThisWeek, recentConf, prevConf, recentAcc, prevAcc].
+    // One row: [overallAccuracy, questionsSolved, testsAttempted, solvedThisWeek,
+    // recentConf, prevConf, recentAcc, prevAcc].
     // recent* = the last 7 days, prev* = the 7 days before that (for the
     // week-over-week deltas the stat cards display). All aggregation happens
-    // in the database so only a single row crosses the wire.
+    // in the database so only a single row crosses the wire. NOTE: the stat
+    // card's OVERALL confidence is NOT this query's concern anymore — it is
+    // computed in DashboardStatsService.overallConfidence() from the same
+    // evidence-weighted, coverage-aware per-topic stats the "Confidence by
+    // Category" chart uses, so the card and the chart always agree.
             @Query(value = """
             SELECT
-              AVG(CASE WHEN ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS overall_conf,
               AVG(CASE WHEN ua.is_correct THEN 1.0 ELSE 0.0 END) AS overall_acc,
+              COUNT(DISTINCT ua.test_attempt_id) AS tests_attempted,
               COUNT(*) AS solved,
               COALESCE(SUM(CASE WHEN ua.created_at >= :thisStart THEN 1 ELSE 0 END), 0) AS solved_week,
               AVG(CASE WHEN ua.created_at >= :thisStart AND ua.confidence_state <> 'NOT_ATTEMPTED' THEN ua.confidence_score END) AS recent_conf,
@@ -51,13 +55,14 @@ public interface UserAttemptRepository extends JpaRepository<UserAttempt, Long> 
             FROM user_attempts ua
             JOIN topics t ON t.id = ua.topic_id
             JOIN categories c ON c.id = t.category_id
-            WHERE ua.user_id = :userId
+            WHERE ua.user_id = :userId AND ua.topic_id IN (:topicIds)
             GROUP BY c.id, c.name
             ORDER BY q_count DESC
             """, nativeQuery = true)
     List<Object[]> findCategoryConfidence(@Param("userId") UUID userId,
                                           @Param("thisStart") LocalDateTime thisStart,
-                                          @Param("prevStart") LocalDateTime prevStart);
+                                          @Param("prevStart") LocalDateTime prevStart,
+                                          @Param("topicIds") Collection<Long> topicIds);
 
     // Rows of [topicId, confidence, accuracy, questionCount, distinctAnswered] —
     // used by the Confidence Explorer's topic-level table. questionCount counts

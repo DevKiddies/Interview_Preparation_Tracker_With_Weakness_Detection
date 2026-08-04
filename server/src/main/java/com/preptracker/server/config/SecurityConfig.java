@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/contact/**").permitAll()
                         // Landing page hero stats — public aggregate counts, no auth needed
                         .requestMatchers("/api/public/**").permitAll()
+                        // AI Chatbot endpoint
+                        .requestMatchers("/api/chat/**").authenticated()
                         // Admin panel routes require ROLE_ADMIN, which JwtFilter injects from the token's "role" claim
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

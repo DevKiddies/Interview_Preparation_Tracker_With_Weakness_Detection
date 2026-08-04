@@ -119,7 +119,7 @@ function buildMonth(year, month, today, metricKey, statsByDay) {
     const stats = isFuture ? EMPTY_STATS : (statsByDay.get(toKey(year, month, d)) ?? EMPTY_STATS);
     const lv = isFuture ? 0 : metric.level(stats);
     cells.push({ date, day: d, lv, stats, isToday, isFuture, colIndex: (startDow + d - 1) % 7 });
-    if (!isFuture) activeFlags.push(stats.attempts > 0);
+    if (!isFuture) activeFlags.push(stats.questions > 0);
   }
 
   while (cells.length % 7 !== 0) cells.push(null);
@@ -152,7 +152,7 @@ function CellTooltip({ cell }) {
     );
   }
 
-  if (stats.attempts === 0) {
+  if (stats.questions === 0) {
     return (
         <div className="space-y-0.5">
           <p className="font-bold text-slate-700 dark:text-slate-200">{dateStr}</p>

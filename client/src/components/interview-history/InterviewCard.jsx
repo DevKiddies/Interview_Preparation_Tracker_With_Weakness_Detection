@@ -32,6 +32,18 @@ const STATUS_LABEL = {
   ARCHIVED: "Archived",
 };
 
+const RESULT_LABELS = {
+  SELECTED: "Selected",
+  NOT_SELECTED: "Not Selected",
+  ARCHIVED: "Archived",
+  DELETED: "Deleted",
+};
+
+const RESULT_BADGE_STYLES = {
+  SELECTED: "bg-emerald-600 text-white",
+  NOT_SELECTED: "bg-slate-500 text-white",
+};
+
 function StatBlock({ label, value, emphasis }) {
   return (
       <div className="min-w-0">
@@ -109,6 +121,15 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
                 >
                 {STATUS_LABEL[interview.status] || "Archived"}
               </span>
+                {interview.status === "COMPLETED" && interview.result && (
+                    <span
+                        className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                            RESULT_BADGE_STYLES[interview.result] || "bg-slate-500 text-white"
+                        }`}
+                    >
+                    {RESULT_LABELS[interview.result] || interview.result}
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                 <Calendar size={10} className="shrink-0" />
@@ -144,7 +165,7 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
                 emphasis
             />
             <StatBlock
-                label="Confidence"
+                label="Behavioral Confidence"
                 value={interview.confidence != null ? `${interview.confidence}%` : "—"}
                 emphasis
             />

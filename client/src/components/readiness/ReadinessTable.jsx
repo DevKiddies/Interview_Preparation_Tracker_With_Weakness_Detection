@@ -27,8 +27,8 @@ function getSortValue(item, key) {
     case "name": return item.name;
     case "status": return getStatusRank(item.accuracy);
     case "progress":
-    case "accuracy": return item.accuracy;
     case "confidence": return item.confidence;
+    case "accuracy": return item.accuracy;
     case "questions": return item.questions;
     default: return null;
   }
@@ -73,7 +73,7 @@ function SortableHeader({ label, sortable, sortKey, sortDir, onSort }) {
   );
 }
 
-export default function ConfidenceTable({ items, childLevel, onItemClick }) {
+export default function ReadinessTable({ items, childLevel, onItemClick }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [sortKey, setSortKey] = useState(null);
@@ -162,7 +162,7 @@ export default function ConfidenceTable({ items, childLevel, onItemClick }) {
             <SortableHeader label="Topic / Technique" sortable="name" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
             <SortableHeader label="Status" sortable="status" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
             <SortableHeader label="Progress" sortable="progress" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
-            <SortableHeader label="Confidence" sortable="confidence" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
+            <SortableHeader label="Readiness" sortable="confidence" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
             <SortableHeader label="Accuracy" sortable="accuracy" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
             <SortableHeader label="Questions" sortable="questions" sortKey={sortKey} sortDir={sortDir} onSort={cycleSort} />
             <th className="w-7 px-2.5 py-2" />
@@ -170,10 +170,11 @@ export default function ConfidenceTable({ items, childLevel, onItemClick }) {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
           {rows.map((item) => {
-            const tier = getTier(item.accuracy);
-            const hasData = tier !== null;
-            const barClass = hasData ? tier.bar : "bg-slate-200 dark:bg-slate-700";
-            const barWidth = hasData ? `${item.accuracy}%` : "0%";
+            const statusTier = getTier(item.accuracy);
+            const readinessTier = getTier(item.confidence);
+            const hasData = readinessTier !== null;
+            const barClass = hasData ? readinessTier.bar : "bg-slate-200 dark:bg-slate-700";
+            const barWidth = hasData ? `${item.confidence}%` : "0%";
             const clickable = item.general !== true;
             return (
                 <tr
@@ -184,7 +185,7 @@ export default function ConfidenceTable({ items, childLevel, onItemClick }) {
                   <td className="px-3.5 py-2 text-center">
                     <p className="font-medium text-[13px] text-slate-700 dark:text-slate-200">{item.name}</p>
                     <div className="mt-1 flex items-center justify-center gap-1.5 sm:hidden">
-                      <StatusTag tier={tier} hasData={hasData} />
+                      <StatusTag tier={statusTier} hasData={statusTier !== null} />
                       <div className="h-1 w-10 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                         <div className={`h-full rounded-full ${barClass}`} style={{ width: barWidth }} />
                       </div>
@@ -192,11 +193,14 @@ export default function ConfidenceTable({ items, childLevel, onItemClick }) {
                   </td>
 
                   <td className="hidden px-3.5 py-2 text-center sm:table-cell">
-                    <StatusTag tier={tier} hasData={hasData} />
+                    <StatusTag tier={statusTier} hasData={statusTier !== null} />
                   </td>
 
                   <td className="hidden px-3.5 py-2 sm:table-cell">
-                    <div className="mx-auto h-1 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                        className="mx-auto h-1 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+                        title={hasData ? `${item.confidence}% readiness` : "No data"}
+                    >
                       <div className={`h-full rounded-full ${barClass}`} style={{ width: barWidth }} />
                     </div>
                   </td>

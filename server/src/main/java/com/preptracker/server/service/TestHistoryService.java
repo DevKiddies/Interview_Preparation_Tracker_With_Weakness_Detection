@@ -19,6 +19,7 @@ import com.preptracker.server.repository.UserAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,12 +62,21 @@ public class TestHistoryService {
             String type = a.getType() != null ? a.getType() : "MOCK";
             String title = titleFor(type, a.getCategory());
 
+            // The attempt only persists its submission time (takenAt); the start
+            // time isn't stored, but the timer runs continuously from quiz mount,
+            // so it reconstructs accurately as takenAt - timeTakenSeconds.
+            LocalDateTime submittedAt = a.getTakenAt();
+            LocalDateTime startedAt = (a.getTimeTakenSeconds() != null && submittedAt != null)
+                    ? submittedAt.minusSeconds(a.getTimeTakenSeconds())
+                    : submittedAt;
+
             result.add(new TestHistoryDTO(
                     a.getId(),
                     title,
                     type,
-                    a.getTakenAt(),
-                    "COMPLETED",
+                    startedAt,
+                    submittedAt,
+                    statusLabel(a.getCompletionStatus()),
                     a.getTotal(),
                     a.getTimeTakenSeconds() != null ? Math.max(1, Math.round(a.getTimeTakenSeconds() / 60f)) : null,
                     a.getScore(),
@@ -79,8 +89,20 @@ public class TestHistoryService {
     }
 
     private String titleFor(String type, String category) {
-        String base = category != null && !category.isBlank() ? category : "Assessment";
-        return "TOPIC".equals(type) ? base + " (Topic Test)" : base + " (Mock Test)";
+        // No type suffix here: the history card already renders a dedicated
+        // "Mock Test" / "Topic Test" badge next to the title, so appending
+        // "(Topic Test)" would just duplicate it.
+        return category != null && !category.isBlank() ? category : "Assessment";
+    }
+
+    // Maps the persisted completion_status to the label the history UI renders.
+    private String statusLabel(String completionStatus) {
+        if (completionStatus == null) return "COMPLETED";
+        return switch (completionStatus.toUpperCase()) {
+            case "ABANDONED" -> "ABANDONED";
+            case "ABORTED" -> "ABORTED";
+            default -> "COMPLETED";
+        };
     }
 
     private List<String> weakTopics(List<UserAttempt> answered, Map<Long, String> topicNames) {
