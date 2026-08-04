@@ -16,7 +16,7 @@
 
 <br/>
 
-**PrepEdge** is a full-stack interview preparation platform that helps candidates track their progress across interview cycles, take timed mock/topic assessments, and surface weak topics through confidence-vs-accuracy analytics — backed by a dedicated admin panel for managing the question bank, tests, and users.
+**PrepEdge** is a full-stack interview preparation platform that helps candidates track their progress across interview cycles, take timed mock/topic assessments, and surface weak topics through confidence-vs-accuracy analytics. A Gemini-powered AI coach answers interview questions personalized to each user's live performance, and a dedicated admin panel manages the question bank, tests, and users.
 
 <br/>
 
@@ -76,8 +76,9 @@
 <tr>
 <td width="50%">
 
-### 🔔 Notifications & Resources
+### 🔔 Notifications, AI Coach & Resources
 - In-app notification bell with unread count and mark-as-read
+- **AI Interview Coach** (Gemini) — a floating chatbot that reads your stats, strong/weak topics, and target role to give personalized prep guidance & mock-answer reviews
 - Notes, cheat sheets, and coding-problem reference pages (Markdown-rendered)
 - Interview experiences shared across users
 - Public "Contact Us" form routed to the team inbox
@@ -100,12 +101,11 @@
 
 ## 📌 Project Status
 
-The project is under active development (**~80% complete**). Core auth, onboarding, mock testing, grading, confidence scoring, interview tracking, and the bulk of the admin panel are built and wired end-to-end against the real backend. Known gaps and in-progress pieces:
+The project is under active development (**~90% complete**). Core auth, onboarding, mock testing, grading, confidence scoring, interview tracking, the Gemini AI coach, and the full admin panel are built and wired end-to-end against the real backend. Remaining gaps:
 
-- **Admin dashboard overview** (`AdminDashboard.jsx`) still renders static mock data — the backing endpoint (`GET /api/admin/analytics/overview`) already exists and just needs to be wired in.
-- **Personalized recommendation engine** (suggesting what to practice next based on weak topics) is not yet built.
 - **Automated test coverage** is minimal — only the default Spring Boot context-load smoke test exists; no frontend test suite yet.
 - Some admin routes (`/admin/users/:userId`, `/admin/questions/edit/:id`) are intentionally stubbed with a "Coming Soon" placeholder pending detail-view designs.
+- The **AI coach** answers based on each user's current dashboard statistics; a deeper, per-question recommendation engine (suggesting exactly which questions to practice next) is not yet built.
 
 ---
 
@@ -137,6 +137,8 @@ The project is under active development (**~80% complete**). Core auth, onboardi
 | Spring Data Redis | — | JWT blacklist on logout |
 | Brevo API | — | Transactional email (OTP, notifications) |
 | Google API Client | 2.6.0 | Google OAuth token verification |
+| Google Gemini AI | — | Generative AI coach (WebClient) |
+| Spring WebFlux | — | Reactive WebClient for Gemini API |
 | Project Lombok | 1.18.46 | Boilerplate reduction |
 | Maven | — | Build tool (via `mvnw` wrapper) |
 
@@ -169,9 +171,9 @@ The project is under active development (**~80% complete**). Core auth, onboardi
 │  PostgreSQL (Supabase)   │    │  External APIs          │
 │  Users, Interviews,      │    │  • Google OAuth 2.0     │
 │  Test/User Attempts,     │    │  • GitHub OAuth 2.0     │
-│  Questions, Categories,  │    │  • Brevo (Email)        │
-│  Topics, Techniques,     │    │                         │
-│  Companies, Admins       │    │                         │
+│  Questions, Categories,     │    │  • Brevo (Email)        │
+│  Topics, Techniques,        │    │  • Gemini (AI Coach)    │
+│  Companies, Admins          │    │                         │
 └──────────────────────────┘    └─────────────────────────┘
 ```
 
@@ -188,8 +190,9 @@ Interview_Preparation_Tracker_With_Weakness_Detection/
 │       │   └── admin/                   # Admin panel pages
 │       ├── components/
 │       │   ├── admin/                   # Admin shell/layout
+│       │   ├── chat/                    # Floating AI coach chatbot
 │       │   ├── dashboard/               # Dashboard widgets (radar, heatmap, trends)
-│       │   ├── confidence/              # Confidence Explorer views
+│       │   ├── readiness/               # Confidence/readiness explorer views
 │       │   ├── interview/               # Onboarding/interview-setup steps
 │       │   ├── interview-history/       # Interview timeline & filters
 │       │   ├── mock-test/                # Quiz-taking UI (header, navigator, footer)
@@ -199,8 +202,11 @@ Interview_Preparation_Tracker_With_Weakness_Detection/
 │       │   ├── result/                  # Result overview/analytics/review tabs
 │       │   └── ui/                      # Reusable primitives (Card, ProgressBar, ...)
 │       ├── context/                     # Theme (dark/light) context
-│       ├── utils/                       # API base URL, auth/profile caching, validation
+│       ├── utils/                       # API base, chat/auth/profile caches, validation
 │       └── data/                        # Static display metadata (category labels/colors)
+│
+├── db/                                  # SQL migrations
+│   └── migration_*.sql                  # Normalization, dashboard-support migrations
 │
 ├── server/                              # Spring Boot backend
 │   └── src/main/java/com/preptracker/server/
@@ -293,9 +299,12 @@ GOOGLE_CLIENT_ID=your_google_client_id
 # GitHub OAuth 2.0
 GITHUB_CLIENT_ID=your_github_client_id
 GITHUB_CLIENT_SECRET=your_github_client_secret
+
+# Google Gemini (AI coach)
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-> Redis host/port, the GitHub OAuth redirect URI, and the frontend callback URL are currently hardcoded in `application.properties` for local development (`localhost:6379`, `localhost:8080`, `localhost:5173`). Update those directly in `application.properties` for other environments.
+> Redis host/port, the GitHub OAuth redirect URI, the frontend callback URL, and the Gemini model URL are currently configured in `application.properties` for local development (`localhost:6379`, `localhost:8080`, `localhost:5173`, `gemini-3.5-flash-lite`). Update those directly in `application.properties` for other environments. Note: the AI coach / chat feature requires a valid `GEMINI_API_KEY`; without it, `/api/chat` will fail.
 
 ### Client (`client/.env`)
 
@@ -333,11 +342,23 @@ All endpoints are prefixed `/api`. Auth is stateless JWT (Bearer token); admin e
 | GET | `/users/me` | Current user's full profile |
 | GET / PUT / DELETE | `/users/{id}` | Get / update / delete own account (username, password, avatar, interview date) |
 | POST | `/users/onboarding` | Complete the onboarding flow |
+| GET | `/users/me/dashboard/stats` | Overall dashboard KPIs (tests, solved, accuracy, confidence) |
+| GET | `/users/me/dashboard/categories` | Per-category confidence breakdown |
+| GET | `/users/me/dashboard/confidence-tree` | Category → topic → technique confidence tree |
+| GET | `/users/me/dashboard/trend` | Confidence/accuracy trend over time |
+| GET | `/users/me/dashboard/blind-spots` | High-confidence-but-low-accuracy "danger zone" topics |
+| GET | `/users/me/dashboard/accuracy-heatmap` | Accuracy heatmap grid |
+| GET | `/users/me/dashboard/activity-heatmap` | Practice activity heatmap |
 | GET | `/interviews` | List the user's interview tracks + aggregate stats |
-| POST | `/interviews/{id}/result` | Close an interview with a result |
+| POST | `/interviews/result` | Close an interview with a result |
+| POST | `/chat` | Ask the AI coach (personalized with your stats) |
 | GET | `/questions` | Fetch shuffled questions, filterable by topic/category/limit |
+| POST | `/tests/start/{testId}` | Start a persisted mock test session |
+| POST | `/tests/start` | Start a topic-based practice session |
+| POST | `/tests/abandon` | Abort the active session (saves partial progress) |
 | POST | `/tests/submit` | Submit a completed test for grading + confidence scoring |
 | GET | `/tests/latest` | Most recent test attempt (for the dashboard card) |
+| GET | `/tests/attempts/{attemptId}` | Detailed result for a past attempt |
 | GET | `/tests/available` | List available full mock assessments |
 | GET | `/tests/history` | Persisted mock/topic test history |
 | GET | `/notifications` | List recent notifications |
@@ -354,7 +375,9 @@ All endpoints are prefixed `/api`. Auth is stateless JWT (Bearer token); admin e
 | PUT / DELETE | `/admin/questions/{id}` | Update / delete a question |
 | GET / POST / PUT / DELETE | `/admin/tests` \| `/admin/tests/{id}` | Manage mock tests |
 | GET | `/admin/results` | List all persisted test results |
+| GET | `/admin/dashboard` | Admin dashboard widget data |
 | GET | `/admin/analytics/overview` | Platform-wide KPIs, growth, and health |
+| GET | `/admin/analytics/users` | User-centric analytics (growth, demographics, reports) |
 | GET | `/admin/categories` \| `/admin/topics` \| `/admin/techniques` \| `/admin/companies` \| `/admin/technique-topics` | List metadata |
 | POST / DELETE | `/admin/topics` \| `/admin/topics/{id}` | Create / delete a topic |
 
