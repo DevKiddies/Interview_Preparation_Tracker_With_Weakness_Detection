@@ -32,7 +32,6 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserProfileRepository userProfileRepository;
     private final NotificationService notificationService;
-    private final InterviewService interviewService;
 
     public User getUserById(UUID id) {
         return userRepository.findById(id)
@@ -110,26 +109,47 @@ public class UserService {
     // are written, so a stepwise save never wipes out fields collected by earlier
     // steps — and going back to change a value simply overwrites it on the next save.
     // The 'completed' flag gates everything that should happen exactly once: marking
-    // the user onboarded, syncing the interview track, and firing the welcome
-    // notification.
+    // the user onboarded and firing the welcome notification.
+    //
+    // user_profiles is the SINGLE source of truth for the current goal. It is NOT
+    // mirrored into the interviews table here — that table is an immutable history
+    // of closed interviews, written only when the goal is archived / a result is
+    // marked (InterviewService.snapshotCurrentGoal). This removes the old
+    // ACTIVE-interview row that duplicated the profile and caused desync bugs.
     public void completeOnboarding(UUID userId, OnboardingRequest request) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElse(new UserProfile());
 
         profile.setUserId(userId);
 
-        if (request.getTargetCompany() != null && !request.getTargetCompany().isBlank()) {
-            profile.setTargetCompany(request.getTargetCompany());
+        boolean alreadyHadGoal = hasGoal(profile);
+
+        // Every caller sends the full goal (target company, experience level,
+        // date, focus topics), so a present-but-blank value is an explicit clear —
+        // e.g. Danger Zone's "Archive" / "Delete" POST all-empty to wipe the
+        // current goal. Only an absent (null) field is skipped, so a partial save
+        // never clobbers fields collected by earlier onboarding steps.
+        if (request.getTargetCompany() != null) {
+            profile.setTargetCompany(blankToNull(request.getTargetCompany()));
         }
-        if (request.getInterviewDate() != null && !request.getInterviewDate().isBlank()) {
+        if (request.getInterviewDate() != null) {
             profile.setInterviewDate(parseDate(request.getInterviewDate()));
         }
-        if (request.getExperienceLevel() != null && !request.getExperienceLevel().isBlank()) {
-            profile.setExperienceLevel(request.getExperienceLevel());
+        if (request.getExperienceLevel() != null) {
+            profile.setExperienceLevel(blankToNull(request.getExperienceLevel()));
         }
         if (request.getFocusTopics() != null) {
             profile.setFocusTopics(String.join(",", request.getFocusTopics()));
         }
+
+        // Remember when this goal started (stable across edits), so the eventual
+        // history snapshot can report duration. Reset when the goal is cleared.
+        if (hasGoal(profile) && !alreadyHadGoal) {
+            profile.setStartDate(LocalDate.now());
+        } else if (!hasGoal(profile)) {
+            profile.setStartDate(null);
+        }
+
         userProfileRepository.save(profile);
 
         User user = userRepository.findById(userId)
@@ -151,14 +171,6 @@ public class UserService {
 
         userRepository.save(user);
 
-        // Keep interview history in sync with the goal on every save (not just the
-        // final onboarding step): onboarding steps, the interview-settings "Finish"
-        // button, and "Delete" all POST here — the upsert either creates/updates the
-        // active track or archives it when the goal is cleared.
-        interviewService.upsertFromOnboarding(userId,
-                profile.getTargetCompany(), profile.getExperienceLevel(),
-                profile.getInterviewDate() != null ? profile.getInterviewDate().toString() : null);
-
         if (!request.isCompleted()) {
             return;
         }
@@ -173,5 +185,16 @@ public class UserService {
 
     private LocalDate parseDate(String value) {
         return value != null && !value.isBlank() ? LocalDate.parse(value) : null;
+    }
+
+    private boolean hasGoal(UserProfile profile) {
+        return profile != null && profile.getTargetCompany() != null
+                && !profile.getTargetCompany().isBlank();
+    }
+
+    // Normalizes an explicit empty goal field ("") to null so the cleared value
+    // is stored as "not set" rather than a blank string.
+    private String blankToNull(String value) {
+        return value != null && !value.isBlank() ? value : null;
     }
 }

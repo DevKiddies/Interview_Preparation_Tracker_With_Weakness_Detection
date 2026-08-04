@@ -16,11 +16,13 @@ public record InterviewDTO(
         String experience,
         LocalDate startDate,
         LocalDate interviewDate,
-        String status,       // ACTIVE | COMPLETED | ARCHIVED
-        String result,       // SELECTED | NOT_SELECTED | ARCHIVED | DELETED (nullable)
+        List<String> focusTopics,  // frozen at closure; empty when none were set
+        String status,       // COMPLETED | ARCHIVED (history is never ACTIVE)
+        String result,       // SELECTED | NOT_SELECTED | ARCHIVED (nullable)
         Integer confidence,
         Integer accuracy,
         Integer questionsSolved,
         Integer duration,    // days between start_date and interview_date
-        List<String> weakTopics
+        List<String> weakTopics,
+        Integer interviewReadiness   // frozen snapshot for closed interviews
 ) {}

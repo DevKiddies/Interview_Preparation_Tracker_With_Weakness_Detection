@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, Target, BarChart2 } from "lucide-react";
 import Sidebar from "../components/dashboard/Sidebar";
-import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
+import { DashboardContentSkeleton } from "../components/dashboard/DashboardSkeleton";
 import StatCard from "../components/dashboard/StatCard";
 import ActivityHeatmap from "../components/profile/ActivityHeatmap";
 import QuickActions from "../components/dashboard/QuickActions";
@@ -150,9 +150,7 @@ export default function DashboardPage() {
     };
   }, [prepCardStatus, navigate]);
 
-  return loading ? (
-    <DashboardSkeleton />
-  ) : (
+  return (
       <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
         <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6">
           <Sidebar
@@ -161,6 +159,9 @@ export default function DashboardPage() {
               experienceLabel={experienceLabel}
           />
 
+          {loading ? (
+            <DashboardContentSkeleton />
+          ) : (
           <div className="min-w-0 flex-1 space-y-6">
             <>
             {/* Universal Current Interview Card */}
@@ -228,6 +229,7 @@ export default function DashboardPage() {
             </div>
             </>
           </div>
+          )}
         </div>
       </div>
   );

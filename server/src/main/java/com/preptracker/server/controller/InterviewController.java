@@ -1,9 +1,11 @@
 package com.preptracker.server.controller;
 
-// Exposes the current user's interview tracks under /api/interviews.
-// GET returns the full list (with derived aggregate stats). POST /{id}/result
-// closes an active interview with a result (SELECTED / NOT_SELECTED / ARCHIVED /
-// DELETED), matching the outcome step on the interview settings page.
+// Exposes the current user's interview history under /api/interviews.
+// GET returns the full history list (with derived aggregate stats).
+// POST /result closes the CURRENT preparation goal with a result (SELECTED /
+// NOT_SELECTED / ARCHIVED / DELETED): the goal is snapshotted into an immutable
+// history row (or, for DELETED, dropped without record) and then cleared so a new
+// interview can begin. There is no per-interview close — interviews are immutable.
 
 import com.preptracker.server.dto.InterviewDTO;
 import com.preptracker.server.service.InterviewService;
@@ -34,12 +36,11 @@ public class InterviewController {
         return ResponseEntity.ok(interviewService.getInterviews(authenticatedUserId()));
     }
 
-    @PostMapping("/{id}/result")
-    public ResponseEntity<Map<String, Object>> markResult(
-            @PathVariable Long id,
+    @PostMapping("/result")
+    public ResponseEntity<Map<String, Object>> snapshotResult(
             @RequestBody Map<String, String> body) {
         String result = body.get("result");
-        InterviewDTO dto = interviewService.markResult(authenticatedUserId(), id, result);
+        InterviewDTO dto = interviewService.snapshotCurrentGoal(authenticatedUserId(), result);
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("deleted", dto == null);
         if (dto != null) response.put("interview", dto);

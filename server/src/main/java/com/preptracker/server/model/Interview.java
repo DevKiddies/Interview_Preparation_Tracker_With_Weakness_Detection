@@ -18,6 +18,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "interviews")
@@ -45,11 +46,24 @@ public class Interview {
     @Column(name = "interview_date")
     private LocalDate interviewDate;
 
+    // Frozen focus topics for this interview (comma-separated, e.g. "DSA,System
+    // Design"). Copied from the current goal at closure time so history remembers
+    // the exact syllabus this preparation cycle targeted. TEXT for no length cap.
+    @Column(name = "focus_topics", columnDefinition = "TEXT")
+    private String focusTopics;
+
     @Column(nullable = false)
     private String status = "ACTIVE";
 
     @Column
     private String result;
+
+    // Frozen snapshot of the interview's readiness (the coverage-aware, focus-topic
+    // readiness) captured once when the interview is closed (COMPLETED/ARCHIVED).
+    // It is never recomputed: this is history. Active interviews have null here —
+    // their readiness is derived live for the dashboard.
+    @Column(name = "interview_readiness", precision = 5, scale = 2)
+    private BigDecimal interviewReadiness;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -38,7 +38,6 @@ function InterviewPage() {
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [archiving, setArchiving] = useState(false);
-    const [interviews, setInterviews] = useState([]);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -46,15 +45,6 @@ function InterviewPage() {
             navigate("/login");
             return;
         }
-
-        fetch(`${API_BASE}/api/interviews`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => r.json())
-            .then((data) => {
-                if (Array.isArray(data)) setInterviews(data);
-            })
-            .catch(() => {});
 
         fetch(`${API_BASE}/api/users/me`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -129,22 +119,19 @@ function InterviewPage() {
         clearInterviewClosed();
     }, [targetCompany, experienceLevel, interviewDate, focusTopics, navigate]);
 
-    const handleDelete = useCallback(async () => {
-        setDeleting(true);
+    // Close the current interview via the immutable history snapshot endpoint.
+    // ARCHIVED / SELECTED / NOT_SELECTED record a history row; DELETED drops it
+    // without a record. In every case the backend clears the current goal, so
+    // the local state and cached profile are wiped to match. `onDone` lets the
+    // caller decide what to do next (e.g. the result-step confirmation screen
+    // stays put until the user chooses).
+    const closeInterview = useCallback(async (result, onDone) => {
         const token = localStorage.getItem("token");
         try {
-            const res = await fetch(`${API_BASE}/api/users/onboarding`, {
+            const res = await fetch(`${API_BASE}/api/interviews/result`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    targetCompany: "",
-                    experienceLevel: "",
-                    interviewDate: "",
-                    focusTopics: [],
-                }),
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ result }),
             });
             if (res.ok) {
                 setTargetCompany("");
@@ -158,67 +145,32 @@ function InterviewPage() {
                     interviewDate: "",
                     focusTopics: [],
                 });
-                setStep(1);
             }
         } catch {
             /* ignore */
         }
-        setDeleting(false);
         clearInterviewClosed();
+        onDone();
     }, []);
 
-    // Archive the current interview: closes the active track (kept in history
-    // as ARCHIVED), clears the current goal so the preparation card reads
-    // empty, and drops the settings page back to step 1 so a new goal can be
-    // set for the next interview.
-    const handleArchive = useCallback(async () => {
+    const handleDelete = useCallback(() => {
+        setDeleting(true);
+        closeInterview("DELETED", () => {
+            setDeleting(false);
+            setStep(1);
+        });
+    }, [closeInterview]);
+
+    // Archive the current interview: the current goal is snapshotted into
+    // immutable history as ARCHIVED, then cleared so the preparation card reads
+    // empty and a new goal can be set.
+    const handleArchive = useCallback(() => {
         setArchiving(true);
-        const token = localStorage.getItem("token");
-        try {
-            const active = interviews.find((i) => i.status === "ACTIVE");
-            if (token && active) {
-                await fetch(`${API_BASE}/api/interviews/${active.id}/result`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ result: "ARCHIVED" }),
-                }).catch(() => {});
-                setInterviews((prev) =>
-                    prev.map((i) => (i.id === active.id ? { ...i, status: "ARCHIVED" } : i))
-                );
-            }
-            const res = await fetch(`${API_BASE}/api/users/onboarding`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    targetCompany: "",
-                    experienceLevel: "",
-                    interviewDate: "",
-                    focusTopics: [],
-                }),
-            });
-            if (res.ok) {
-                setTargetCompany("");
-                setExperienceLevel("");
-                setInterviewDate("");
-                setFocusTopics([]);
-                setCachedProfile({
-                    ...getCachedProfile(),
-                    targetCompany: "",
-                    experienceLevel: "",
-                    interviewDate: "",
-                    focusTopics: [],
-                });
-                setStep(1);
-            }
-        } catch {
-            /* ignore */
-        }
-        setArchiving(false);
-        clearInterviewClosed();
-    }, [interviews]);
+        closeInterview("ARCHIVED", () => {
+            setArchiving(false);
+            setStep(1);
+        });
+    }, [closeInterview]);
 
     const goNext = () => {
         if (!canAdvance) return;
@@ -233,19 +185,12 @@ function InterviewPage() {
         else handleSave();
     };
 
-    // Persist the outcome (SELECTED / NOT_SELECTED / ARCHIVED / DELETED) to the
-    // active interview track so it shows up in interview history. Fire-and-forget
-    // — localStorage still drives the current-page UX.
+    // Persist the outcome (SELECTED / NOT_SELECTED / ARCHIVED / DELETED) to
+    // immutable history and clear the current goal. Fire-and-forget — the result
+    // confirmation screen drives the current-page UX.
     const markResult = useCallback((result) => {
-        const token = localStorage.getItem("token");
-        const active = interviews.find((i) => i.status === "ACTIVE");
-        if (!token || !active) return;
-        fetch(`${API_BASE}/api/interviews/${active.id}/result`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ result }),
-        }).catch(() => {});
-    }, [interviews]);
+        closeInterview(result, () => {});
+    }, [closeInterview]);
 
     const goBack = () => {
         if (step === 0) {

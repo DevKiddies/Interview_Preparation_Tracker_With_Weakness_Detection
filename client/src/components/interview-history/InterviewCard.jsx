@@ -85,6 +85,7 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
   }, [interview.interviewDate]);
 
   const isActive = interview.status === "ACTIVE";
+  const hasReadiness = interview.interviewReadiness != null;
 
   const handleCardClick = () => onViewDetails?.(interview);
 
@@ -154,7 +155,7 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 rounded-md bg-slate-50 p-2 dark:bg-slate-800/50 sm:grid-cols-4">
+          <div className={`grid grid-cols-2 gap-x-2 gap-y-1.5 rounded-md bg-slate-50 p-2 dark:bg-slate-800/50 ${hasReadiness ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
             <StatBlock
                 label="Experience"
                 value={EXPERIENCE_LABELS[interview.experience] || interview.experience || "—"}
@@ -174,6 +175,13 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
                 value={interview.accuracy != null ? `${interview.accuracy}%` : "—"}
                 emphasis
             />
+            {hasReadiness && (
+                <StatBlock
+                    label="Interview Readiness"
+                    value={`${interview.interviewReadiness}%`}
+                    emphasis
+                />
+            )}
           </div>
 
           {/* Weak topics */}

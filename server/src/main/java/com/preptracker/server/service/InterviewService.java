@@ -14,20 +14,22 @@ package com.preptracker.server.service;
 // track is closed accordingly.
 
 import com.preptracker.server.dto.InterviewDTO;
-import com.preptracker.server.exception.NotFoundException;
 import com.preptracker.server.model.ConfidenceState;
 import com.preptracker.server.model.Interview;
 import com.preptracker.server.model.TestAttempt;
 import com.preptracker.server.model.Topic;
 import com.preptracker.server.model.UserAttempt;
+import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.InterviewRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TopicRepository;
 import com.preptracker.server.repository.UserAttemptRepository;
+import com.preptracker.server.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -50,6 +52,8 @@ public class InterviewService {
     private final TestAttemptRepository testAttemptRepository;
     private final UserAttemptRepository userAttemptRepository;
     private final TopicRepository topicRepository;
+    private final UserProfileRepository userProfileRepository;
+    private final DashboardStatsService dashboardStatsService;
 
     public List<InterviewDTO> getInterviews(UUID userId) {
         List<Interview> interviews = interviewRepository.findByUserIdOrderByStartDateDesc(userId);
@@ -81,60 +85,57 @@ public class InterviewService {
         return result;
     }
 
+    // Closes the current preparation: snapshots the live goal (from user_profiles)
+    // into an immutable interviews row and, except for DELETED, clears the goal so
+    // a new prep cycle can begin. This table is history only — it never holds an
+    // ACTIVE row, and nothing in it is ever mutated after creation.
     @Transactional
-    public InterviewDTO markResult(UUID userId, Long interviewId, String result) {
-        Interview interview = interviewRepository.findById(interviewId)
-                .orElseThrow(() -> new NotFoundException("Interview not found"));
-        if (!interview.getUserId().equals(userId)) {
-            throw new NotFoundException("Interview not found");
-        }
+    public InterviewDTO snapshotCurrentGoal(UUID userId, String result) {
+        UserProfile profile = userProfileRepository.findByUserId(userId).orElse(null);
 
         if ("DELETED".equals(result)) {
-            interviewRepository.delete(interview);
+            // Delete = "don't record this cycle". Just clear the goal.
+            if (profile != null) clearGoal(profile);
             return null;
         }
 
-        interview.setResult(result);
-        interview.setStatus("ARCHIVED".equals(result) ? "ARCHIVED" : "COMPLETED");
-        Interview saved = interviewRepository.save(interview);
+        String targetCompany = profile == null ? null : profile.getTargetCompany();
+        if (targetCompany == null || targetCompany.isBlank()) {
+            // No active goal to snapshot — nothing to record.
+            return null;
+        }
+
+        // Freeze readiness BEFORE clearing, so it reflects the goal being closed.
+        Integer readiness = dashboardStatsService.interviewReadiness(userId);
+
+        Interview snapshot = new Interview();
+        snapshot.setUserId(userId);
+        snapshot.setTargetCompany(targetCompany);
+        snapshot.setExperienceLevel(profile.getExperienceLevel());
+        snapshot.setStartDate(profile.getStartDate());
+        snapshot.setInterviewDate(profile.getInterviewDate());
+        snapshot.setFocusTopics(profile.getFocusTopics());
+        snapshot.setResult(result);
+        snapshot.setStatus("ARCHIVED".equals(result) ? "ARCHIVED" : "COMPLETED");
+        snapshot.setInterviewReadiness(readiness == null ? null : BigDecimal.valueOf(readiness));
+        Interview saved = interviewRepository.save(snapshot);
+
+        if (profile != null) clearGoal(profile);
+
         return getInterviews(userId).stream()
                 .filter(dto -> dto.id().equals(saved.getId()))
                 .findFirst().orElse(null);
     }
 
-    // Called by UserService.completeOnboarding after the profile is saved, so
-    // every saved goal is reflected as a track in interview history. Saving an
-    // empty goal (user cleared their interview plan) archives the active track.
-    @Transactional
-    public void upsertFromOnboarding(UUID userId, String targetCompany, String experienceLevel,
-                                     String interviewDate) {
-        boolean hasGoal = targetCompany != null && !targetCompany.isBlank();
-
-        if (!hasGoal) {
-            interviewRepository.findFirstByUserIdAndStatusOrderByStartDateDesc(userId, "ACTIVE")
-                    .ifPresent(a -> {
-                        a.setStatus("ARCHIVED");
-                        interviewRepository.save(a);
-                    });
-            return;
-        }
-
-        Interview active = interviewRepository
-                .findFirstByUserIdAndStatusOrderByStartDateDesc(userId, "ACTIVE")
-                .orElse(null);
-
-        if (active == null) {
-            active = new Interview();
-            active.setUserId(userId);
-            active.setStartDate(LocalDate.now());
-            active.setStatus("ACTIVE");
-        }
-
-        active.setTargetCompany(targetCompany);
-        active.setExperienceLevel(experienceLevel);
-        active.setInterviewDate(interviewDate != null && !interviewDate.isBlank()
-                ? LocalDate.parse(interviewDate) : null);
-        interviewRepository.save(active);
+    // Wipes the current goal off the profile so the prep card reads empty and the
+    // next interview starts from a clean slate. History is untouched.
+    private void clearGoal(UserProfile profile) {
+        profile.setTargetCompany(null);
+        profile.setExperienceLevel(null);
+        profile.setInterviewDate(null);
+        profile.setFocusTopics(null);
+        profile.setStartDate(null);
+        userProfileRepository.save(profile);
     }
 
     // ---- helpers ----
@@ -161,13 +162,17 @@ public class InterviewService {
                 i.getExperienceLevel(),
                 i.getStartDate(),
                 i.getInterviewDate(),
+                i.getFocusTopics() == null || i.getFocusTopics().isBlank()
+                        ? List.of()
+                        : List.of(i.getFocusTopics().split(",")),
                 i.getStatus(),
                 i.getResult(),
                 confidence,
                 accuracy,
                 questionsSolved,
                 duration,
-                weakTopics
+                weakTopics,
+                i.getInterviewReadiness() == null ? null : i.getInterviewReadiness().intValue()
         );
     }
 

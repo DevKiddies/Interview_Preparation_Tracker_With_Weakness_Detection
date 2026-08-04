@@ -37,6 +37,12 @@ public class UserProfile {
     @Column
     private LocalDate interviewDate;
 
+    // The day this current goal began (first time a target company was set).
+    // Kept stable across edits; cleared when the goal is cleared. Copied into the
+    // interview snapshot at closure so history reports an accurate duration.
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
     @Column
     private String experienceLevel;
 

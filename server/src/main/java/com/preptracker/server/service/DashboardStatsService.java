@@ -20,7 +20,6 @@ import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
 import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.CategoryRepository;
-import com.preptracker.server.repository.InterviewRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TopicRepository;
@@ -72,22 +71,19 @@ public class DashboardStatsService {
     private final TopicRepository topicRepository;
     private final TechniqueTopicRepository techniqueTopicRepository;
     private final UserProfileRepository userProfileRepository;
-    private final InterviewRepository interviewRepository;
 
     public DashboardStatsService(UserAttemptRepository userAttemptRepository,
             TestAttemptRepository testAttemptRepository,
             CategoryRepository categoryRepository,
             TopicRepository topicRepository,
             TechniqueTopicRepository techniqueTopicRepository,
-            UserProfileRepository userProfileRepository,
-            InterviewRepository interviewRepository) {
+            UserProfileRepository userProfileRepository) {
         this.userAttemptRepository = userAttemptRepository;
         this.testAttemptRepository = testAttemptRepository;
         this.categoryRepository = categoryRepository;
         this.topicRepository = topicRepository;
         this.techniqueTopicRepository = techniqueTopicRepository;
         this.userProfileRepository = userProfileRepository;
-        this.interviewRepository = interviewRepository;
     }
 
     @PreDestroy
@@ -283,6 +279,28 @@ public class DashboardStatsService {
         return coverageConfidence(scopeTopicIds, topicConfidence);
     }
 
+    // Overall readiness scoped to the user's current focus topics (the active
+    // interview's scope). Reuses the exact same evidence-weighted, coverage-aware
+    // engine as the stat card, so the frozen interview number is identical to
+    // what the live card would have shown at the moment of closure. Returns null
+    // when the user has no focus topics to measure against. This is the value
+    // InterviewService snapshots when an interview is completed/archived.
+    public Integer interviewReadiness(UUID userId) {
+        Set<Long> focusIds = focusTopicIds(userId);
+        if (focusIds.isEmpty()) {
+            return null;
+        }
+
+        Map<Long, Integer> topicConfidence = new HashMap<>();
+        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+            Long topicId = ((Number) r[0]).longValue();
+            int distinct = ((Number) r[4]).intValue();
+            topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
+        }
+
+        return coverageConfidence(List.copyOf(focusIds), topicConfidence);
+    }
+
     // ── readiness scope ────────────────────────────────────────────────────────
     // The one place that knows WHY a scope exists. Everything downstream
     // (coverageConfidence, overallConfidence, the category lists, the explorer
@@ -294,18 +312,19 @@ public class DashboardStatsService {
     // the label the API reports so the UI can name the readout.
     private record ReadinessScope(List<Long> topicIds, String label) {}
 
-    // OVERALL by default (every topic in the system). If the user has an active
-    // interview AND their focus topics resolve to at least one real topic,
-    // readiness is measured against just those topics (INTERVIEW scope).
+    // OVERALL by default (every topic in the system). If the user has a current
+    // goal (user_profiles) AND its focus topics resolve to at least one real
+    // topic, readiness is measured against just those topics (INTERVIEW scope).
     private ReadinessScope resolveReadinessScope(UUID userId) {
         List<Long> allTopicIds = new ArrayList<>();
         for (Object[] r : topicRepository.findAllWithCategory()) {
             allTopicIds.add(((Number) r[0]).longValue());
         }
 
-        boolean hasActiveInterview = interviewRepository
-                .findFirstByUserIdAndStatusOrderByStartDateDesc(userId, "ACTIVE").isPresent();
-        if (!hasActiveInterview || allTopicIds.isEmpty()) {
+        boolean hasGoal = userProfileRepository.findByUserId(userId)
+                .map(p -> p.getTargetCompany() != null && !p.getTargetCompany().isBlank())
+                .orElse(false);
+        if (!hasGoal || allTopicIds.isEmpty()) {
             return new ReadinessScope(allTopicIds, "OVERALL");
         }
 
