@@ -4,7 +4,6 @@
 import { ExternalLink, Globe, Mail } from "lucide-react";
 import suhaniPhoto from "../assets/team/Suhani.PNG";
 import utkarshPhoto from "../assets/team/utkarsh.jpg";
-import varadPhoto from "../assets/team/varad.jpeg";
 import tanishqPhoto from "../assets/team/tanishq.jpeg";
 import saurabhPhoto from "../assets/team/saurabh.jpeg";
 
@@ -36,7 +35,6 @@ const team = [
     role: "Full Stack Developer",
     bio: "Owns the intelligence layer — from weakness detection algorithms to AI interview simulations. Varad turns raw performance data into actionable insights that help users improve where it counts most.",
     avatar: "VI",
-    photo: varadPhoto,
     color: "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400",
     github: "#",
     linkedin: "#",

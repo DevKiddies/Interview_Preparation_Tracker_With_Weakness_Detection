@@ -27,9 +27,11 @@ import com.preptracker.server.service.DashboardStatsService;
 import com.preptracker.server.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -54,7 +56,8 @@ public class UserController {
     // not another user's by swapping the ID in the URL path.
     private void requireSelf(UUID id) {
         if (!authenticatedUserId().equals(id)) {
-            throw new RuntimeException("Access denied: you can only modify your own account");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Access denied: you can only modify your own account");
         }
     }
 
