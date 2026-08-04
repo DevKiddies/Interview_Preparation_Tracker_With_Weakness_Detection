@@ -202,7 +202,7 @@ export default function DashboardPage() {
             {/* Stats Row */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard
-                  title="Overall Confidence"
+                  title="Interview Readiness"
                   value={stats?.overallConfidence != null ? `${stats.overallConfidence}%` : "—"}
                   icon="brain"
                   color="blue"

@@ -8,11 +8,11 @@ const TREND_ICON = {
   flat: <Minus size={11} className="text-slate-400" />,
 };
 
-const TABS = ["Confidence", "Accuracy"];
+const TABS = ["Readiness", "Accuracy"];
 
 export default function ConfidenceByCategory({ topics = [] }) {
     const navigate = useNavigate();
-    const [tab, setTab] = useState("Confidence");
+    const [tab, setTab] = useState("Readiness");
     const isAccuracy = tab === "Accuracy";
 
     const getColor = (value) => {
@@ -35,7 +35,7 @@ export default function ConfidenceByCategory({ topics = [] }) {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                     <h2 className="text-xs font-black uppercase tracking-tight text-slate-900 dark:text-white">
-                        {isAccuracy ? "Accuracy by Category" : "Confidence by Category"}
+                        {isAccuracy ? "Accuracy by Category" : "Readiness by Category"}
                     </h2>
                     <p className="text-[9px] font-black uppercase tracking-normal text-slate-500 dark:text-slate-400 opacity-80">
                         Performance metrics breakdown across core concepts.

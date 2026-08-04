@@ -35,7 +35,7 @@ const STATS = [
     glow: "ring-1 ring-amber-400 shadow-[0_4px_20px_-2px_rgba(245,158,11,0.5)]"
   },
   {
-    title: "Avg Confidence",
+    title: "Avg Behavioral Confidence",
     key: "avgConfidence",
     suffix: "%",
     icon: Brain,

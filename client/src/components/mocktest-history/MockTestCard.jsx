@@ -109,7 +109,7 @@ function MockTestCard({ test, onViewAnalysis }) {
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 flex-1 sm:grid-cols-4">
               <StatBlock label="Questions" value={test.questionCount ?? "—"} />
               <StatBlock label="Time" icon={<Clock size={9} />} value={test.duration != null ? `${test.duration}m` : "—"} />
-              <StatBlock label="Confidence" value={test.confidence != null ? `${test.confidence}%` : "—"} emphasis />
+              <StatBlock label="Behavioral Confidence" value={test.confidence != null ? `${test.confidence}%` : "—"} emphasis />
               <StatBlock label="Accuracy" value={test.accuracy != null ? `${test.accuracy}%` : "—"} emphasis />
             </div>
 

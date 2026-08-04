@@ -57,7 +57,7 @@ export default function ConfidenceSummary({ title, confidence, childrenCount, ch
                 {title}
               </h2>
               <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${badge}`}>
-              {normalizedConfidence}% Score
+              {normalizedConfidence}% Readiness
             </span>
             </div>
 

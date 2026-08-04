@@ -98,8 +98,8 @@ export default function ConfidenceExplorerPage() {
     general: c.level === "general",
   }));
 
-  // Sort weakest first by accuracy (actual progress) so the explorer surfaces
-  // what needs work, matching the accuracy-driven status bars in the table.
+  // Sort weakest first by accuracy so the explorer surfaces what needs work,
+  // matching the accuracy-driven status badges in the table.
   const sortedChildren = [...children].sort((a, b) => {
     const ca = a.accuracy == null ? Infinity : a.accuracy;
     const cb = b.accuracy == null ? Infinity : b.accuracy;

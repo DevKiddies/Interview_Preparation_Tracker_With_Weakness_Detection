@@ -144,7 +144,7 @@ function InterviewCard({ interview, onViewDetails, onContinue }) {
                 emphasis
             />
             <StatBlock
-                label="Confidence"
+                label="Behavioral Confidence"
                 value={interview.confidence != null ? `${interview.confidence}%` : "—"}
                 emphasis
             />
