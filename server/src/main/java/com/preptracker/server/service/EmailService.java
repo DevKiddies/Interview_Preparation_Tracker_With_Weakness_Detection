@@ -35,23 +35,25 @@ public class EmailService {
 
     public void sendPasswordResetEmail(String toEmail, String otp) {
         RestTemplate restTemplate = new RestTemplate();
+        ObjectMapper mapper = new ObjectMapper();
 
-        String body = """
-                {
-                    "sender":{"name":"%s", "email":"%s"},
-                    "to":[{"email":"%s"}],
-                    "subject":"PrepEdge - Password Reset OTP",
-                    "htmlContent":"<h2>Password Reset</h2><p>Your OTP to reset your password is: <strong>%s</strong></p><p>This OTP expires in 15 minutes. If you did not request a password reset, please ignore this email.</p>"
-                }
-                """.formatted(senderName, senderEmail, toEmail, otp);
+        String htmlContent = "<h2>Password Reset</h2><p>Your OTP to reset your password is: <strong>"
+                + otp + "</strong></p><p>This OTP expires in 15 minutes. If you did not request a "
+                + "password reset, please ignore this email.</p>";
+
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("name", senderName, "email", senderEmail),
+                "to", List.of(Map.of("email", toEmail)),
+                "subject", "PrepEdge - Password Reset OTP",
+                "htmlContent", htmlContent
+        );
 
         HttpHeaders header = new HttpHeaders();
         header.setContentType(MediaType.APPLICATION_JSON);
         header.set("api-key", apiKey);
 
-        HttpEntity<String> entity = new HttpEntity<>(body, header);
-
         try {
+            HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), header);
             var response = restTemplate.postForEntity(
                     "https://api.brevo.com/v3/smtp/email",
                     entity,
@@ -66,23 +68,23 @@ public class EmailService {
 
     public void sendOtpEmail(String toEmail, String otp){
         RestTemplate restTemplate = new RestTemplate();
+        ObjectMapper mapper = new ObjectMapper();
 
-        String body = """
-                {
-                    "sender":{"name":"%s", "email":"%s"},
-                    "to":[{"email":"%s"}],
-                    "subject":"PrepEdge-Email Verification OTP",
-                    "htmlContent":"<h2>OTP: <strong>%s</strong></h2><p>This OTP expires in 10 mins</p>"
-                }
-                """.formatted(senderName, senderEmail, toEmail, otp);
+        String htmlContent = "<h2>OTP: <strong>" + otp + "</strong></h2><p>This OTP expires in 10 mins</p>";
+
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("name", senderName, "email", senderEmail),
+                "to", List.of(Map.of("email", toEmail)),
+                "subject", "PrepEdge-Email Verification OTP",
+                "htmlContent", htmlContent
+        );
 
         HttpHeaders header=new HttpHeaders();
         header.setContentType(MediaType.APPLICATION_JSON);
         header.set("api-key",apiKey);
 
-        HttpEntity<String> entity = new HttpEntity<>(body,header);
-
         try {
+            HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), header);
             var response = restTemplate.postForEntity(
                     "https://api.brevo.com/v3/smtp/email",
                     entity,
