@@ -43,11 +43,12 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        if (userRepository.existsByUsername(request.getNewUsername())) {
-            throw new ConflictException("Username '" + request.getNewUsername() + "' is already taken");
+        String newUsername = request.getNewUsername();
+        if (!newUsername.equals(user.getUsername()) && userRepository.existsByUsername(newUsername)) {
+            throw new ConflictException("Username '" + newUsername + "' is already taken");
         }
 
-        user.setUsername(request.getNewUsername());
+        user.setUsername(newUsername);
         return userRepository.save(user);
     }
 
