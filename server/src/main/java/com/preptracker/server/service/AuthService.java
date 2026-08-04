@@ -224,28 +224,30 @@ public class AuthService {
 
     @Transactional
     public void resendOtp(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
+        // Silently no-op for an unknown email instead of throwing, so the response
+        // doesn't let a caller distinguish a registered address from an unregistered
+        // one (account enumeration).
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getIsVerified()) {
+                throw new RuntimeException("Account is already verified");
+            }
 
-        if (user.getIsVerified()) {
-            throw new RuntimeException("Account is already verified");
-        }
+            // Invalidate all previous OTPs before issuing a new one to prevent replay
+            // attacks
+            List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
+            existing.forEach(t -> t.setUsed(true));
+            verificationTokenRepository.saveAll(existing);
 
-        // Invalidate all previous OTPs before issuing a new one to prevent replay
-        // attacks
-        List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
-        existing.forEach(t -> t.setUsed(true));
-        verificationTokenRepository.saveAll(existing);
+            String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
+            VerificationToken verificationToken = new VerificationToken();
+            verificationToken.setUserId(user.getId());
+            verificationToken.setOtp(otp);
+            verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(20));
+            verificationToken.setUsed(false);
+            verificationTokenRepository.save(verificationToken);
 
-        String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
-        VerificationToken verificationToken = new VerificationToken();
-        verificationToken.setUserId(user.getId());
-        verificationToken.setOtp(otp);
-        verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(20));
-        verificationToken.setUsed(false);
-        verificationTokenRepository.save(verificationToken);
-
-        emailService.sendOtpEmail(user.getEmail(), otp);
+            emailService.sendOtpEmail(user.getEmail(), otp);
+        });
     }
 
     public AuthResponse logout(String authHeader) {
@@ -264,23 +266,25 @@ public class AuthService {
 
     @Transactional
     public void requestPasswordReset(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new NotFoundException("No account found with that email address"));
+        // Silently no-op for an unknown email instead of throwing, so the response
+        // doesn't let a caller distinguish a registered address from an unregistered
+        // one (account enumeration).
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            // Invalidate all existing tokens for this user
+            List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
+            existing.forEach(token -> token.setUsed(true));
+            verificationTokenRepository.saveAll(existing);
 
-        // Invalidate all existing tokens for this user
-        List<VerificationToken> existing = verificationTokenRepository.findAllByUserId(user.getId());
-        existing.forEach(token -> token.setUsed(true));
-        verificationTokenRepository.saveAll(existing);
+            String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
+            VerificationToken verificationToken = new VerificationToken();
+            verificationToken.setUserId(user.getId());
+            verificationToken.setOtp(otp);
+            verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+            verificationToken.setUsed(false);
+            verificationTokenRepository.save(verificationToken);
 
-        String otp = String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
-        VerificationToken verificationToken = new VerificationToken();
-        verificationToken.setUserId(user.getId());
-        verificationToken.setOtp(otp);
-        verificationToken.setExpiresAt(LocalDateTime.now().plusMinutes(15));
-        verificationToken.setUsed(false);
-        verificationTokenRepository.save(verificationToken);
-
-        emailService.sendPasswordResetEmail(user.getEmail(), otp);
+            emailService.sendPasswordResetEmail(user.getEmail(), otp);
+        });
     }
 
     @Transactional
