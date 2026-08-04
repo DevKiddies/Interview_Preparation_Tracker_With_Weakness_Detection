@@ -66,9 +66,6 @@ public class AuthService {
     @Value("${github.client-secret}")
     private String githubClientSecret;
 
-    @Value("${jwt.expiration}")
-    private long expirationMs;
-
     /**
      * A user can sign up with LOCAL credentials and later log in via Google or
      * GitHub.
@@ -258,7 +255,12 @@ public class AuthService {
         UUID userId = UUID.fromString(jwtUtil.extractUserId(token));
         userSessionService.endSession(userId);
 
-        tokenBlackListService.blacklistToken(token, expirationMs);
+        // Blacklist the token only for its REMAINING lifetime, not the full 24h.
+        // Once the token would have expired anyway, the signature/expiry check
+        // rejects it and the Redis entry (which would otherwise linger uselessly)
+        // is allowed to expire at the same moment.
+        long remainingMs = Math.max(0, jwtUtil.extractExpiration(token).getTime() - System.currentTimeMillis());
+        tokenBlackListService.blacklistToken(token, remainingMs);
         return new AuthResponse("Logged Out Successfully");
     }
 

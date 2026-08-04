@@ -8,6 +8,8 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import BanGuard from "./components/BanGuard";
+import PageSkeleton from "./components/ui/PageSkeleton";
+import DashboardSkeleton from "./components/dashboard/DashboardSkeleton";
 import API_BASE from "./utils/api";
 
 // All pages are lazy-loaded — React only downloads the JS for a page when
@@ -72,7 +74,7 @@ const AdminWeaknessAnalysis = lazy(
 );
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, skeleton = <PageSkeleton /> }) {
   const token = localStorage.getItem("token");
   const location = useLocation();
   const [valid, setValid] = useState(token ? null : false);
@@ -111,7 +113,7 @@ function ProtectedRoute({ children }) {
       <Navigate to="/login" state={{ from: location.pathname }} replace />
     );
   }
-  if (valid === null) return null; // validating — brief blank frame
+  if (valid === null) return skeleton; // validating — show a skeleton, not a blank frame
   return children;
 }
 
@@ -119,6 +121,14 @@ function AdminProtectedRoute({ children }) {
   const adminToken = localStorage.getItem("adminToken");
   const location = useLocation();
   return adminToken ? children : <Navigate to="/admin/login" state={{ from: location.pathname }} replace />;
+}
+
+// Signed-in visitors hitting the root should land on the dashboard, not the
+// marketing landing page. The token is validated by ProtectedRoute once they
+// reach /dashboard, so a stale token just bounces them to /login.
+function HomeRedirect() {
+  const token = localStorage.getItem("token");
+  return token ? <Navigate to="/dashboard" replace /> : <LandingPage />;
 }
 
 const App = () => {
@@ -139,16 +149,25 @@ const App = () => {
       {!isAdminRoute && <BanGuard />}
       {!hideLayout && <Navbar />}
       <main className="grow">
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageSkeleton />}>
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/verify" element={<UserVerificationPage />} />
             <Route path="/onboarding" element={<ProtectedRoute><OnBoardingPage /></ProtectedRoute>} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute skeleton={<DashboardSkeleton />}>
+                  <Suspense fallback={<DashboardSkeleton />}>
+                    <DashboardPage />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
             <Route path="/profile/settings" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/interview-settings" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
             <Route path="/interview-history" element={<ProtectedRoute><InterviewHistoryPage /></ProtectedRoute>} />

@@ -64,6 +64,10 @@ public class JwtUtil {
         return getClaims(token).getSubject();
     }
 
+    public Date extractExpiration(String token) {
+        return getClaims(token).getExpiration();
+    }
+
     public boolean isTokenValid(String token) {
         try {
             getClaims(token);

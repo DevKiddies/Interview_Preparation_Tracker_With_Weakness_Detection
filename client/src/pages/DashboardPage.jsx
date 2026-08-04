@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, Target, BarChart2 } from "lucide-react";
 import Sidebar from "../components/dashboard/Sidebar";
+import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
 import StatCard from "../components/dashboard/StatCard";
 import ActivityHeatmap from "../components/profile/ActivityHeatmap";
 import QuickActions from "../components/dashboard/QuickActions";
@@ -51,85 +52,55 @@ export default function DashboardPage() {
   const [trend, setTrend] = useState(() => getCachedDashboard()?.trend ?? null);
   const [blindSpots, setBlindSpots] = useState(() => getCachedDashboard()?.blindSpots ?? []);
   const [heatmap, setHeatmap] = useState(() => getCachedDashboard()?.heatmap ?? []);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch(`${API_BASE}/api/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.username) {
-            setUsername(data.username);
-            localStorage.setItem("username", data.username);
-          }
-          if (data.avatarUrl) {
-            localStorage.setItem("avatarUrl", data.avatarUrl);
-          }
-          // Notify the Navbar to refresh the avatar and username without a page reload.
-          window.dispatchEvent(new CustomEvent("user-profile-updated"));
-          setProfile(data);
-          setCachedProfile(data);
-        })
-        .catch(() => {});
+    const headers = { Authorization: `Bearer ${token}` };
 
-    fetch(`${API_BASE}/api/users/me/dashboard/stats`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-        .then((data) => {
-          setStats(data);
-          setCachedDashboard({ ...getCachedDashboard(), stats: data });
-        })
-        .catch(() => {});
+    // The profile is refreshed (and cached) at login and by other pages, so we
+    // only hit /api/users/me again when nothing is cached — avoids a duplicate
+    // round-trip on every dashboard load.
+    if (!getCachedProfile()) {
+      fetch(`${API_BASE}/api/users/me`, { headers })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.username) {
+              setUsername(data.username);
+              localStorage.setItem("username", data.username);
+            }
+            if (data.avatarUrl) {
+              localStorage.setItem("avatarUrl", data.avatarUrl);
+            }
+            // Notify the Navbar to refresh the avatar and username without a page reload.
+            window.dispatchEvent(new CustomEvent("user-profile-updated"));
+            setProfile(data);
+            setCachedProfile(data);
+          })
+          .catch(() => {});
+    }
 
-    fetch(`${API_BASE}/api/users/me/dashboard/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setCategories(data);
-            setCachedDashboard({ ...getCachedDashboard(), categories: data });
-          }
-        })
-        .catch(() => {});
+    const fetches = [
+      fetch(`${API_BASE}/api/users/me/dashboard/stats`, { headers }).then((res) => (res.ok ? res.json() : Promise.resolve(null))),
+      fetch(`${API_BASE}/api/users/me/dashboard/categories`, { headers }).then((res) => (res.ok ? res.json() : Promise.resolve(null))),
+      fetch(`${API_BASE}/api/users/me/dashboard/trend`, { headers }).then((res) => (res.ok ? res.json() : Promise.resolve(null))),
+      fetch(`${API_BASE}/api/users/me/dashboard/blind-spots`, { headers }).then((res) => (res.ok ? res.json() : Promise.resolve(null))),
+      fetch(`${API_BASE}/api/users/me/dashboard/accuracy-heatmap`, { headers }).then((res) => (res.ok ? res.json() : Promise.resolve(null))),
+    ];
 
-    fetch(`${API_BASE}/api/users/me/dashboard/trend`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-        .then((data) => {
-          setTrend(data);
-          setCachedDashboard({ ...getCachedDashboard(), trend: data });
+    Promise.all(fetches)
+        .then(([stats, categories, trend, blindSpots, heatmap]) => {
+          setStats(stats);
+          if (Array.isArray(categories)) setCategories(categories);
+          setTrend(trend ?? {});
+          if (Array.isArray(blindSpots)) setBlindSpots(blindSpots);
+          if (Array.isArray(heatmap)) setHeatmap(heatmap);
+          setCachedDashboard({ stats, categories, trend, blindSpots, heatmap });
         })
-        .catch(() => {});
-
-    fetch(`${API_BASE}/api/users/me/dashboard/blind-spots`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setBlindSpots(data);
-            setCachedDashboard({ ...getCachedDashboard(), blindSpots: data });
-          }
-        })
-        .catch(() => {});
-
-    fetch(`${API_BASE}/api/users/me/dashboard/accuracy-heatmap`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setHeatmap(data);
-            setCachedDashboard({ ...getCachedDashboard(), heatmap: data });
-          }
-        })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setLoading(false));
   }, []);
 
   // Calculate whole days remaining until the interview date.
@@ -179,7 +150,9 @@ export default function DashboardPage() {
     };
   }, [prepCardStatus, navigate]);
 
-  return (
+  return loading ? (
+    <DashboardSkeleton />
+  ) : (
       <div className="min-h-screen bg-indigo-50 transition-colors duration-200 dark:bg-slate-950">
         <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6">
           <Sidebar
@@ -189,6 +162,7 @@ export default function DashboardPage() {
           />
 
           <div className="min-w-0 flex-1 space-y-6">
+            <>
             {/* Universal Current Interview Card */}
             <PreparationCard
                 targetLabel={targetLabel}
@@ -252,6 +226,7 @@ export default function DashboardPage() {
               <BlindSpotAnalysis data={blindSpots} />
               <AccuracyHeatmap data={heatmap} />
             </div>
+            </>
           </div>
         </div>
       </div>

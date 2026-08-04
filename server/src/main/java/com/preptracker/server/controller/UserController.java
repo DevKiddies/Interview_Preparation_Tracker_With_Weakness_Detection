@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.UUID;
 
 @RestController
@@ -169,13 +170,19 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getMe() {
         UUID uid = authenticatedUserId();
-        User user;
-        try {
-            user = userService.getUserById(uid);
-        } catch (NotFoundException e) {
-            // JWT is valid but the user record no longer exists — force re-login
-            throw new UnauthorizedException("Session is no longer valid. Please log in again.");
-        }
+        CompletableFuture<User> userF = CompletableFuture.supplyAsync(() -> {
+            try {
+                return userService.getUserById(uid);
+            } catch (NotFoundException e) {
+                // JWT is valid but the user record no longer exists — force re-login
+                throw new UnauthorizedException("Session is no longer valid. Please log in again.");
+            }
+        });
+        CompletableFuture<UserProfile> profileF = CompletableFuture.supplyAsync(
+                () -> userService.getUserProfile(uid));
+
+        User user = userF.join();
+        UserProfile profile = profileF.join();
 
         Map<String, Object> response = new HashMap<>();
         response.put("id", user.getId());
@@ -185,7 +192,6 @@ public class UserController {
         response.put("avatarUrl", user.getAvatarUrl());
         response.put("authProvider", user.getAuthProvider());
 
-        UserProfile profile = userService.getUserProfile(uid);
         if (profile != null) {
             response.put("targetCompany", profile.getTargetCompany());
             response.put("interviewDate", profile.getInterviewDate());

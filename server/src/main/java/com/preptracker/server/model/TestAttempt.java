@@ -52,7 +52,7 @@ public class TestAttempt {
     // How the attempt ended: COMPLETE (normal/timeout submission), ABORTED
     // (auto-submitted after too many tab switches) or ABANDONED (browser/tab
     // closed before submission, recorded via a pagehide beacon).
-    @Column(name = "completion_status", nullable = false, columnDefinition = "varchar(20) default 'COMPLETE'")
+    @Column(name = "completion_status", nullable = false, length = 20)
     private String completionStatus = "COMPLETE";
 
     @CreationTimestamp

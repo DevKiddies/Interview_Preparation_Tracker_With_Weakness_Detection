@@ -18,12 +18,14 @@ import com.preptracker.server.dto.ConfidenceTreeDTO;
 import com.preptracker.server.dto.DashboardStatsDTO;
 import com.preptracker.server.dto.TrendPointDTO;
 import com.preptracker.server.model.Category;
+import com.preptracker.server.model.UserProfile;
 import com.preptracker.server.repository.CategoryRepository;
 import com.preptracker.server.repository.TechniqueTopicRepository;
 import com.preptracker.server.repository.TestAttemptRepository;
 import com.preptracker.server.repository.TopicRepository;
 import com.preptracker.server.repository.UserAttemptRepository;
 import com.preptracker.server.repository.UserProfileRepository;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +43,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 public class DashboardStatsService {
@@ -54,6 +59,10 @@ public class DashboardStatsService {
     // EVIDENCE COLLECTED, not on the question bank size, so adding more
     // questions to a topic never lowers a user's displayed confidence.
     private static final int EVIDENCE_TARGET = 10;
+
+    // Supabase sits at ~264ms per round-trip, so independent queries run in
+    // parallel on this pool to collapse N sequential round-trips into one.
+    private final ExecutorService queryPool = Executors.newFixedThreadPool(6);
 
     private final UserAttemptRepository userAttemptRepository;
     private final TestAttemptRepository testAttemptRepository;
@@ -76,13 +85,26 @@ public class DashboardStatsService {
         this.userProfileRepository = userProfileRepository;
     }
 
+    @PreDestroy
+    void shutdownQueryPool() {
+        queryPool.shutdown();
+    }
+
     public DashboardStatsDTO getStats(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime thisStart = now.minusDays(WEEK_DAYS);
         LocalDateTime prevStart = now.minusDays(2L * WEEK_DAYS);
 
-        List<Object[]> rows = userAttemptRepository.findDashboardStats(userId, thisStart, prevStart);
-        List<LocalDateTime> attemptTimestamps = testAttemptRepository.findDistinctAttemptTimestamps(userId);
+        CompletableFuture<List<Object[]>> rowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findDashboardStats(userId, thisStart, prevStart), queryPool);
+        CompletableFuture<List<LocalDateTime>> timestampsF = CompletableFuture.supplyAsync(
+                () -> testAttemptRepository.findDistinctAttemptTimestamps(userId), queryPool);
+        CompletableFuture<Integer> confidenceF = CompletableFuture.supplyAsync(
+                () -> overallConfidence(userId), queryPool);
+
+        List<Object[]> rows = rowsF.join();
+        List<LocalDateTime> attemptTimestamps = timestampsF.join();
+        Integer confidence = confidenceF.join();
 
         if (rows == null || rows.isEmpty()) {
             return new DashboardStatsDTO(
@@ -104,7 +126,6 @@ public class DashboardStatsService {
         // 0%. A raw question-weighted average (row[0] of findDashboardStats)
         // looked wildly higher than the chart, e.g. 94% card vs single-digit
         // category bars, because it ignored coverage and evidence.
-        Integer confidence = overallConfidence(userId);
         Integer accuracy = round100(row[0]);
 
         int testsAttempted = ((Number) row[1]).intValue();
@@ -137,10 +158,19 @@ public class DashboardStatsService {
         // category the user has actually covered (see coverageConfidence). Topic
         // confidence here is already evidence-weighted so the category mean
         // matches what the Confidence Explorer tree shows.
+        CompletableFuture<List<Object[]>> topicStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTopicStats(userId), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+        CompletableFuture<List<Object[]>> categoryRowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart), queryPool);
+        CompletableFuture<List<Category>> categoriesF = CompletableFuture.supplyAsync(
+                categoryRepository::findAll, queryPool);
+
         Map<Long, Integer> topicConfidence = new HashMap<>();
         Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+        for (Object[] r : topicStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             int distinct = ((Number) r[4]).intValue();
             topicConfidence.put(topicId, weightConfidence(round(r[1]), distinct));
@@ -148,12 +178,12 @@ public class DashboardStatsService {
             topicQuestions.put(topicId, ((Number) r[3]).intValue());
         }
         Map<Long, List<Long>> topicsByCategory = new HashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
             topicsByCategory.computeIfAbsent(((Number) r[2]).longValue(), k -> new ArrayList<>())
                     .add(((Number) r[0]).longValue());
         }
 
-        List<Object[]> rows = userAttemptRepository.findCategoryConfidence(userId, thisStart, prevStart);
+        List<Object[]> rows = categoryRowsF.join();
 
         // Aggregate rows only cover categories the user has attempts in, but the
         // chart shows EVERY category, so merge per-category aggregates into a map
@@ -164,7 +194,7 @@ public class DashboardStatsService {
         }
 
         List<CategoryConfidenceDTO> out = new ArrayList<>();
-        for (Category category : categoryRepository.findAll()) {
+        for (Category category : categoriesF.join()) {
             Long id = category.getId();
             Object[] r = aggregateById.get(id);
             int weakTopics = r == null ? 0 : ((Number) r[3]).intValue();
@@ -248,11 +278,20 @@ public class DashboardStatsService {
     // and question counts, for the Confidence Explorer. Built from three small
     // aggregate queries plus the (tiny) reference tables, all merged in memory.
     public ConfidenceTreeDTO getConfidenceTree(UUID userId) {
+        CompletableFuture<List<Object[]>> topicStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTopicStats(userId), queryPool);
+        CompletableFuture<List<Object[]>> techniqueStatsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findTechniqueStatsByTopic(userId), queryPool);
+        CompletableFuture<List<Object[]>> techniqueTopicsF = CompletableFuture.supplyAsync(
+                () -> techniqueTopicRepository.findAllWithTopicAndName(), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+
         Map<Long, Integer> topicConfidence = new HashMap<>();
         Map<Long, Integer> topicAccuracy = new HashMap<>();
         Map<Long, Integer> topicQuestions = new HashMap<>();
         Map<Long, Integer> topicDistinctAnswered = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTopicStats(userId)) {
+        for (Object[] r : topicStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             topicConfidence.put(topicId, round(r[1]));
             topicAccuracy.put(topicId, round100(r[2]));
@@ -263,7 +302,7 @@ public class DashboardStatsService {
         // topicId -> (techniqueId -> [confidence, accuracy, questionCount,
         // distinctAnswered]) scoped to the topic the attempt actually happened in.
         Map<Long, Map<Long, double[]>> techniqueStatsByTopic = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findTechniqueStatsByTopic(userId)) {
+        for (Object[] r : techniqueStatsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             Long techniqueId = ((Number) r[1]).longValue();
             double conf = r[2] == null ? Double.NaN : ((Number) r[2]).doubleValue();
@@ -278,7 +317,7 @@ public class DashboardStatsService {
         // keep the first encountered as the canonical parent for the explorer).
         Map<Long, Long> techniqueParent = new HashMap<>();
         Map<Long, String> techniqueNames = new HashMap<>();
-        for (Object[] r : techniqueTopicRepository.findAllWithTopicAndName()) {
+        for (Object[] r : techniqueTopicsF.join()) {
             Long techniqueId = ((Number) r[0]).longValue();
             techniqueParent.putIfAbsent(techniqueId, ((Number) r[1]).longValue());
             techniqueNames.putIfAbsent(techniqueId, (String) r[2]);
@@ -286,7 +325,7 @@ public class DashboardStatsService {
 
         // category_id -> list of [topicId, topicName]
         Map<Long, List<ConfidenceNodeDTO>> topicsByCategory = new HashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             String topicName = (String) r[1];
             Long categoryId = ((Number) r[2]).longValue();
@@ -541,10 +580,19 @@ public class DashboardStatsService {
     // onboarding (falling back to every topic if none were selected) so the
     // heatmap reflects what the user actually cares about.
     public List<AccuracyHeatmapRowDTO> getAccuracyHeatmap(UUID userId) {
+        // All three queries are independent, so they run in parallel on the pool
+        // and collapse 2-3 sequential Supabase round-trips into one.
+        CompletableFuture<List<Object[]>> accRowsF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findAccuracyByDifficulty(userId), queryPool);
+        CompletableFuture<List<Object[]>> allTopicsF = CompletableFuture.supplyAsync(
+                () -> topicRepository.findAllWithCategory(), queryPool);
+        CompletableFuture<java.util.Optional<UserProfile>> profileF = CompletableFuture.supplyAsync(
+                () -> userProfileRepository.findByUserId(userId), queryPool);
+
         // topicId -> accuracy per difficulty (0-100); only difficulties that
         // actually appear in the user's attempts are present.
         Map<Long, double[]> accByTopic = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findAccuracyByDifficulty(userId)) {
+        for (Object[] r : accRowsF.join()) {
             Long topicId = ((Number) r[0]).longValue();
             String difficulty = (String) r[1];
             double accuracy = ((Number) r[2]).doubleValue() * 100;
@@ -560,14 +608,14 @@ public class DashboardStatsService {
 
         // All topics, ordered by category then name (mirrors the heatmap layout).
         Map<Long, String> topicName = new LinkedHashMap<>();
-        for (Object[] r : topicRepository.findAllWithCategory()) {
+        for (Object[] r : allTopicsF.join()) {
             topicName.put(((Number) r[0]).longValue(), (String) r[1]);
         }
 
         // Keep only topics the user picked during onboarding, preserving the
         // canonical category/name order.
         java.util.Set<Long> focusIds = new java.util.LinkedHashSet<>();
-        userProfileRepository.findByUserId(userId).ifPresent(p -> {
+        profileF.join().ifPresent(p -> {
             String raw = p.getFocusTopics();
             if (raw != null && !raw.isBlank()) {
                 for (String name : raw.split(",")) {
@@ -601,8 +649,13 @@ public class DashboardStatsService {
     public ActivityHeatmapDTO getActivityHeatmap(UUID userId) {
         LocalDateTime start = LocalDate.now().minusYears(3).atStartOfDay();
 
+        CompletableFuture<List<Object[]>> dailyActivityF = CompletableFuture.supplyAsync(
+                () -> userAttemptRepository.findDailyActivity(userId, start), queryPool);
+        CompletableFuture<List<Object[]>> dailyStudyF = CompletableFuture.supplyAsync(
+                () -> testAttemptRepository.findDailyStudyTime(userId, start), queryPool);
+
         Map<LocalDate, ActivityDayDTO> byDay = new HashMap<>();
-        for (Object[] r : userAttemptRepository.findDailyActivity(userId, start)) {
+        for (Object[] r : dailyActivityF.join()) {
             LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
             int attempts = ((Number) r[1]).intValue();
             int answered = ((Number) r[2]).intValue();
@@ -610,7 +663,7 @@ public class DashboardStatsService {
             Integer accuracy = r[4] == null ? null : (int) Math.round(((Number) r[4]).doubleValue() * 100);
             byDay.put(day, new ActivityDayDTO(day.toString(), attempts, answered, confidence, accuracy, 0));
         }
-        for (Object[] r : testAttemptRepository.findDailyStudyTime(userId, start)) {
+        for (Object[] r : dailyStudyF.join()) {
             LocalDate day = ((java.sql.Timestamp) r[0]).toLocalDateTime().toLocalDate();
             int studySeconds = ((Number) r[1]).intValue();
             ActivityDayDTO dto = byDay.get(day);

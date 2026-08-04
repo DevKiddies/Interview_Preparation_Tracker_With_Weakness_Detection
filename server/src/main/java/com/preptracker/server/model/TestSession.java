@@ -41,7 +41,7 @@ public class TestSession {
     @Column(nullable = false)
     private Boolean completed = false;
 
-    @Column(name = "completion_status", nullable = false, columnDefinition = "varchar(20) default 'ABANDONED'")
+    @Column(name = "completion_status", nullable = false, length = 20)
     private String completionStatus = "ABANDONED";
 
     @Column(name = "completed_at")
