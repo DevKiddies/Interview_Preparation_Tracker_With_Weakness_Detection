@@ -123,6 +123,12 @@ function AdminLoginPage() {
             Not an admin?{" "}
             <Link
               to="/login"
+              onClick={(e) => {
+                if (localStorage.getItem("token")) {
+                  e.preventDefault();
+                  navigate("/dashboard");
+                }
+              }}
               className="text-blue-500 hover:underline font-medium"
             >
               Go to user login
