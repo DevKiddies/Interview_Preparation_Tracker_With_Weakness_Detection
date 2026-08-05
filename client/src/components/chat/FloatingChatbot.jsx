@@ -38,7 +38,6 @@ export default function FloatingChatbot() {
       const data = await ChatAPI.sendMessage(userText);
       setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: data.response, timestamp: new Date().toISOString() }]);
     } catch (error) {
-      // Log the error here to fix the linter warning and help with future debugging
       console.error("Chat API Error:", error); 
       setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: "Sorry, I couldn't connect to the server. Please try again later.", timestamp: new Date().toISOString() }]);
     } finally {
@@ -47,9 +46,9 @@ export default function FloatingChatbot() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-24 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end">
       {isOpen && (
-        <div className="w-[350px] sm:w-[400px] h-[550px] max-h-[80vh] mb-4 bg-slate-50 dark:bg-slate-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
+        <div className="w-[calc(100vw-2rem)] sm:w-[400px] h-[500px] sm:h-[550px] max-h-[70vh] sm:max-h-[80vh] mb-4 bg-slate-50 dark:bg-slate-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
           
           <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shadow-sm shrink-0">
             <div className="flex items-center gap-2">
@@ -90,7 +89,7 @@ export default function FloatingChatbot() {
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+        className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 shrink-0"
       >
         {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
       </button>
