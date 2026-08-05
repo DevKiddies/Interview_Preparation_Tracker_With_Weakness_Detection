@@ -109,9 +109,13 @@
         </dependency>
         <!-- Required to use WebClient for communicating with the Gemini AI API -->
         <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-webflux</artifactId>
-</dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

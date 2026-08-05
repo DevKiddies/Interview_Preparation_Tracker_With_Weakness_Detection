@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // Auth endpoints are public (login, register, OTP, OAuth callbacks)
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/auth/**").permitAll()
                         // Contact Us form — public, no login required to reach out
