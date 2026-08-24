@@ -183,18 +183,6 @@ public class AuthService {
             throw new UnauthorizedException("OTP already used");
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now()))
             throw new UnauthorizedException("OTP expired");
-        /* OLD CODE */
-        // verificationToken.setUsed(true);
-        // user.setIsVerified(true);
-        // String token = jwtUtil.generateToken(user);
-        // verificationTokenRepository.save(verificationToken);
-        // userRepository.save(user);
-        // //Save the login session for the user after successful OTP verification and
-        // login.
-        // // This enters a new record in the user_sessions table with loginTime set to
-        // now and logoutTime as null.
-        // userSessionService.startSession(user.getId());
-        // return new AuthResponse(token);
 
         // Mark the OTP as used and activate the account.
         // Since OTP verification also logs the user in, update lastActiveAt before
